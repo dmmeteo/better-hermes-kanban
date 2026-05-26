@@ -1,0 +1,22 @@
+services:
+  web:
+    image: nginx:alpine
+    container_name: better-hermes-kanban-web
+    restart: unless-stopped
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - proxy
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.better-hermes-kanban.rule: Host(`bhk.dmmeteo.dev`)
+      traefik.http.routers.better-hermes-kanban.entrypoints: websecure
+      traefik.http.routers.better-hermes-kanban.tls.certresolver: letsencrypt
+      traefik.http.routers.better-hermes-kanban.middlewares: infra-auth@docker
+      traefik.http.services.better-hermes-kanban.loadbalancer.server.port: "80"
+
+networks:
+  proxy:
+    external: true
