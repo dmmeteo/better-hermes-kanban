@@ -100,11 +100,20 @@ function normalizePriority(value: unknown): Priority {
 function normalizeBoard(raw: unknown, index = 0): Board {
   const item = isObject(raw) ? raw : {};
   const slug = asString(item.slug ?? item.id ?? item.name, `board-${index + 1}`);
+  const counts = isObject(item.counts)
+    ? Object.fromEntries(Object.entries(item.counts).map(([key, value]) => [key, asNumber(value)]))
+    : undefined;
   return {
     id: slug,
     name: asString(item.name ?? item.title ?? item.slug ?? item.id, slug),
-    taskCount: asNumber(item.task_count ?? item.taskCount ?? item.count ?? item.total, 0),
-    isDefault: Boolean(item.is_default ?? item.isDefault ?? item.default ?? index === 0),
+    taskCount: asNumber(item.task_count ?? item.taskCount ?? item.count ?? item.total, counts ? Object.values(counts).reduce((sum, count) => sum + count, 0) : 0),
+    isDefault: Boolean(item.is_default ?? item.isDefault ?? item.default ?? item.is_current ?? item.isCurrent ?? index === 0),
+    description: asString(item.description, ''),
+    icon: asString(item.icon, ''),
+    color: asString(item.color, ''),
+    archived: Boolean(item.archived),
+    counts,
+    isCurrent: Boolean(item.is_current ?? item.isCurrent),
   };
 }
 
@@ -303,6 +312,51 @@ export const kanbanApi = {
     const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}`);
     const rawTask = isObject(payload) && payload.task ? payload.task : payload;
     return normalizeTask(rawTask, 'current');
+  },
+
+  async createBoard(input: { slug: string; name?: string; description?: string; icon?: string; color?: string; defaultWorkdir?: string }): Promise<Board> {
+    const response = await requestJson<unknown>('/boards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slug: input.slug,
+        name: input.name,
+        description: input.description,
+        icon: input.icon,
+        color: input.color,
+        default_workdir: input.defaultWorkdir,
+      }),
+    });
+    return normalizeBoard(isObject(response) && response.board ? response.board : response);
+  },
+
+  async updateBoard(boardId: string, input: { name?: string; description?: string; icon?: string; color?: string; defaultWorkdir?: string }): Promise<Board> {
+    const response = await requestJson<unknown>(`/boards/${encodeURIComponent(boardId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: input.name,
+        description: input.description,
+        icon: input.icon,
+        color: input.color,
+        default_workdir: input.defaultWorkdir,
+      }),
+    });
+    return normalizeBoard(isObject(response) && response.board ? response.board : response);
+  },
+
+  async deleteBoard(boardId: string, options: { hardDelete?: boolean } = {}): Promise<void> {
+    const query = options.hardDelete ? '?delete=true' : '';
+    await requestJson<unknown>(`/boards/${encodeURIComponent(boardId)}${query}`, { method: 'DELETE' });
+  },
+
+  async switchBoard(boardId: string, options: { persist?: boolean } = {}): Promise<Board> {
+    const response = await requestJson<unknown>(`/boards/${encodeURIComponent(boardId)}/switch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persist: options.persist ?? true }),
+    });
+    return normalizeBoard(isObject(response) && response.board ? response.board : response, 0);
   },
 
   async createTask(): Promise<Task> {

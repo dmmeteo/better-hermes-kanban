@@ -20,6 +20,7 @@ import json
 import subprocess
 import sys
 import time
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -35,6 +36,8 @@ PORT = 9120
 HERMES = "/home/me/.hermes/hermes-agent/venv/bin/hermes"
 ALLOWED_UPDATE_FIELDS = {"status", "assignee", "priority", "title", "body"}
 ALLOWED_STATUSES = {"triage", "todo", "scheduled", "ready", "blocked", "done"}
+BOARD_UPDATE_FIELDS = {"name", "description", "icon", "color", "default_workdir"}
+BOARD_SEGMENT_RE = re.compile(r"^/api/plugins/kanban/boards/([^/]+)(?:/(switch))?$")
 
 
 def run_json(args: list[str]) -> object:
@@ -144,6 +147,55 @@ def set_status_direct(conn, task_id: str, status: str) -> bool:
 def board_list() -> dict:
     boards = run_json([HERMES, "kanban", "boards", "list", "--json"])
     return {"boards": boards}
+
+
+def create_board(payload: dict) -> dict:
+    slug = str(payload.get("slug") or "").strip()
+    if not slug:
+        raise ValueError("board slug is required")
+    board = kanban_db.create_board(
+        slug,
+        name=payload.get("name"),
+        description=payload.get("description"),
+        icon=payload.get("icon"),
+        color=payload.get("color"),
+        default_workdir=payload.get("default_workdir"),
+    )
+    return {"board": board}
+
+
+def update_board(slug: str, payload: dict) -> dict:
+    unknown = sorted(set(payload) - BOARD_UPDATE_FIELDS)
+    if unknown:
+        raise ValueError(f"Unsupported board field(s): {', '.join(unknown)}")
+    board = resolve_board(slug)
+    if not board or not kanban_db.board_exists(board):
+        return {"_status": 404, "detail": f"board {slug!r} not found"}
+    updated = kanban_db.write_board_metadata(
+        board,
+        name=payload.get("name") if "name" in payload else None,
+        description=payload.get("description") if "description" in payload else None,
+        icon=payload.get("icon") if "icon" in payload else None,
+        color=payload.get("color") if "color" in payload else None,
+        default_workdir=payload.get("default_workdir") if "default_workdir" in payload else None,
+    )
+    return {"board": updated}
+
+
+def remove_board(slug: str, *, hard_delete: bool = False) -> dict:
+    return {"result": kanban_db.remove_board(slug, archive=not hard_delete)}
+
+
+def switch_board(slug: str, payload: dict) -> dict:
+    board = resolve_board(slug)
+    if not board or not kanban_db.board_exists(board):
+        return {"_status": 404, "detail": f"board {slug!r} not found"}
+    persist = bool(payload.get("persist", True))
+    if persist:
+        kanban_db.set_current_board(board)
+    meta = kanban_db.read_board_metadata(board)
+    meta["is_current"] = persist or kanban_db.get_current_board() == board
+    return {"board": meta}
 
 
 def board_payload(slug: str | None) -> dict:
