@@ -147,7 +147,7 @@ function normalizeLinks(raw: unknown): LinkedTask[] {
 
 function normalizeTask(raw: unknown, boardId: string): Task {
   const item = isObject(raw) ? raw : {};
-  const id = asString(item.id ?? item.task_id ?? item.taskId, `task-${crypto.randomUUID()}`);
+  const id = asString(item.id ?? item.task_id ?? item.taskId, `task-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const body = asString(item.body ?? item.description ?? item.summary ?? item.result, '');
   const comments = Array.isArray(item.comments)
     ? item.comments.map((comment, index) => {
