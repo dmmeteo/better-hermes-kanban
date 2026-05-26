@@ -91,6 +91,12 @@ export interface Board {
   name: string;
   taskCount: number;
   isDefault: boolean;
+  description?: string;
+  icon?: string;
+  color?: string;
+  archived?: boolean;
+  counts?: Record<string, number>;
+  isCurrent?: boolean;
 }
 
 export interface UpdateTaskData {
