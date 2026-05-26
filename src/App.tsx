@@ -224,6 +224,8 @@ function App() {
         onTabChange={(tab) => {
           if (tab === 'boards') {
             handleCloseDetail();
+          } else if (tab === 'more') {
+            setIsBoardSettingsOpen(true);
           } else {
             toast.info(`${tab} coming soon`);
           }
