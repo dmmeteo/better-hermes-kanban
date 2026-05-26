@@ -1,7 +1,7 @@
 import type { Task } from '@/lib/types';
 import { TaskDetail } from './TaskDetail';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import type { TaskStatus } from '@/lib/types';
+import type { TaskStatus, UpdateTaskData } from '@/lib/types';
 
 interface TaskDetailSheetProps {
   task: Task | null;
@@ -14,6 +14,8 @@ interface TaskDetailSheetProps {
   onReclaim: () => void;
   onDecompose: () => void;
   onDelete: () => void;
+  onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  isUpdating?: boolean;
 }
 
 export function TaskDetailSheet({
@@ -27,6 +29,8 @@ export function TaskDetailSheet({
   onReclaim,
   onDecompose,
   onDelete,
+  onUpdateTask,
+  isUpdating = false,
 }: TaskDetailSheetProps) {
   if (!task) return null;
 
@@ -45,6 +49,8 @@ export function TaskDetailSheet({
           onReclaim={onReclaim}
           onDecompose={onDecompose}
           onDelete={onDelete}
+          onUpdateTask={onUpdateTask}
+          isUpdating={isUpdating}
         />
       </SheetContent>
     </Sheet>

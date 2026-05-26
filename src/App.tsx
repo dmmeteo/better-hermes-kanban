@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
-import type { Task, Board } from '@/lib/types';
+import type { Task, Board, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar } from '@/components/layout/TopBar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
@@ -24,6 +24,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -69,11 +70,36 @@ function App() {
     setIsMobileDetailOpen(false);
   }, []);
 
-  const handleStatusChange = useCallback(
-    async () => {
-      toast.info('Read-only mode: task status changes are disabled in this MVP');
+  const updateSelectedTask = useCallback(
+    async (patch: UpdateTaskData) => {
+      if (!selectedTask || !activeBoard) return;
+      if (patch.status === 'running') {
+        toast.error('Running status is dispatcher-owned and cannot be set manually');
+        return;
+      }
+      if (patch.status && !window.confirm(`Apply status change to ${patch.status} for ${selectedTask.id}?`)) {
+        return;
+      }
+      try {
+        setUpdatingTaskId(selectedTask.id);
+        const updated = await kanbanApi.updateTask(selectedTask.id, patch, activeBoard.id);
+        setTasks((current) => current.map((task) => (task.id === updated.id ? { ...task, ...updated } : task)));
+        toast.success('Task updated');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to update task';
+        toast.error(message);
+      } finally {
+        setUpdatingTaskId(null);
+      }
     },
-    []
+    [activeBoard, selectedTask]
+  );
+
+  const handleStatusChange = useCallback(
+    async (status: TaskStatus) => {
+      await updateSelectedTask({ status });
+    },
+    [updateSelectedTask]
   );
 
   const handleBlock = useCallback(async () => {
@@ -190,6 +216,8 @@ function App() {
               onReclaim={handleReclaim}
               onDecompose={handleDecompose}
               onDelete={handleDelete}
+              onUpdateTask={updateSelectedTask}
+              isUpdating={updatingTaskId === selectedTask.id}
             />
           </div>
         ) : (
@@ -240,6 +268,8 @@ function App() {
           onReclaim={handleReclaim}
           onDecompose={handleDecompose}
           onDelete={handleDelete}
+          onUpdateTask={updateSelectedTask}
+          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
         />
       </div>
 

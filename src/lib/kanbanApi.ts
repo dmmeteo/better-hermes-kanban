@@ -8,6 +8,7 @@ import type {
   TaskActivity,
   LinkedTask,
   TaskRun,
+  UpdateTaskData,
 } from './types';
 import { mockTasks, boards as mockBoards, BOT_PROFILES } from '@/data/mockTasks';
 
@@ -73,6 +74,13 @@ function toIso(value: unknown): string {
 function normalizeStatus(value: unknown): TaskStatus {
   const status = asString(value, 'todo').toLowerCase() as TaskStatus;
   return ALL_STATUSES.includes(status) ? status : 'todo';
+}
+
+function priorityToNative(priority: Priority): number {
+  if (priority === 'p0') return 100;
+  if (priority === 'p1') return 90;
+  if (priority === 'p3') return 10;
+  return 50;
 }
 
 function normalizePriority(value: unknown): Priority {
@@ -301,8 +309,22 @@ export const kanbanApi = {
     throw new KanbanApiError('Read-only mode: task creation is disabled in this MVP');
   },
 
-  async updateTask(): Promise<Task> {
-    throw new KanbanApiError('Read-only mode: task updates are disabled in this MVP');
+  async updateTask(taskId: string, data: UpdateTaskData, boardId?: string): Promise<Task> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const payload: Record<string, unknown> = {};
+    if (data.status !== undefined) payload.status = data.status;
+    if (data.assignee !== undefined) payload.assignee = data.assignee || '';
+    if (data.priority !== undefined) payload.priority = priorityToNative(data.priority);
+    if (data.title !== undefined) payload.title = data.title;
+    if (data.description !== undefined) payload.body = data.description;
+
+    const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const rawTask = isObject(response) && response.task ? response.task : response;
+    return normalizeTask(rawTask, boardId || 'current');
   },
 
   async deleteTask(): Promise<void> {

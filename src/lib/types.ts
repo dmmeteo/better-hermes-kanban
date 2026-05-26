@@ -93,6 +93,14 @@ export interface Board {
   isDefault: boolean;
 }
 
+export interface UpdateTaskData {
+  title?: string;
+  description?: string;
+  priority?: Priority;
+  assignee?: string | null;
+  status?: TaskStatus;
+}
+
 export interface CreateTaskData {
   title: string;
   description?: string;
