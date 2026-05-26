@@ -11,9 +11,10 @@ interface TaskCardProps {
   task: Task;
   onClick: (task: Task) => void;
   isOverlay?: boolean;
+  readOnly?: boolean;
 }
 
-export function TaskCard({ task, onClick, isOverlay = false }: TaskCardProps) {
+export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -24,7 +25,7 @@ export function TaskCard({ task, onClick, isOverlay = false }: TaskCardProps) {
   } = useSortable({
     id: task.id,
     data: { task },
-    disabled: task.status === 'running',
+    disabled: task.status === 'running' || readOnly,
   });
 
   const style = {
@@ -43,11 +44,12 @@ export function TaskCard({ task, onClick, isOverlay = false }: TaskCardProps) {
       {...listeners}
       onClick={() => !isDragging && onClick(task)}
       className={cn(
-        'relative bg-card border border-border/60 rounded-lg p-3.5 cursor-grab',
+        'relative bg-card border border-border/60 rounded-lg p-3.5',
+        readOnly ? 'cursor-pointer' : 'cursor-grab',
+        readOnly ? 'active:cursor-pointer' : 'active:cursor-grabbing active:scale-[0.98]',
         'flex flex-col gap-2',
         'transition-all duration-150',
         'hover:border-border hover:-translate-y-0.5 hover:shadow-lg',
-        'active:cursor-grabbing active:scale-[0.98]',
         isDragging && 'opacity-40',
         isOverlay && 'opacity-85 rotate-[2deg] shadow-2xl cursor-grabbing',
         isRunning && 'running-card cursor-default',
@@ -84,7 +86,7 @@ export function TaskCard({ task, onClick, isOverlay = false }: TaskCardProps) {
               {task.linkCount}
             </span>
           )}
-          {!isOverlay && (
+          {!isOverlay && !readOnly && (
             <GripVertical size={14} className="text-muted-foreground/40 cursor-grab" />
           )}
         </div>

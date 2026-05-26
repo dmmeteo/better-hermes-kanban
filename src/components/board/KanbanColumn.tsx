@@ -11,13 +11,14 @@ interface KanbanColumnProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onAddTask?: (status: TaskStatus) => void;
+  readOnly?: boolean;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onAddTask }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false }: KanbanColumnProps) {
   const isRunning = status === 'running';
   const { setNodeRef, isOver } = useDroppable({
     id: status,
-    disabled: isRunning,
+    disabled: isRunning || readOnly,
     data: { status },
   });
 
@@ -52,14 +53,14 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask }: KanbanCo
           <span className="text-[11px] text-muted-foreground font-medium">
             {tasks.length}
           </span>
-          {isRunning && (
+          {(isRunning || readOnly) && (
             <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
               <Lock size={10} />
               read-only
             </span>
           )}
         </div>
-        {!isRunning && (
+        {!isRunning && !readOnly && (
           <button
             onClick={() => onAddTask?.(status)}
             className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
@@ -101,7 +102,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask }: KanbanCo
         </SortableContext>
 
         {/* Empty state */}
-        {tasks.length === 0 && !isRunning && (
+        {tasks.length === 0 && !isRunning && !readOnly && (
           <button
             onClick={() => onAddTask?.(status)}
             className="w-full py-6 rounded-lg border border-dashed border-border/50 text-muted-foreground text-xs hover:border-border hover:bg-accent/50 transition-colors"

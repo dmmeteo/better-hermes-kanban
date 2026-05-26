@@ -23,6 +23,7 @@ interface DesktopKanbanBoardProps {
   onTasksChange: (tasks: Task[]) => void;
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
+  readOnly?: boolean;
 }
 
 export function DesktopKanbanBoard({
@@ -31,6 +32,7 @@ export function DesktopKanbanBoard({
   onTasksChange,
   onAddTask,
   searchQuery,
+  readOnly = false,
 }: DesktopKanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -61,10 +63,16 @@ export function DesktopKanbanBoard({
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
+    if (readOnly) return;
     setActiveId(event.active.id as string);
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    if (readOnly) {
+      setActiveId(null);
+      toast.info('Read-only mode: drag/drop updates are disabled in this MVP');
+      return;
+    }
     const { active, over } = event;
     setActiveId(null);
 
@@ -165,6 +173,7 @@ export function DesktopKanbanBoard({
             tasks={tasksByStatus[status] || []}
             onTaskClick={onTaskClick}
             onAddTask={onAddTask}
+            readOnly={readOnly}
           />
         ))}
       </div>

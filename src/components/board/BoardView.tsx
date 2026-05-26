@@ -42,6 +42,7 @@ export function BoardView({
           onTasksChange={onTasksChange}
           onAddTask={onAddTask}
           searchQuery={searchQuery}
+          readOnly
         />
       </div>
     </>

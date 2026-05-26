@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
-import type { Task, Board, TaskStatus, Priority } from '@/lib/types';
+import type { Task, Board } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar } from '@/components/layout/TopBar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
@@ -22,20 +22,28 @@ function App() {
   const [isBoardSettingsOpen, setIsBoardSettingsOpen] = useState(false);
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Load initial data
   useEffect(() => {
     async function load() {
       try {
-        const [boardData, boardsData] = await Promise.all([
-          kanbanApi.getBoard(),
-          kanbanApi.getBoards(),
-        ]);
+        const boardsResult = await kanbanApi.getBoards();
+        const preferredBoard =
+          boardsResult.boards.find((board) => board.id === 'better-hermes-kanban') ||
+          boardsResult.boards.find((board) => board.isDefault) ||
+          boardsResult.boards[0];
+        const boardData = await kanbanApi.getBoard(preferredBoard?.id);
         setTasks(boardData.tasks);
-        setBoards(boardsData);
+        setBoards(boardsResult.boards);
         setActiveBoard(boardData.board);
-      } catch {
-        toast.error('Failed to load board data');
+        setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
+        setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load board data';
+        setLoadError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
@@ -62,119 +70,40 @@ function App() {
   }, []);
 
   const handleStatusChange = useCallback(
-    async (newStatus: TaskStatus) => {
-      if (!selectedTaskId) return;
-      try {
-        const updated = await kanbanApi.updateTask(selectedTaskId, { status: newStatus });
-        setTasks((prev) => prev.map((t) => (t.id === selectedTaskId ? updated : t)));
-        toast.success(`Status changed to ${newStatus}`);
-      } catch {
-        toast.error('Failed to update status');
-      }
+    async () => {
+      toast.info('Read-only mode: task status changes are disabled in this MVP');
     },
-    [selectedTaskId]
+    []
   );
 
   const handleBlock = useCallback(async () => {
-    if (!selectedTaskId) return;
-    try {
-      const updated = await kanbanApi.blockTask(selectedTaskId, 'Blocked by user');
-      setTasks((prev) => prev.map((t) => (t.id === selectedTaskId ? updated : t)));
-      toast.success('Task blocked');
-    } catch {
-      toast.error('Failed to block task');
-    }
-  }, [selectedTaskId]);
+    toast.info('Read-only mode: task actions are disabled in this MVP');
+  }, []);
 
   const handleReclaim = useCallback(async () => {
-    if (!selectedTaskId) return;
-    try {
-      const updated = await kanbanApi.reclaimTask(selectedTaskId);
-      setTasks((prev) => prev.map((t) => (t.id === selectedTaskId ? updated : t)));
-      toast.success('Task reclaimed');
-    } catch {
-      toast.error('Failed to reclaim task');
-    }
-  }, [selectedTaskId]);
+    toast.info('Read-only mode: task actions are disabled in this MVP');
+  }, []);
 
   const handleDecompose = useCallback(async () => {
-    if (!selectedTaskId) return;
-    try {
-      const subtasks = await kanbanApi.decomposeTask(selectedTaskId);
-      setTasks((prev) => [...prev, ...subtasks]);
-      toast.success(`Created ${subtasks.length} subtasks`);
-    } catch {
-      toast.error('Failed to decompose task');
-    }
-  }, [selectedTaskId]);
+    toast.info('Read-only mode: task actions are disabled in this MVP');
+  }, []);
 
   const handleDelete = useCallback(async () => {
-    if (!selectedTaskId) return;
-    try {
-      await kanbanApi.deleteTask(selectedTaskId);
-      setTasks((prev) => prev.filter((t) => t.id !== selectedTaskId));
-      handleCloseDetail();
-      toast.success('Task deleted');
-    } catch {
-      toast.error('Failed to delete task');
-    }
-  }, [selectedTaskId, handleCloseDetail]);
+    toast.info('Read-only mode: task deletion is disabled in this MVP');
+  }, []);
 
   const handleCreateTask = useCallback(
-    async (data: {
-      title: string;
-      description: string;
-      priority: Priority;
-      assignee: string | null;
-      status: TaskStatus;
-    }) => {
-      try {
-        const newTask = await kanbanApi.createTask({
-          title: data.title,
-          description: data.description,
-          priority: data.priority,
-          assignee: data.assignee,
-          status: data.status,
-        });
-        setTasks((prev) => [...prev, newTask]);
-        setIsQuickCaptureOpen(false);
-        toast.success('Task created');
-      } catch {
-        toast.error('Failed to create task');
-      }
+    async () => {
+      toast.info('Read-only mode: task creation is disabled in this MVP');
     },
     []
   );
 
   const handleAddComment = useCallback(
-    async (text: string) => {
-      if (!selectedTaskId) return;
-      try {
-        await kanbanApi.addComment(selectedTaskId, text);
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === selectedTaskId
-              ? {
-                  ...t,
-                  commentCount: t.commentCount + 1,
-                  comments: [
-                    ...t.comments,
-                    {
-                      id: `c-${Date.now()}`,
-                      author: 'user',
-                      text,
-                      createdAt: new Date().toISOString(),
-                    },
-                  ],
-                }
-              : t
-          )
-        );
-      } catch {
-        toast.error('Failed to add comment');
-      }
+    async () => {
+      toast.info('Read-only mode: comments are disabled in this MVP');
     },
-    [selectedTaskId]
+    []
   );
 
   const handleBoardChange = useCallback(
@@ -184,6 +113,9 @@ function App() {
         const data = await kanbanApi.getBoard(board.id);
         setTasks(data.tasks);
         setActiveBoard(data.board);
+        setDataSource(data.source);
+        setLoadError(data.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+        setSelectedTaskId(null);
       } catch {
         toast.error('Failed to switch board');
       } finally {
@@ -232,9 +164,15 @@ function App() {
         onBoardChange={handleBoardChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+        onOpenQuickCapture={() => toast.info('Read-only mode: task creation is disabled in this MVP')}
         onOpenSettings={() => setIsBoardSettingsOpen(true)}
       />
+
+      {(dataSource === 'fallback' || loadError) && (
+        <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+          {loadError || 'Showing offline demo data.'}
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
@@ -263,9 +201,9 @@ function App() {
               activeBoard={activeBoard}
               onBoardChange={handleBoardChange}
               onTaskClick={handleTaskClick}
-              onTasksChange={setTasks}
+              onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => {
-                setIsQuickCaptureOpen(true);
+                toast.info('Read-only mode: task creation is disabled in this MVP');
               }}
               searchQuery={searchQuery}
             />
@@ -286,7 +224,7 @@ function App() {
             toast.info(`${tab} coming soon`);
           }
         }}
-        onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+        onOpenQuickCapture={() => toast.info('Read-only mode: task creation is disabled in this MVP')}
       />
 
       {/* Desktop Task Detail Sheet */}
