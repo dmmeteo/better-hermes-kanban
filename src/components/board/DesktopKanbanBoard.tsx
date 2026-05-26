@@ -165,7 +165,7 @@ export function DesktopKanbanBoard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pt-3 pb-4 h-full items-start">
+      <div className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden custom-scrollbar px-4 pt-3 pb-4 items-stretch">
         {STATUS_ORDER.map((status) => (
           <KanbanColumn
             key={status}

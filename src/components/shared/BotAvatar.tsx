@@ -33,7 +33,7 @@ export function BotAvatar({ name, size = 'sm', className }: BotAvatarProps) {
       >
         <Bot size={iconSize} style={{ color: '#7C5CFF' }} />
       </span>
-      <span className="text-xs text-muted-foreground">Bot: {name}</span>
+      <span className="text-xs text-muted-foreground/90">Bot: {name}</span>
     </span>
   );
 }

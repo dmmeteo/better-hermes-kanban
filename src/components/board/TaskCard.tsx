@@ -25,7 +25,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
   } = useSortable({
     id: task.id,
     data: { task },
-    disabled: task.status === 'running' || readOnly,
+    disabled: task.status === 'running',
   });
 
   const style = {
@@ -40,11 +40,11 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
+      {...(!readOnly ? attributes : {})}
+      {...(!readOnly ? listeners : {})}
       onClick={() => !isDragging && onClick(task)}
       className={cn(
-        'relative bg-card border border-border/60 rounded-lg p-3.5',
+        'relative bg-secondary/80 text-card-foreground border border-border/80 rounded-lg p-3.5',
         readOnly ? 'cursor-pointer' : 'cursor-grab',
         readOnly ? 'active:cursor-pointer' : 'active:cursor-grabbing active:scale-[0.98]',
         'flex flex-col gap-2',
@@ -93,18 +93,18 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
       </div>
 
       {/* Title */}
-      <h4 className="text-sm font-semibold text-foreground leading-snug pl-1 line-clamp-2">
+      <h4 className="text-sm font-semibold text-[#F4F7FB] leading-snug pl-1 line-clamp-2">
         {task.title}
       </h4>
 
       {/* Assignee */}
       <div className="pl-1">
-        <BotAvatar name={task.assignee} size="sm" />
+        <BotAvatar name={task.assignee} size="sm" className="text-muted-foreground/90" />
       </div>
 
       {/* Summary preview */}
       {task.latestSummary && (
-        <p className="text-[11px] text-muted-foreground leading-relaxed pl-1 line-clamp-2">
+        <p className="text-[11px] text-muted-foreground/90 leading-relaxed pl-1 line-clamp-2">
           {task.latestSummary}
         </p>
       )}

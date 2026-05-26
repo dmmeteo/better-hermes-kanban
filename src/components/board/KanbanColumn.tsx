@@ -28,7 +28,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
   return (
     <div
       className={cn(
-        'flex-shrink-0 w-[300px] flex flex-col rounded-xl border',
+        'flex-shrink-0 w-[300px] h-full min-h-0 flex flex-col rounded-xl border',
         'bg-card/50 backdrop-blur-sm',
         'transition-colors duration-200',
         isOver && !isRunning && 'border-dashed',
@@ -74,7 +74,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 p-2 min-h-[120px]',
+          'flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2',
           isRunning && 'relative'
         )}
       >
@@ -96,6 +96,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
                 key={task.id}
                 task={task}
                 onClick={onTaskClick}
+                readOnly={readOnly}
               />
             ))}
           </div>
