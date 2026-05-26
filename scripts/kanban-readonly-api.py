@@ -41,6 +41,19 @@ PORT = 9120
 HERMES = "/home/me/.hermes/hermes-agent/venv/bin/hermes"
 ALLOWED_UPDATE_FIELDS = {"status", "assignee", "priority", "title", "body"}
 ALLOWED_STATUSES = {"triage", "todo", "scheduled", "ready", "blocked", "done"}
+ALLOWED_CREATE_FIELDS = {
+    "title",
+    "body",
+    "description",
+    "assignee",
+    "priority",
+    "status",
+    "parents",
+    "parent_ids",
+    "workspace_kind",
+    "workspace_path",
+}
+ALLOWED_WORKSPACE_KINDS = {"scratch", "dir", "worktree"}
 BOARD_UPDATE_FIELDS = {"name", "description", "icon", "color", "default_workdir"}
 BOARD_SEGMENT_RE = re.compile(r"^/api/plugins/kanban/boards/([^/]+)(?:/(switch))?$")
 SAFE_ORCHESTRATION_FIELDS = {
@@ -78,6 +91,88 @@ def task_to_dict(task: object, board: str | None) -> dict:
     if board:
         data.setdefault("board", board)
     return data
+
+
+def priority_from_payload(value: object, default: int = 50) -> int:
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        if raw in {"p0", "critical"}:
+            return 100
+        if raw in {"p1", "high"}:
+            return 90
+        if raw in {"p2", "medium"}:
+            return 50
+        if raw in {"p3", "low"}:
+            return 10
+    try:
+        priority = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("priority must be P0/P1/P2/P3 or a numeric value")
+    if priority < 0 or priority > 1000:
+        raise ValueError("priority must be between 0 and 1000")
+    return priority
+
+
+def create_task(payload: dict, slug: str | None) -> dict:
+    unknown = sorted(set(payload) - ALLOWED_CREATE_FIELDS)
+    if unknown:
+        raise ValueError(f"Unsupported create field(s): {', '.join(unknown)}")
+    board = resolve_board(slug)
+    title = str(payload.get("title") or "").strip()
+    if not title:
+        raise ValueError("title is required")
+    if len(title) > 240:
+        raise ValueError("title must be 240 characters or less")
+    body = str(payload.get("body", payload.get("description", "")) or "").strip()
+    if len(body) > 20000:
+        raise ValueError("body must be 20000 characters or less")
+    assignee = str(payload.get("assignee") or "").strip() or None
+    if assignee and not profile_exists(assignee):
+        raise ValueError(f"profile {assignee!r} does not exist")
+    status = str(payload.get("status") or "triage").strip().lower()
+    if status not in {"triage", "todo", "scheduled", "ready", "blocked"}:
+        raise ValueError("status must be one of triage, todo, scheduled, ready, blocked")
+    workspace_kind = str(payload.get("workspace_kind") or "scratch").strip().lower()
+    if workspace_kind not in ALLOWED_WORKSPACE_KINDS:
+        raise ValueError("workspace_kind must be one of scratch, dir, worktree")
+    workspace_path = str(payload.get("workspace_path") or "").strip() or None
+    if workspace_path and not Path(workspace_path).is_absolute():
+        raise ValueError("workspace_path must be absolute when provided")
+    parents_raw = payload.get("parents", payload.get("parent_ids", []))
+    if parents_raw is None:
+        parents: list[str] = []
+    elif isinstance(parents_raw, list):
+        parents = [str(parent).strip() for parent in parents_raw if str(parent).strip()]
+    else:
+        raise ValueError("parents must be a list of task ids")
+
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        task_id = kanban_db.create_task(
+            conn,
+            title=title,
+            body=body,
+            assignee=assignee,
+            created_by="bhk",
+            workspace_kind=workspace_kind,
+            workspace_path=workspace_path,
+            priority=priority_from_payload(payload.get("priority"), 50),
+            parents=parents,
+            triage=status == "triage",
+            initial_status="blocked" if status == "blocked" else "running",
+            board=board,
+        )
+        if status == "scheduled":
+            kanban_db.schedule_task(conn, task_id, reason="Scheduled from BHK guarded create")
+        elif status in {"todo", "ready"}:
+            set_status_direct(conn, task_id, status)
+        task = kanban_db.get_task(conn, task_id)
+        return {"task": task_to_dict(task, board)}
+    finally:
+        conn.close()
 
 
 def update_task(task_id: str, payload: dict, slug: str | None) -> dict:
@@ -346,6 +441,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/plugins/kanban/boards":
                 self.send_json(201, create_board(self.read_json_body()))
+                return
+            if parsed.path == "/api/plugins/kanban/tasks":
+                qs = parse_qs(parsed.query)
+                result = create_task(self.read_json_body(), (qs.get("board") or [None])[0])
+                status = int(result.pop("_status", 201))
+                self.send_json(status, result)
                 return
             match = BOARD_SEGMENT_RE.match(parsed.path)
             if match and match.group(2) == "switch":

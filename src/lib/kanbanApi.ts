@@ -11,6 +11,7 @@ import type {
   LinkedTask,
   TaskRun,
   UpdateTaskData,
+  CreateTaskData,
 } from './types';
 import { mockTasks, boards as mockBoards, BOT_PROFILES } from '@/data/mockTasks';
 
@@ -403,8 +404,24 @@ export const kanbanApi = {
     return normalizeBoard(isObject(response) && response.board ? response.board : response, 0);
   },
 
-  async createTask(): Promise<Task> {
-    throw new KanbanApiError('Read-only mode: task creation is disabled in this MVP');
+  async createTask(data: CreateTaskData, boardId?: string): Promise<Task> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const response = await requestJson<unknown>(`/tasks${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: data.title,
+        body: data.description ?? '',
+        priority: priorityToNative(data.priority),
+        assignee: data.assignee || '',
+        status: data.status,
+        parent_ids: data.parentIds ?? [],
+        workspace_kind: data.workspaceKind ?? 'scratch',
+        workspace_path: data.workspacePath?.trim() || undefined,
+      }),
+    });
+    const rawTask = isObject(response) && response.task ? response.task : response;
+    return normalizeTask(rawTask, boardId || 'current');
   },
 
   async updateTask(taskId: string, data: UpdateTaskData, boardId?: string): Promise<Task> {
@@ -466,9 +483,10 @@ export const kanbanApi = {
     }
   },
 
-  async getAssignees(): Promise<BotProfile[]> {
+  async getAssignees(boardId?: string): Promise<BotProfile[]> {
     try {
-      const payload = await requestJson<unknown>('/assignees');
+      const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+      const payload = await requestJson<unknown>(`/assignees${query}`);
       const rawAssignees = Array.isArray(payload)
         ? payload
         : isObject(payload) && Array.isArray(payload.assignees)

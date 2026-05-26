@@ -142,6 +142,8 @@ export interface CreateTaskData {
   assignee?: string | null;
   status: TaskStatus;
   parentIds?: string[];
+  workspaceKind?: 'scratch' | 'dir' | 'worktree';
+  workspacePath?: string;
 }
 
 export const STATUS_ORDER: TaskStatus[] = [

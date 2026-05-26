@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bot, ChevronDown } from 'lucide-react';
-import type { Priority, TaskStatus } from '@/lib/types';
+import type { BotProfile, CreateTaskData, Priority, TaskStatus } from '@/lib/types';
 import { BOT_PROFILES } from '@/lib/types';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
@@ -15,13 +15,10 @@ import { toast } from 'sonner';
 interface TaskQuickCaptureProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (data: {
-    title: string;
-    description: string;
-    priority: Priority;
-    assignee: string | null;
-    status: TaskStatus;
-  }) => void;
+  onCreate: (data: CreateTaskData) => void | Promise<void>;
+  assignees?: BotProfile[];
+  isSubmitting?: boolean;
+  boardName?: string;
   isMobile?: boolean;
 }
 
@@ -39,38 +36,53 @@ const statusOptions: { value: TaskStatus; label: string; color: string }[] = [
   { value: 'ready', label: 'Ready', color: '#10B981' },
 ];
 
-export function TaskQuickCapture({ open, onClose, onCreate, isMobile = false }: TaskQuickCaptureProps) {
+export function TaskQuickCapture({ open, onClose, onCreate, assignees = BOT_PROFILES, isSubmitting = false, boardName, isMobile = false }: TaskQuickCaptureProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('p2');
-  const [assignee, setAssignee] = useState<string>('log-analyzer');
+  const [assignee, setAssignee] = useState<string>('');
   const [status, setStatus] = useState<TaskStatus>('triage');
+  const [workspaceKind, setWorkspaceKind] = useState<CreateTaskData['workspaceKind']>('scratch');
+  const [workspacePath, setWorkspacePath] = useState('');
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!title.trim()) {
       toast.error('Title is required');
       return;
     }
-    onCreate({
+    if (workspacePath.trim() && !workspacePath.trim().startsWith('/')) {
+      toast.error('Workspace path must be absolute');
+      return;
+    }
+    await onCreate({
       title: title.trim(),
       description: description.trim(),
       priority,
       assignee: assignee || null,
       status,
+      workspaceKind,
+      workspacePath: workspacePath.trim() || undefined,
     });
     // Reset form
     setTitle('');
     setDescription('');
     setPriority('p2');
-    setAssignee('log-analyzer');
+    setAssignee('');
     setStatus('triage');
+    setWorkspaceKind('scratch');
+    setWorkspacePath('');
   };
 
   const formContent = (
     <div className="space-y-4">
+      {boardName && (
+        <div className="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
+          Creating on real board: <span className="text-foreground">{boardName}</span>
+        </div>
+      )}
       {/* Title */}
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-muted-foreground">Title</label>
@@ -117,7 +129,7 @@ export function TaskQuickCapture({ open, onClose, onCreate, isMobile = false }: 
             >
               <span className="text-muted-foreground">Auto / no assignee</span>
             </button>
-            {BOT_PROFILES.map((bot) => (
+            {assignees.map((bot) => (
               <button
                 key={bot.id}
                 onClick={() => { setAssignee(bot.name); setShowAssigneeDropdown(false); }}
@@ -169,6 +181,32 @@ export function TaskQuickCapture({ open, onClose, onCreate, isMobile = false }: 
         )}
       </div>
 
+      {/* Workspace */}
+      <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-3">
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Workspace</label>
+          <select
+            value={workspaceKind}
+            onChange={(event) => setWorkspaceKind(event.target.value as CreateTaskData['workspaceKind'])}
+            className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+          >
+            <option value="scratch">Scratch</option>
+            <option value="dir">Shared dir</option>
+            <option value="worktree">Worktree</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Path (optional)</label>
+          <input
+            type="text"
+            value={workspacePath}
+            onChange={(event) => setWorkspacePath(event.target.value)}
+            placeholder="/absolute/path or board default"
+            className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground/50"
+          />
+        </div>
+      </div>
+
       {/* Status */}
       <div className="space-y-1.5 relative">
         <label className="text-xs font-medium text-muted-foreground">Status</label>
@@ -207,11 +245,11 @@ export function TaskQuickCapture({ open, onClose, onCreate, isMobile = false }: 
       {/* Create button */}
       <button
         onClick={handleCreate}
-        disabled={!title.trim()}
+        disabled={!title.trim() || isSubmitting}
         className="w-full py-3 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ backgroundColor: '#7C5CFF' }}
       >
-        Create task
+        {isSubmitting ? 'Creating...' : 'Create task'}
       </button>
     </div>
   );
