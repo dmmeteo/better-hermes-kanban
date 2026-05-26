@@ -16,6 +16,7 @@ interface TaskDetailSheetProps {
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
   isUpdating?: boolean;
+  isMobile?: boolean;
 }
 
 export function TaskDetailSheet({
@@ -31,6 +32,7 @@ export function TaskDetailSheet({
   onDelete,
   onUpdateTask,
   isUpdating = false,
+  isMobile = false,
 }: TaskDetailSheetProps) {
   if (!task) return null;
 
@@ -38,11 +40,13 @@ export function TaskDetailSheet({
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:w-[480px] p-0 border-l border-border bg-background"
+        className="!w-screen !max-w-none p-0 border-l border-border bg-background md:!w-[50vw] md:!max-w-none"
       >
         <TaskDetail
           task={task}
           allTasks={allTasks}
+          isMobile={isMobile}
+          onBack={onClose}
           onStatusChange={onStatusChange}
           onAddComment={onAddComment}
           onBlock={onBlock}

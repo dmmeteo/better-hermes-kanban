@@ -21,7 +21,12 @@ import subprocess
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+HERMES_REPO = Path("/home/me/.hermes/hermes-agent")
+if str(HERMES_REPO) not in sys.path:
+    sys.path.insert(0, str(HERMES_REPO))
 
 from hermes_cli import kanban_db
 

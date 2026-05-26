@@ -6,10 +6,10 @@ import { TopBar } from '@/components/layout/TopBar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
-import { TaskDetail } from '@/components/task/TaskDetail';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
+import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
 function App() {
@@ -20,11 +20,11 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isBoardSettingsOpen, setIsBoardSettingsOpen] = useState(false);
-  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   // Load initial data
   useEffect(() => {
@@ -59,15 +59,10 @@ function App() {
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTaskId(task.id);
-    // Only open mobile full-screen detail on small screens
-    if (window.innerWidth < 768) {
-      setIsMobileDetailOpen(true);
-    }
   }, []);
 
   const handleCloseDetail = useCallback(() => {
     setSelectedTaskId(null);
-    setIsMobileDetailOpen(false);
   }, []);
 
   const updateSelectedTask = useCallback(
@@ -202,41 +197,20 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
-        {/* Mobile detail view */}
-        {isMobileDetailOpen && selectedTask ? (
-          <div className="md:hidden h-full">
-            <TaskDetail
-              task={selectedTask}
-              allTasks={tasks}
-              isMobile
-              onBack={handleCloseDetail}
-              onStatusChange={handleStatusChange}
-              onAddComment={handleAddComment}
-              onBlock={handleBlock}
-              onReclaim={handleReclaim}
-              onDecompose={handleDecompose}
-              onDelete={handleDelete}
-              onUpdateTask={updateSelectedTask}
-              isUpdating={updatingTaskId === selectedTask.id}
-            />
-          </div>
-        ) : (
-          /* Board view */
-          <div className="h-full">
-            <BoardView
-              tasks={tasks}
-              boards={boards}
-              activeBoard={activeBoard}
-              onBoardChange={handleBoardChange}
-              onTaskClick={handleTaskClick}
-              onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
-              onAddTask={() => {
-                toast.info('Read-only mode: task creation is disabled in this MVP');
-              }}
-              searchQuery={searchQuery}
-            />
-          </div>
-        )}
+        <div className="h-full">
+          <BoardView
+            tasks={tasks}
+            boards={boards}
+            activeBoard={activeBoard}
+            onBoardChange={handleBoardChange}
+            onTaskClick={handleTaskClick}
+            onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
+            onAddTask={() => {
+              toast.info('Read-only mode: task creation is disabled in this MVP');
+            }}
+            searchQuery={searchQuery}
+          />
+        </div>
       </main>
 
       {/* Desktop Footer Bar */}
@@ -255,23 +229,22 @@ function App() {
         onOpenQuickCapture={() => toast.info('Read-only mode: task creation is disabled in this MVP')}
       />
 
-      {/* Desktop Task Detail Sheet */}
-      <div className="hidden md:block">
-        <TaskDetailSheet
-          task={selectedTask}
-          allTasks={tasks}
-          open={!!selectedTaskId && !isMobileDetailOpen}
-          onClose={handleCloseDetail}
-          onStatusChange={handleStatusChange}
-          onAddComment={handleAddComment}
-          onBlock={handleBlock}
-          onReclaim={handleReclaim}
-          onDecompose={handleDecompose}
-          onDelete={handleDelete}
-          onUpdateTask={updateSelectedTask}
-          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
-        />
-      </div>
+      {/* Task Detail Drawer: half-screen on desktop, full-screen on mobile */}
+      <TaskDetailSheet
+        task={selectedTask}
+        allTasks={tasks}
+        open={!!selectedTaskId}
+        onClose={handleCloseDetail}
+        onStatusChange={handleStatusChange}
+        onAddComment={handleAddComment}
+        onBlock={handleBlock}
+        onReclaim={handleReclaim}
+        onDecompose={handleDecompose}
+        onDelete={handleDelete}
+        onUpdateTask={updateSelectedTask}
+        isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+        isMobile={isMobile}
+      />
 
       {/* Quick Capture */}
       <div className="md:hidden">
