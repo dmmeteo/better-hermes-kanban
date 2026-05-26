@@ -8,6 +8,10 @@ Endpoints:
 - GET /healthz
 - GET /api/plugins/kanban/boards
 - GET /api/plugins/kanban/board?board=<slug>
+- GET /api/plugins/kanban/profiles
+- GET /api/plugins/kanban/assignees
+- GET /api/plugins/kanban/orchestration
+- PUT /api/plugins/kanban/orchestration
 - PATCH /api/plugins/kanban/tasks/<id>?board=<slug>
 
 The data source is the Hermes Kanban CLI/SQLite board layer. This is a
@@ -30,6 +34,7 @@ if str(HERMES_REPO) not in sys.path:
     sys.path.insert(0, str(HERMES_REPO))
 
 from hermes_cli import kanban_db
+from hermes_cli.config import load_config, save_config
 
 HOST = "172.17.0.1"
 PORT = 9120
@@ -38,6 +43,19 @@ ALLOWED_UPDATE_FIELDS = {"status", "assignee", "priority", "title", "body"}
 ALLOWED_STATUSES = {"triage", "todo", "scheduled", "ready", "blocked", "done"}
 BOARD_UPDATE_FIELDS = {"name", "description", "icon", "color", "default_workdir"}
 BOARD_SEGMENT_RE = re.compile(r"^/api/plugins/kanban/boards/([^/]+)(?:/(switch))?$")
+SAFE_ORCHESTRATION_FIELDS = {
+    "orchestrator_profile",
+    "default_assignee",
+    "auto_decompose",
+    "auto_promote_children",
+}
+READONLY_ORCHESTRATION_FIELDS = {
+    "max_in_progress",
+    "max_spawn",
+    "dispatch_interval_seconds",
+    "failure_limit",
+    "dispatch_stale_timeout_seconds",
+}
 
 
 def run_json(args: list[str]) -> object:
@@ -186,6 +204,84 @@ def remove_board(slug: str, *, hard_delete: bool = False) -> dict:
     return {"result": kanban_db.remove_board(slug, archive=not hard_delete)}
 
 
+def list_profiles() -> dict:
+    try:
+        profiles = kanban_db.list_profiles_on_disk()
+    except Exception:
+        profiles = []
+    return {
+        "profiles": [
+            {"id": name, "name": name, "icon": "bot", "source": "profile"}
+            for name in profiles
+        ]
+    }
+
+
+def list_assignees(slug: str | None = None) -> dict:
+    board = resolve_board(slug)
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        return {"assignees": kanban_db.known_assignees(conn)}
+    finally:
+        conn.close()
+
+
+def profile_exists(name: str) -> bool:
+    return not name or name in set(kanban_db.list_profiles_on_disk())
+
+
+def orchestration_payload() -> dict:
+    cfg = load_config() or {}
+    kanban_cfg = cfg.get("kanban") if isinstance(cfg, dict) else {}
+    if not isinstance(kanban_cfg, dict):
+        kanban_cfg = {}
+
+    explicit_orch = str(kanban_cfg.get("orchestrator_profile") or "").strip()
+    explicit_default = str(kanban_cfg.get("default_assignee") or "").strip()
+    profiles = set(kanban_db.list_profiles_on_disk())
+    active_default = "developer" if "developer" in profiles else "default"
+    resolved_orch = explicit_orch if explicit_orch in profiles else active_default
+    resolved_default = explicit_default if explicit_default in profiles else active_default
+
+    advanced = {key: kanban_cfg.get(key) for key in READONLY_ORCHESTRATION_FIELDS}
+    return {
+        "orchestrator_profile": explicit_orch,
+        "default_assignee": explicit_default,
+        "auto_decompose": bool(kanban_cfg.get("auto_decompose", True)),
+        "auto_promote_children": bool(kanban_cfg.get("auto_promote_children", True)),
+        "resolved_orchestrator_profile": resolved_orch,
+        "resolved_default_assignee": resolved_default,
+        "active_profile": active_default,
+        "advanced": advanced,
+        "explicit": {key: key in kanban_cfg for key in (SAFE_ORCHESTRATION_FIELDS | READONLY_ORCHESTRATION_FIELDS)},
+    }
+
+
+def update_orchestration(payload: dict) -> dict:
+    unknown = sorted(set(payload) - SAFE_ORCHESTRATION_FIELDS)
+    if unknown:
+        raise ValueError(f"Unsupported orchestration field(s): {', '.join(unknown)}")
+    cfg = load_config() or {}
+    kanban_section = cfg.setdefault("kanban", {})
+    if not isinstance(kanban_section, dict):
+        kanban_section = {}
+        cfg["kanban"] = kanban_section
+
+    for key in ("orchestrator_profile", "default_assignee"):
+        if key in payload:
+            name = str(payload.get(key) or "").strip()
+            if name and not profile_exists(name):
+                return {"_status": 400, "detail": f"profile '{name}' does not exist"}
+            kanban_section[key] = name
+    for key in ("auto_decompose", "auto_promote_children"):
+        if key in payload:
+            kanban_section[key] = bool(payload[key])
+
+    save_config(cfg)
+    return orchestration_payload()
+
+
 def switch_board(slug: str, payload: dict) -> dict:
     board = resolve_board(slug)
     if not board or not kanban_db.board_exists(board):
@@ -245,6 +341,42 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("JSON body must be an object")
         return payload
 
+    def do_POST(self) -> None:  # noqa: N802 - stdlib callback name
+        parsed = urlparse(self.path)
+        try:
+            if parsed.path == "/api/plugins/kanban/boards":
+                self.send_json(201, create_board(self.read_json_body()))
+                return
+            match = BOARD_SEGMENT_RE.match(parsed.path)
+            if match and match.group(2) == "switch":
+                result = switch_board(match.group(1), self.read_json_body())
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
+                return
+            self.send_json(404, {"detail": "Not found"})
+        except json.JSONDecodeError:
+            self.send_json(400, {"detail": "Invalid JSON body"})
+        except ValueError as exc:
+            self.send_json(400, {"detail": str(exc)})
+        except Exception as exc:
+            self.send_json(500, {"detail": f"BHK board API error: {exc}"})
+
+    def do_PUT(self) -> None:  # noqa: N802 - stdlib callback name
+        parsed = urlparse(self.path)
+        try:
+            if parsed.path == "/api/plugins/kanban/orchestration":
+                result = update_orchestration(self.read_json_body())
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
+                return
+            self.send_json(404, {"detail": "Not found"})
+        except json.JSONDecodeError:
+            self.send_json(400, {"detail": "Invalid JSON body"})
+        except ValueError as exc:
+            self.send_json(400, {"detail": str(exc)})
+        except Exception as exc:
+            self.send_json(500, {"detail": f"BHK orchestration API error: {exc}"})
+
     def do_PATCH(self) -> None:  # noqa: N802 - stdlib callback name
         parsed = urlparse(self.path)
         try:
@@ -256,6 +388,12 @@ class Handler(BaseHTTPRequestHandler):
                 status = int(result.pop("_status", 200))
                 self.send_json(status, result)
                 return
+            match = BOARD_SEGMENT_RE.match(parsed.path)
+            if match and not match.group(2):
+                result = update_board(match.group(1), self.read_json_body())
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
+                return
             self.send_json(404, {"detail": "Not found"})
         except json.JSONDecodeError:
             self.send_json(400, {"detail": "Invalid JSON body"})
@@ -263,6 +401,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"detail": str(exc)})
         except Exception as exc:
             self.send_json(500, {"detail": f"BHK update API error: {exc}"})
+
+    def do_DELETE(self) -> None:  # noqa: N802 - stdlib callback name
+        parsed = urlparse(self.path)
+        try:
+            match = BOARD_SEGMENT_RE.match(parsed.path)
+            if match and not match.group(2):
+                qs = parse_qs(parsed.query)
+                hard_delete = (qs.get("delete") or [""])[0].lower() in {"1", "true", "yes"}
+                self.send_json(200, remove_board(match.group(1), hard_delete=hard_delete))
+                return
+            self.send_json(404, {"detail": "Not found"})
+        except ValueError as exc:
+            self.send_json(400, {"detail": str(exc)})
+        except Exception as exc:
+            self.send_json(500, {"detail": f"BHK delete API error: {exc}"})
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib callback name
         parsed = urlparse(self.path)
@@ -277,6 +430,17 @@ class Handler(BaseHTTPRequestHandler):
                 qs = parse_qs(parsed.query)
                 slug = (qs.get("board") or [None])[0]
                 self.send_json(200, board_payload(slug))
+                return
+            if parsed.path == "/api/plugins/kanban/profiles":
+                self.send_json(200, list_profiles())
+                return
+            if parsed.path == "/api/plugins/kanban/assignees":
+                qs = parse_qs(parsed.query)
+                slug = (qs.get("board") or [None])[0]
+                self.send_json(200, list_assignees(slug))
+                return
+            if parsed.path == "/api/plugins/kanban/orchestration":
+                self.send_json(200, orchestration_payload())
                 return
             self.send_json(404, {"detail": "Not found"})
         except subprocess.CalledProcessError as exc:

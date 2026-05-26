@@ -2,6 +2,8 @@ import type {
   Task,
   Board,
   BotProfile,
+  KanbanOrchestrationSettings,
+  KanbanOrchestrationUpdate,
   TaskStatus,
   TaskComment,
   Priority,
@@ -60,6 +62,12 @@ function asNumber(value: unknown, fallback = 0): number {
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => asString(item)).filter(Boolean) : [];
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const number = asNumber(value, NaN);
+  return Number.isFinite(number) ? number : null;
 }
 
 function toIso(value: unknown): string {
@@ -160,6 +168,42 @@ function normalizeLinks(raw: unknown): LinkedTask[] {
       relation,
     };
   }).filter((link) => link.taskId);
+}
+
+function normalizeProfile(raw: unknown, index = 0): BotProfile {
+  const item = isObject(raw) ? raw : {};
+  const name = asString(item.name ?? item.id ?? item.assignee, `profile-${index + 1}`);
+  return {
+    id: name,
+    name,
+    icon: asString(item.icon, 'bot'),
+    source: asString(item.source, 'profile') as BotProfile['source'],
+    taskCount: asNullableNumber(item.task_count ?? item.taskCount) ?? undefined,
+    runningCount: asNullableNumber(item.running_count ?? item.runningCount) ?? undefined,
+  };
+}
+
+function normalizeOrchestration(raw: unknown): KanbanOrchestrationSettings {
+  const item = isObject(raw) ? raw : {};
+  const advanced = isObject(item.advanced) ? item.advanced : item;
+  const explicit = isObject(item.explicit) ? item.explicit : {};
+  return {
+    orchestratorProfile: asString(item.orchestrator_profile ?? item.orchestratorProfile),
+    defaultAssignee: asString(item.default_assignee ?? item.defaultAssignee),
+    autoDecompose: Boolean(item.auto_decompose ?? item.autoDecompose ?? true),
+    autoPromoteChildren: Boolean(item.auto_promote_children ?? item.autoPromoteChildren ?? true),
+    resolvedOrchestratorProfile: asString(item.resolved_orchestrator_profile ?? item.resolvedOrchestratorProfile),
+    resolvedDefaultAssignee: asString(item.resolved_default_assignee ?? item.resolvedDefaultAssignee),
+    activeProfile: asString(item.active_profile ?? item.activeProfile, 'default'),
+    advanced: {
+      maxInProgress: asNullableNumber(advanced.max_in_progress ?? advanced.maxInProgress),
+      maxSpawn: asNullableNumber(advanced.max_spawn ?? advanced.maxSpawn),
+      dispatchIntervalSeconds: asNullableNumber(advanced.dispatch_interval_seconds ?? advanced.dispatchIntervalSeconds),
+      failureLimit: asNullableNumber(advanced.failure_limit ?? advanced.failureLimit),
+      dispatchStaleTimeoutSeconds: asNullableNumber(advanced.dispatch_stale_timeout_seconds ?? advanced.dispatchStaleTimeoutSeconds),
+    },
+    explicit: Object.fromEntries(Object.entries(explicit).map(([key, value]) => [key, Boolean(value)])),
+  };
 }
 
 function normalizeTask(raw: unknown, boardId: string): Task {
@@ -406,7 +450,55 @@ export const kanbanApi = {
   },
 
   async getProfiles(): Promise<BotProfile[]> {
-    return [...BOT_PROFILES];
+    try {
+      const payload = await requestJson<unknown>('/profiles');
+      const rawProfiles = Array.isArray(payload)
+        ? payload
+        : isObject(payload) && Array.isArray(payload.profiles)
+          ? payload.profiles
+          : [];
+      const profiles = rawProfiles.map(normalizeProfile);
+      return profiles.length ? profiles : [...BOT_PROFILES];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load profiles';
+      console.warn(`${message}; showing offline demo profiles`);
+      return [...BOT_PROFILES];
+    }
+  },
+
+  async getAssignees(): Promise<BotProfile[]> {
+    try {
+      const payload = await requestJson<unknown>('/assignees');
+      const rawAssignees = Array.isArray(payload)
+        ? payload
+        : isObject(payload) && Array.isArray(payload.assignees)
+          ? payload.assignees
+          : [];
+      return rawAssignees.map((assignee, index) => ({ ...normalizeProfile(assignee, index), source: 'assignee' }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load assignees';
+      console.warn(`${message}; showing profile list only`);
+      return [];
+    }
+  },
+
+  async getOrchestration(): Promise<KanbanOrchestrationSettings> {
+    const payload = await requestJson<unknown>('/orchestration');
+    return normalizeOrchestration(payload);
+  },
+
+  async updateOrchestration(input: KanbanOrchestrationUpdate): Promise<KanbanOrchestrationSettings> {
+    const response = await requestJson<unknown>('/orchestration', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orchestrator_profile: input.orchestratorProfile,
+        default_assignee: input.defaultAssignee,
+        auto_decompose: input.autoDecompose,
+        auto_promote_children: input.autoPromoteChildren,
+      }),
+    });
+    return normalizeOrchestration(response);
   },
 
   async getDiagnostics(): Promise<{ taskCount: number; statusCounts: Record<string, number> }> {

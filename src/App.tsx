@@ -26,31 +26,33 @@ function App() {
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
+  const loadBoardData = useCallback(async (preferredBoardId?: string) => {
+    try {
+      const boardsResult = await kanbanApi.getBoards();
+      const preferredBoard =
+        (preferredBoardId ? boardsResult.boards.find((board) => board.id === preferredBoardId) : null) ||
+        boardsResult.boards.find((board) => board.id === 'better-hermes-kanban') ||
+        boardsResult.boards.find((board) => board.isDefault) ||
+        boardsResult.boards[0];
+      const boardData = await kanbanApi.getBoard(preferredBoard?.id);
+      setTasks(boardData.tasks);
+      setBoards(boardsResult.boards);
+      setActiveBoard(boardData.board);
+      setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
+      setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load board data';
+      setLoadError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Load initial data
   useEffect(() => {
-    async function load() {
-      try {
-        const boardsResult = await kanbanApi.getBoards();
-        const preferredBoard =
-          boardsResult.boards.find((board) => board.id === 'better-hermes-kanban') ||
-          boardsResult.boards.find((board) => board.isDefault) ||
-          boardsResult.boards[0];
-        const boardData = await kanbanApi.getBoard(preferredBoard?.id);
-        setTasks(boardData.tasks);
-        setBoards(boardsResult.boards);
-        setActiveBoard(boardData.board);
-        setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
-        setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load board data';
-        setLoadError(message);
-        toast.error(message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, []);
+    loadBoardData();
+  }, [loadBoardData]);
 
   const selectedTask = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) || null,
@@ -271,6 +273,7 @@ function App() {
           boards={boards}
           activeBoard={activeBoard}
           onBoardChange={handleBoardChange}
+          onBoardsRefresh={loadBoardData}
           isMobile
         />
       </div>
@@ -281,6 +284,7 @@ function App() {
           boards={boards}
           activeBoard={activeBoard}
           onBoardChange={handleBoardChange}
+          onBoardsRefresh={loadBoardData}
         />
       </div>
     </div>

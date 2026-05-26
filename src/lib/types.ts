@@ -14,6 +14,34 @@ export interface BotProfile {
   id: string;
   name: string;
   icon: string;
+  source?: 'profile' | 'assignee' | 'mock';
+  taskCount?: number;
+  runningCount?: number;
+}
+
+export interface KanbanOrchestrationSettings {
+  orchestratorProfile: string;
+  defaultAssignee: string;
+  autoDecompose: boolean;
+  autoPromoteChildren: boolean;
+  resolvedOrchestratorProfile: string;
+  resolvedDefaultAssignee: string;
+  activeProfile: string;
+  advanced: {
+    maxInProgress: number | null;
+    maxSpawn: number | null;
+    dispatchIntervalSeconds: number | null;
+    failureLimit: number | null;
+    dispatchStaleTimeoutSeconds: number | null;
+  };
+  explicit: Record<string, boolean>;
+}
+
+export interface KanbanOrchestrationUpdate {
+  orchestratorProfile?: string;
+  defaultAssignee?: string;
+  autoDecompose?: boolean;
+  autoPromoteChildren?: boolean;
 }
 
 export interface TaskComment {
