@@ -14,6 +14,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { WarningBanner } from '@/components/shared/WarningBanner';
+import { MarkdownText } from '@/components/shared/MarkdownText';
 import { TaskActions } from './TaskActions';
 import { TaskComments } from './TaskComments';
 import { TaskActivity } from './TaskActivity';
@@ -153,7 +154,9 @@ export function TaskDetail({
 
           {/* Description */}
           {task.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed">{task.description}</p>
+            <div className="rounded-xl border border-border/60 bg-card/50 p-3.5">
+              <MarkdownText value={task.description} />
+            </div>
           )}
 
           {/* Meta grid */}
@@ -201,7 +204,7 @@ export function TaskDetail({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-foreground leading-relaxed">{task.latestSummary}</p>
+              <MarkdownText value={task.latestSummary} compact className="text-xs text-foreground" />
             </div>
           )}
 
