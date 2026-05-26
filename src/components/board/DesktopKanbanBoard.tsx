@@ -1,0 +1,179 @@
+import { useState, useMemo } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import type { Task, TaskStatus } from '@/lib/types';
+import { STATUS_ORDER } from '@/lib/types';
+import { KanbanColumn } from './KanbanColumn';
+import { TaskCard } from './TaskCard';
+import { toast } from 'sonner';
+
+interface DesktopKanbanBoardProps {
+  tasks: Task[];
+  onTaskClick: (task: Task) => void;
+  onTasksChange: (tasks: Task[]) => void;
+  onAddTask: (status: TaskStatus) => void;
+  searchQuery: string;
+}
+
+export function DesktopKanbanBoard({
+  tasks,
+  onTaskClick,
+  onTasksChange,
+  onAddTask,
+  searchQuery,
+}: DesktopKanbanBoardProps) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const filteredTasks = useMemo(() => {
+    if (!searchQuery.trim()) return tasks;
+    const q = searchQuery.toLowerCase();
+    return tasks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q) ||
+        (t.assignee && t.assignee.toLowerCase().includes(q))
+    );
+  }, [tasks, searchQuery]);
+
+  const tasksByStatus = useMemo(() => {
+    const grouped: Record<string, Task[]> = {};
+    STATUS_ORDER.forEach((status) => {
+      grouped[status] = filteredTasks.filter((t) => t.status === status);
+    });
+    return grouped;
+  }, [filteredTasks]);
+
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const activeTaskId = active.id as string;
+    const overId = over.id as string;
+
+    // Check if dropped over a column (status)
+    const overStatus = STATUS_ORDER.find((s) => s === overId);
+    const activeTaskItem = tasks.find((t) => t.id === activeTaskId);
+
+    if (!activeTaskItem) return;
+
+    if (overStatus) {
+      if (overStatus === 'running') {
+        toast.error('Cannot drop into Running — status is read-only');
+        return;
+      }
+
+      if (activeTaskItem.status !== overStatus) {
+        const updated = tasks.map((t) =>
+          t.id === activeTaskId
+            ? {
+                ...t,
+                status: overStatus,
+                updatedAt: new Date().toISOString(),
+                activity: [
+                  ...t.activity,
+                  {
+                    id: `a-${Date.now()}`,
+                    type: 'status_change' as const,
+                    description: `Status changed from ${activeTaskItem.status} to ${overStatus}`,
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              }
+            : t
+        );
+        onTasksChange(updated);
+        toast.success(`Moved to ${overStatus}`);
+      }
+    } else {
+      // Dropped over another card
+      const overTask = tasks.find((t) => t.id === overId);
+      if (overTask && activeTaskItem.status === overTask.status) {
+        const statusTasks = tasks.filter((t) => t.status === overTask.status);
+        const oldIndex = statusTasks.findIndex((t) => t.id === activeTaskId);
+        const newIndex = statusTasks.findIndex((t) => t.id === overId);
+
+        if (oldIndex !== newIndex) {
+          const reordered = arrayMove(statusTasks, oldIndex, newIndex);
+          const otherTasks = tasks.filter((t) => t.status !== overTask.status);
+          onTasksChange([...otherTasks, ...reordered]);
+        }
+      } else if (overTask) {
+        // Move to different status
+        if (overTask.status === 'running') {
+          toast.error('Cannot drop into Running — status is read-only');
+          return;
+        }
+        const updated = tasks.map((t) =>
+          t.id === activeTaskId
+            ? {
+                ...t,
+                status: overTask.status,
+                updatedAt: new Date().toISOString(),
+                activity: [
+                  ...t.activity,
+                  {
+                    id: `a-${Date.now()}`,
+                    type: 'status_change' as const,
+                    description: `Status changed from ${activeTaskItem.status} to ${overTask.status}`,
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              }
+            : t
+        );
+        onTasksChange(updated);
+        toast.success(`Moved to ${overTask.status}`);
+      }
+    }
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pt-3 pb-4 h-full items-start">
+        {STATUS_ORDER.map((status) => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            tasks={tasksByStatus[status] || []}
+            onTaskClick={onTaskClick}
+            onAddTask={onAddTask}
+          />
+        ))}
+      </div>
+
+      <DragOverlay>
+        {activeTask ? (
+          <TaskCard task={activeTask} onClick={() => {}} isOverlay />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}

@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 25% 5%;
+    --foreground: 220 15% 93%;
+    --card: 220 22% 8%;
+    --card-foreground: 220 15% 93%;
+    --popover: 220 22% 8%;
+    --popover-foreground: 220 15% 93%;
+    --primary: 255 100% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 13%;
+    --secondary-foreground: 220 15% 93%;
+    --muted: 220 18% 13%;
+    --muted-foreground: 218 12% 55%;
+    --accent: 220 18% 13%;
+    --accent-foreground: 220 15% 93%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 218 18% 18%;
+    --input: 218 18% 18%;
+    --ring: 255 100% 68%;
+    --radius: 0.5rem;
+    --sidebar-background: 220 22% 8%;
+    --sidebar-foreground: 220 15% 93%;
+    --sidebar-primary: 255 100% 68%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 18% 13%;
+    --sidebar-accent-foreground: 220 15% 93%;
+    --sidebar-border: 218 18% 18%;
+    --sidebar-ring: 255 100% 68%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Running card animated border */
+@keyframes running-border {
+  0% { border-color: rgba(14, 165, 233, 0.3); }
+  50% { border-color: rgba(14, 165, 233, 0.8); }
+  100% { border-color: rgba(14, 165, 233, 0.3); }
+}
+
+.running-card {
+  animation: running-border 3s ease-in-out infinite;
+}
+
+/* Count badge pulse */
+@keyframes count-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.count-pulse {
+  animation: count-pulse 300ms ease-out;
+}
+
+/* New task slide in */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.task-slide-in {
+  animation: slide-in 300ms ease-out;
+}

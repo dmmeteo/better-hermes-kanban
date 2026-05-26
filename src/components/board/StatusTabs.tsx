@@ -1,0 +1,55 @@
+import type { TaskStatus } from '@/lib/types';
+import { STATUS_ORDER, STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { Lock } from 'lucide-react';
+
+interface StatusTabsProps {
+  activeStatus: TaskStatus;
+  onStatusChange: (status: TaskStatus) => void;
+  counts: Record<string, number>;
+}
+
+export function StatusTabs({ activeStatus, onStatusChange, counts }: StatusTabsProps) {
+  return (
+    <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2">
+      {STATUS_ORDER.map((status) => {
+        const count = counts[status] || 0;
+        const isActive = activeStatus === status;
+        const color = STATUS_COLORS[status];
+        const isRunning = status === 'running';
+
+        return (
+          <button
+            key={status}
+            onClick={() => onStatusChange(status)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all duration-150',
+              'border shrink-0',
+              isActive
+                ? 'text-white border-transparent'
+                : 'text-muted-foreground border-border bg-card hover:bg-accent'
+            )}
+            style={
+              isActive
+                ? { backgroundColor: color, borderColor: color }
+                : {}
+            }
+          >
+            {isRunning && <Lock size={10} />}
+            {STATUS_LABELS[status]}
+            {count > 0 && (
+              <span
+                className={cn(
+                  'ml-0.5 min-w-[18px] text-center rounded-full text-[10px] px-1 py-0',
+                  isActive ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
