@@ -2,11 +2,12 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
 import type { Task, Board, BotProfile, CreateTaskData, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
-import { TopBar } from '@/components/layout/TopBar';
+import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
+import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -20,6 +21,10 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isBoardSettingsOpen, setIsBoardSettingsOpen] = useState(false);
+  const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
+    const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
+    return saved === 'modal' ? 'modal' : 'drawer';
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,6 +66,10 @@ function App() {
   useEffect(() => {
     loadBoardData();
   }, [loadBoardData]);
+
+  useEffect(() => {
+    window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
+  }, [detailPresentation]);
 
   const selectedTask = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) || null,
@@ -226,6 +235,8 @@ function App() {
         onSearchChange={setSearchQuery}
         onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
         onOpenSettings={() => setIsBoardSettingsOpen(true)}
+        detailPresentation={detailPresentation}
+        onDetailPresentationChange={setDetailPresentation}
       />
 
       {(dataSource === 'fallback' || loadError) && (
@@ -268,22 +279,40 @@ function App() {
         onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
       />
 
-      {/* Task Detail Drawer: half-screen on desktop, full-screen on mobile */}
-      <TaskDetailSheet
-        task={selectedTask}
-        allTasks={tasks}
-        open={!!selectedTaskId}
-        onClose={handleCloseDetail}
-        onStatusChange={handleStatusChange}
-        onAddComment={handleAddComment}
-        onBlock={handleBlock}
-        onReclaim={handleReclaim}
-        onDecompose={handleDecompose}
-        onDelete={handleDelete}
-        onUpdateTask={updateSelectedTask}
-        isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
-        isMobile={isMobile}
-      />
+      {/* Task Detail: selectable drawer or centered Jira-style modal */}
+      {detailPresentation === 'drawer' ? (
+        <TaskDetailSheet
+          task={selectedTask}
+          allTasks={tasks}
+          open={!!selectedTaskId}
+          onClose={handleCloseDetail}
+          onStatusChange={handleStatusChange}
+          onAddComment={handleAddComment}
+          onBlock={handleBlock}
+          onReclaim={handleReclaim}
+          onDecompose={handleDecompose}
+          onDelete={handleDelete}
+          onUpdateTask={updateSelectedTask}
+          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+          isMobile={isMobile}
+        />
+      ) : (
+        <TaskDetailModal
+          task={selectedTask}
+          allTasks={tasks}
+          open={!!selectedTaskId}
+          onClose={handleCloseDetail}
+          onStatusChange={handleStatusChange}
+          onAddComment={handleAddComment}
+          onBlock={handleBlock}
+          onReclaim={handleReclaim}
+          onDecompose={handleDecompose}
+          onDelete={handleDelete}
+          onUpdateTask={updateSelectedTask}
+          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+          isMobile={isMobile}
+        />
+      )}
 
       {/* Quick Capture */}
       <div className="md:hidden">

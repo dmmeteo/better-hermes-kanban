@@ -8,6 +8,7 @@ import {
   Clock,
   Paperclip,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -39,6 +40,7 @@ interface TaskDetailProps {
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
   isUpdating?: boolean;
+  showCloseButton?: boolean;
 }
 
 export function TaskDetail({
@@ -54,6 +56,7 @@ export function TaskDetail({
   onDelete,
   onUpdateTask,
   isUpdating = false,
+  showCloseButton = false,
 }: TaskDetailProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -125,7 +128,7 @@ export function TaskDetail({
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50">
         {isMobile && onBack && (
-          <button onClick={onBack} className="p-1 -ml-1 rounded-lg hover:bg-accent transition-colors">
+          <button onClick={onBack} className="p-1 -ml-1 rounded-lg hover:bg-accent transition-colors" aria-label="Back to board">
             <ChevronLeft size={20} />
           </button>
         )}
@@ -136,9 +139,19 @@ export function TaskDetail({
         </div>
         <div className="flex-1" />
         <StatusBadge status={task.status} />
-        <button className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+        <button className="p-1.5 rounded-lg hover:bg-accent transition-colors" aria-label="More task actions">
           <MoreHorizontal size={16} className="text-muted-foreground" />
         </button>
+        {showCloseButton && onBack && (
+          <button
+            onClick={onBack}
+            className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+            aria-label="Close task detail"
+            data-testid="task-detail-close"
+          >
+            <X size={16} className="text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* Content */}

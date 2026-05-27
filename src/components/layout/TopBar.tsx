@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, ChevronDown, Settings, Feather } from 'lucide-react';
+import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Board } from '@/lib/types';
@@ -7,8 +7,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+export type TaskDetailPresentation = 'drawer' | 'modal';
 
 interface TopBarProps {
   boards: Board[];
@@ -18,6 +24,8 @@ interface TopBarProps {
   onSearchChange: (query: string) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
+  detailPresentation: TaskDetailPresentation;
+  onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
 }
 
 export function TopBar({
@@ -28,6 +36,8 @@ export function TopBar({
   onSearchChange,
   onOpenQuickCapture,
   onOpenSettings,
+  detailPresentation,
+  onDetailPresentationChange,
 }: TopBarProps) {
   return (
     <header className="shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
@@ -93,6 +103,42 @@ export function TopBar({
               className="w-64 h-8 pl-8 text-xs bg-secondary border-border"
             />
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                data-testid="task-detail-presentation-trigger"
+              >
+                {detailPresentation === 'modal' ? <SquareStack size={14} /> : <PanelRightOpen size={14} />}
+                <span>Detail: {detailPresentation === 'modal' ? 'Modal' : 'Drawer'}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Task detail presentation
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={detailPresentation}
+                onValueChange={(value) => onDetailPresentationChange(value as TaskDetailPresentation)}
+              >
+                <DropdownMenuRadioItem value="drawer" className="text-xs">
+                  <div className="flex flex-col gap-0.5">
+                    <span>Side drawer</span>
+                    <span className="text-[11px] text-muted-foreground">Current half-screen detail panel</span>
+                  </div>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="modal" className="text-xs">
+                  <div className="flex flex-col gap-0.5">
+                    <span>Jira-style modal</span>
+                    <span className="text-[11px] text-muted-foreground">Centered overlay with keyboard close/focus trap</span>
+                  </div>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             size="sm"
