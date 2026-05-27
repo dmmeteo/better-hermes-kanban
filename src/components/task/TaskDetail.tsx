@@ -153,7 +153,7 @@ export function TaskDetail({
   }, [activeTab, desktopTabs]);
 
   return (
-    <div className={cn('h-full flex flex-col', isMobile ? 'bg-background' : '')}>
+    <div className={cn('flex h-full min-h-0 flex-col', isMobile ? 'bg-background' : '')}>
       {/* Header */}
       {showPanelChrome && (
         <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50">
@@ -193,7 +193,7 @@ export function TaskDetail({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
         <div className="px-4 py-4 space-y-5">
           {showPanelChrome && (
             <>

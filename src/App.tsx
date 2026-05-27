@@ -24,6 +24,23 @@ function boardPath(boardId?: string | null) {
   return boardId ? `/boards/${encodeURIComponent(boardId)}` : '/';
 }
 
+function mergeTaskUpdate(existing: Task, updated: Task): Task {
+  return {
+    ...existing,
+    ...updated,
+    comments: updated.comments.length > 0 ? updated.comments : existing.comments,
+    commentCount: updated.comments.length > 0 ? updated.commentCount : Math.max(existing.commentCount, updated.commentCount),
+    activity: updated.activity.length > 0 ? updated.activity : existing.activity,
+    runs: updated.runs.length > 0 ? updated.runs : existing.runs,
+    linkedTasks: updated.linkedTasks.length > 0 ? updated.linkedTasks : existing.linkedTasks,
+    linkCount: updated.linkedTasks.length > 0 ? updated.linkCount : Math.max(existing.linkCount, updated.linkCount),
+    diagnostics: updated.diagnostics.length > 0 ? updated.diagnostics : existing.diagnostics,
+    warningCount: updated.diagnostics.length > 0 ? updated.warningCount : Math.max(existing.warningCount, updated.warningCount),
+    latestSummary: updated.latestSummary ?? existing.latestSummary,
+    summaryUpdatedAt: updated.summaryUpdatedAt ?? existing.summaryUpdatedAt,
+  };
+}
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -101,7 +118,7 @@ function App() {
       const boardData = await kanbanApi.getBoard(taskBoardId);
       const mergedTasks = directTask
         ? boardData.tasks.some((task) => task.id === directTask.id)
-          ? boardData.tasks.map((task) => (task.id === directTask.id ? { ...task, ...directTask } : task))
+          ? boardData.tasks.map((task) => (task.id === directTask.id ? mergeTaskUpdate(task, directTask) : task))
           : [directTask, ...boardData.tasks]
         : boardData.tasks;
       setTasks(mergedTasks);
@@ -216,7 +233,7 @@ function App() {
       try {
         setUpdatingTaskId(selectedTask.id);
         const updated = await kanbanApi.updateTask(selectedTask.id, patch, activeBoard.id);
-        setTasks((current) => current.map((task) => (task.id === updated.id ? { ...task, ...updated } : task)));
+        setTasks((current) => current.map((task) => (task.id === updated.id ? mergeTaskUpdate(task, updated) : task)));
         toast.success('Task updated');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update task';

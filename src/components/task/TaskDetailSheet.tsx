@@ -40,7 +40,7 @@ export function TaskDetailSheet({
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
-        className="!w-screen !max-w-none p-0 border-l border-border bg-background md:!w-[50vw] md:!max-w-none"
+        className="!w-screen !max-w-none gap-0 overflow-hidden border-l border-border bg-background p-0 md:!w-[65vw] md:!max-w-none"
       >
         <SheetTitle className="sr-only">Task detail: {task.title}</SheetTitle>
         <SheetDescription className="sr-only">Read and update task {task.id}</SheetDescription>

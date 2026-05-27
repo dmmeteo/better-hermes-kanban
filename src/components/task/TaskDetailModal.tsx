@@ -41,7 +41,7 @@ export function TaskDetailModal({
         data-testid="task-detail-modal"
         aria-describedby={undefined}
         showCloseButton={false}
-        className="max-w-none gap-0 overflow-hidden border-border/70 bg-background p-0 shadow-2xl sm:max-w-none md:h-[min(86vh,880px)] md:w-[min(92vw,1120px)] md:rounded-2xl md:border md:shadow-[0_24px_90px_rgba(0,0,0,0.55)] max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0"
+        className="flex h-[min(86dvh,880px)] max-w-none flex-col gap-0 overflow-hidden border-border/70 bg-background p-0 shadow-2xl sm:max-w-none md:w-[min(92vw,1120px)] md:rounded-2xl md:border md:shadow-[0_24px_90px_rgba(0,0,0,0.55)] max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0"
       >
         <DialogTitle className="sr-only">Task detail: {task.title}</DialogTitle>
         <TaskDetail
