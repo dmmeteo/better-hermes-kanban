@@ -8,6 +8,8 @@ interface BoardViewProps {
   activeBoard: Board;
   onBoardChange: (board: Board) => void;
   onTaskClick: (task: Task) => void;
+  onOpenSettings: () => void;
+  onOpenNewBoard: () => void;
   onTasksChange: (tasks: Task[]) => void;
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
@@ -19,6 +21,8 @@ export function BoardView({
   activeBoard,
   onBoardChange,
   onTaskClick,
+  onOpenSettings,
+  onOpenNewBoard,
   onTasksChange,
   onAddTask,
   searchQuery,
@@ -32,6 +36,8 @@ export function BoardView({
           activeBoard={activeBoard}
           onBoardChange={onBoardChange}
           onTaskClick={onTaskClick}
+          onOpenSettings={onOpenSettings}
+          onOpenNewBoard={onOpenNewBoard}
           searchQuery={searchQuery}
         />
       </div>

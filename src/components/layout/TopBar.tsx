@@ -24,6 +24,7 @@ interface TopBarProps {
   onSearchChange: (query: string) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
+  onOpenNewBoard: () => void;
   detailPresentation: TaskDetailPresentation;
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
   isTaskPage?: boolean;
@@ -38,6 +39,7 @@ export function TopBar({
   onSearchChange,
   onOpenQuickCapture,
   onOpenSettings,
+  onOpenNewBoard,
   detailPresentation,
   onDetailPresentationChange,
   isTaskPage = false,
@@ -55,136 +57,133 @@ export function TopBar({
           <button type="button" aria-label="Search tasks" className="p-2 rounded-lg hover:bg-accent">
             <Search size={18} className="text-muted-foreground" />
           </button>
-          <button
-            type="button"
-            aria-label="Open settings"
-            data-testid="mobile-settings-button"
-            onClick={onOpenSettings}
-            className="p-2 rounded-lg hover:bg-accent"
-          >
-            <Settings size={18} className="text-muted-foreground" />
-          </button>
         </div>
       </div>
 
       {/* Desktop header */}
-      <div className="hidden md:flex items-center justify-between h-14 px-6">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2.5">
-            <Feather size={24} style={{ color: '#7C5CFF' }} />
-            <div className="flex flex-col">
-              <span className="font-bold text-sm leading-tight">Hermes</span>
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground leading-tight">
-                Kanban Control Room
-              </span>
-            </div>
+      <div className="hidden md:flex items-center gap-4 h-14 px-6">
+        <div className="flex shrink-0 items-center gap-2.5">
+          <Feather size={24} style={{ color: '#7C5CFF' }} />
+          <div className="flex flex-col">
+            <span className="font-bold text-sm leading-tight">Hermes</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground leading-tight">
+              Kanban Control Room
+            </span>
           </div>
+        </div>
 
+        <div className="relative min-w-[280px] flex-1 max-w-3xl">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="h-9 w-full rounded-xl border-border bg-secondary pl-8 text-xs"
+          />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
           {isTaskPage ? (
             <button
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-accent transition-colors"
+              className="flex max-w-[260px] items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
               onClick={onNavigateToBoard}
               data-testid="task-page-board-link"
             >
               <ArrowLeft size={14} className="text-muted-foreground" />
               <span className="text-muted-foreground">Board</span>
-              <span>{activeBoard.name}</span>
+              <span className="truncate">{activeBoard.name}</span>
             </button>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-accent transition-colors">
+                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent">
                   <span className="text-muted-foreground">Board</span>
-                  <span>{activeBoard.name}</span>
-                  <ChevronDown size={14} className="text-muted-foreground" />
+                  <span className="truncate">{activeBoard.name}</span>
+                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuContent align="end" className="w-64">
                 {boards.map((board) => (
                   <DropdownMenuItem
                     key={board.id}
                     onClick={() => onBoardChange(board)}
                     className={cn(board.id === activeBoard.id && 'bg-accent')}
                   >
-                    <span className="flex-1">{board.name}</span>
+                    <span className="flex-1 truncate">{board.name}</span>
                     <span className="text-muted-foreground text-xs">{board.taskCount}</span>
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onOpenNewBoard} data-testid="board-dropdown-new-board">
+                  <Plus size={14} className="mr-2" />
+                  New board
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search tasks..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-64 h-8 pl-8 text-xs bg-secondary border-border"
-            />
-          </div>
           {!isTaskPage && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 rounded-xl p-0"
-                data-testid="task-detail-presentation-trigger"
-                aria-label={`Task detail view: ${detailPresentation}`}
-                title={`Task detail view: ${detailPresentation}`}
-              >
-                {detailPresentation === 'modal' ? <SquareStack size={17} /> : detailPresentation === 'page' ? <FileText size={17} /> : <PanelRightOpen size={17} />}
-                <span className="sr-only">Task detail view: {detailPresentation}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Task detail presentation
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuRadioGroup
-                value={detailPresentation}
-                onValueChange={(value) => onDetailPresentationChange(value as TaskDetailPresentation)}
-              >
-                <DropdownMenuRadioItem value="drawer" className="text-xs">
-                  <div className="flex flex-col gap-0.5">
-                    <span>Side drawer</span>
-                    <span className="text-[11px] text-muted-foreground">Current half-screen detail panel</span>
-                  </div>
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="modal" className="text-xs">
-                  <div className="flex flex-col gap-0.5">
-                    <span>Jira-style modal</span>
-                    <span className="text-[11px] text-muted-foreground">Centered overlay with keyboard close/focus trap</span>
-                  </div>
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="page" className="text-xs">
-                  <div className="flex flex-col gap-0.5">
-                    <span>Standalone page</span>
-                    <span className="text-[11px] text-muted-foreground">Full content canvas for comparing a task page layout</span>
-                  </div>
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl p-0"
+                  data-testid="task-detail-presentation-trigger"
+                  aria-label={`Task detail view: ${detailPresentation}`}
+                  title={`Task detail view: ${detailPresentation}`}
+                >
+                  {detailPresentation === 'modal' ? <SquareStack size={17} /> : detailPresentation === 'page' ? <FileText size={17} /> : <PanelRightOpen size={17} />}
+                  <span className="sr-only">Task detail view: {detailPresentation}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Task detail presentation
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup
+                  value={detailPresentation}
+                  onValueChange={(value) => onDetailPresentationChange(value as TaskDetailPresentation)}
+                >
+                  <DropdownMenuRadioItem value="drawer" className="text-xs">
+                    <div className="flex flex-col gap-0.5">
+                      <span>Side drawer</span>
+                      <span className="text-[11px] text-muted-foreground">Current half-screen detail panel</span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="modal" className="text-xs">
+                    <div className="flex flex-col gap-0.5">
+                      <span>Jira-style modal</span>
+                      <span className="text-[11px] text-muted-foreground">Centered overlay with keyboard close/focus trap</span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="page" className="text-xs">
+                    <div className="flex flex-col gap-0.5">
+                      <span>Standalone page</span>
+                      <span className="text-[11px] text-muted-foreground">Full content canvas for comparing a task page layout</span>
+                    </div>
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
+
           {!isTaskPage && (
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 rounded-xl p-0"
-            data-testid="desktop-settings-button"
-            aria-label="Settings"
-            title="Settings"
-            onClick={onOpenSettings}
-          >
-            <Settings size={17} />
-            <span className="sr-only">Settings</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-xl p-0"
+              data-testid="desktop-settings-button"
+              aria-label="Settings"
+              title="Settings"
+              onClick={onOpenSettings}
+            >
+              <Settings size={17} />
+              <span className="sr-only">Settings</span>
+            </Button>
           )}
+
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 font-semibold"

@@ -12,7 +12,7 @@ import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
 import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
-import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
+import { BoardsSettingsPanel, type BoardSettingsMode } from '@/components/settings/BoardsSettingsPanel';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -50,6 +50,8 @@ function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('list');
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
     return saved === 'modal' || saved === 'page' ? saved : 'drawer';
@@ -74,7 +76,6 @@ function App() {
     return match?.[1] ? decodeURIComponent(match[1]) : null;
   }, [location.pathname]);
   const isTaskPage = !!routeTaskId;
-  const isSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
@@ -145,6 +146,12 @@ function App() {
 
   // Load route data
   useEffect(() => {
+    if (location.pathname === '/settings' || location.pathname === '/settings/') {
+      setSettingsMode('list');
+      setIsSettingsOpen(true);
+      navigate(boardPath(boardIdFromUrl), { replace: true });
+      return;
+    }
     if (legacyBoardIdFromUrl && !routeTaskId && !boardIdFromPath) {
       navigate(boardPath(legacyBoardIdFromUrl), { replace: true });
       return;
@@ -153,12 +160,8 @@ function App() {
       loadTaskPageData(routeTaskId);
       return;
     }
-    if (isSettingsPage) {
-      loadBoardData(boardIdFromUrl);
-      return;
-    }
     loadBoardData(boardIdFromUrl);
-  }, [boardIdFromPath, boardIdFromUrl, isSettingsPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
+  }, [boardIdFromPath, boardIdFromUrl, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, location.pathname, navigate, routeTaskId]);
 
   useEffect(() => {
     window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
@@ -195,10 +198,6 @@ function App() {
 
   useEffect(() => {
     const appSuffix = 'BHK';
-    if (isSettingsPage) {
-      document.title = `🪽 Settings — ${appSuffix}`;
-      return;
-    }
     if (selectedTask) {
       document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
       return;
@@ -214,7 +213,7 @@ function App() {
       return;
     }
     document.title = `🪽 ${appSuffix}`;
-  }, [activeBoard, boards, isSettingsPage, routeTaskId, selectedTask]);
+  }, [activeBoard, boards, routeTaskId, selectedTask]);
 
   const handleTaskClick = useCallback((task: Task) => {
     if (detailPresentation === 'page') {
@@ -389,21 +388,20 @@ function App() {
       />
 
       {/* Top Bar */}
-      {!isSettingsPage && (
-        <TopBar
+      <TopBar
           boards={boards}
           activeBoard={activeBoard}
           onBoardChange={handleBoardChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-          onOpenSettings={() => navigate('/settings')}
+          onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
+          onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
           detailPresentation={activeDetailPresentation}
           onDetailPresentationChange={handleDetailPresentationChange}
           isTaskPage={isTaskPage}
           onNavigateToBoard={handleCloseDetail}
         />
-      )}
 
       {(dataSource === 'fallback' || loadError) && (
         <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
@@ -414,15 +412,7 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          {isSettingsPage ? (
-            <BoardsSettingsPanel
-              boards={boards}
-              activeBoard={activeBoard}
-              onBoardChange={handleBoardChange}
-              onBoardsRefresh={loadBoardData}
-              onBack={() => navigate(boardPath(activeBoard.id))}
-            />
-          ) : activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
+          {activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
             <TaskDetailPage
               task={selectedTask}
               taskId={selectedTask?.id || routeTaskId || ''}
@@ -446,6 +436,8 @@ function App() {
               activeBoard={activeBoard}
               onBoardChange={handleBoardChange}
               onTaskClick={handleTaskClick}
+              onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
+              onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
               searchQuery={searchQuery}
@@ -455,15 +447,15 @@ function App() {
       </main>
 
       {/* Desktop Footer Bar */}
-      {!isTaskPage && !isSettingsPage && <DesktopFooterBar tasks={tasks} />}
+      {!isTaskPage && <DesktopFooterBar tasks={tasks} />}
 
       {/* Mobile Create FAB */}
-      {!isTaskPage && !isSettingsPage && (
+      {!isTaskPage && (
         <MobileCreateTaskFab onOpenQuickCapture={() => setIsQuickCaptureOpen(true)} />
       )}
 
       {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
-      {!isSettingsPage && !isTaskPage && detailPresentation === 'drawer' ? (
+      {!isTaskPage && detailPresentation === 'drawer' ? (
         <TaskDetailSheet
           task={selectedTask}
           allTasks={tasks}
@@ -479,7 +471,7 @@ function App() {
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
-      ) : !isSettingsPage && !isTaskPage && detailPresentation === 'modal' ? (
+      ) : !isTaskPage && detailPresentation === 'modal' ? (
         <TaskDetailModal
           task={selectedTask}
           allTasks={tasks}
@@ -496,6 +488,16 @@ function App() {
           isMobile={isMobile}
         />
       ) : null}
+
+      <BoardsSettingsPanel
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        mode={settingsMode}
+        boards={boards}
+        activeBoard={activeBoard}
+        onBoardChange={handleBoardChange}
+        onBoardsRefresh={loadBoardData}
+      />
 
       {/* Quick Capture */}
       <div className="md:hidden">
