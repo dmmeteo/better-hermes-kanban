@@ -1,4 +1,5 @@
 import { Search, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import type { Board, BotProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ interface TopBarProps {
   isTaskPage?: boolean;
   isTaskSearchPage?: boolean;
   onNavigateToBoard?: () => void;
+  logoHomeHref: string;
 }
 
 export function TopBar({
@@ -54,15 +56,22 @@ export function TopBar({
   isTaskPage = false,
   isTaskSearchPage = false,
   onNavigateToBoard,
+  logoHomeHref,
 }: TopBarProps) {
   return (
     <header className="shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
       {/* Mobile header */}
       <div className="md:hidden flex items-center justify-between h-12 px-4">
-        <div className="flex items-center gap-2">
+        <Link
+          to={logoHomeHref}
+          aria-label={`Go to ${activeBoard.name || activeBoard.id} board`}
+          title={`Go to ${activeBoard.name || activeBoard.id} board`}
+          data-testid="app-logo-home-link"
+          className="flex items-center gap-2 rounded-lg transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
           <Feather size={20} style={{ color: '#7C5CFF' }} />
           <span className="font-bold text-sm">Hermes</span>
-        </div>
+        </Link>
         <button
           type="button"
           aria-label="Search all tasks"
@@ -77,7 +86,13 @@ export function TopBar({
 
       {/* Desktop header */}
       <div className="hidden md:flex items-center gap-4 h-14 px-6">
-        <div className="flex shrink-0 items-center gap-2.5">
+        <Link
+          to={logoHomeHref}
+          aria-label={`Go to ${activeBoard.name || activeBoard.id} board`}
+          title={`Go to ${activeBoard.name || activeBoard.id} board`}
+          data-testid="app-logo-home-link"
+          className="flex shrink-0 items-center gap-2.5 rounded-xl transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
           <Feather size={24} style={{ color: '#7C5CFF' }} />
           <div className="flex flex-col">
             <span className="font-bold text-sm leading-tight">Hermes</span>
@@ -85,7 +100,7 @@ export function TopBar({
               Kanban Control Room
             </span>
           </div>
-        </div>
+        </Link>
 
         <DataViewSearchAndFilter
           query={searchQuery}

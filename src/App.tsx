@@ -460,6 +460,7 @@ function App() {
           isTaskPage={isTaskPage}
           isTaskSearchPage={isTaskSearchPage}
           onNavigateToBoard={handleCloseDetail}
+          logoHomeHref={boardPath(activeBoard.id)}
         />
 
       {!isTaskPage && (
