@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
-import { AlertTriangle, ArrowRight, Clock3, Link2, MessageSquare, Search, ShieldAlert, User, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { AlertTriangle, ArrowRight, Clock3, Link2, MessageSquare, Search, ShieldAlert, User } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Board, BotProfile, TaskSearchResult } from '@/lib/types';
-import { STATUS_COLORS, STATUS_LABELS, STATUS_ORDER } from '@/lib/types';
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { DataViewSearchAndFilter, getSearchParamValue, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 
 const EXACT_TASK_ID = /^t_[0-9a-f]{8}$/i;
 
 type TaskSearchPageProps = {
   boards: Board[];
-  activeBoard: Board;
   assignees: BotProfile[];
   onOpenTask: (taskId: string, boardId?: string) => void;
 };
@@ -92,13 +91,14 @@ function ResultCard({ result, onOpen }: { result: TaskSearchResult; onOpen: () =
   );
 }
 
-export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: TaskSearchPageProps) {
+export function TaskSearchPage({ boards, assignees, onOpenTask }: TaskSearchPageProps) {
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const [query, setQuery] = useState(filterValue(urlParams, 'q'));
   const [submittedQuery, setSubmittedQuery] = useState(filterValue(urlParams, 'q'));
   const [board, setBoard] = useState(filterValue(urlParams, 'board'));
   const [status, setStatus] = useState(filterValue(urlParams, 'status'));
   const [assignee, setAssignee] = useState(filterValue(urlParams, 'assignee'));
+  const [priority, setPriority] = useState(filterValue(urlParams, 'priority'));
   const [results, setResults] = useState<TaskSearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [indexedAt, setIndexedAt] = useState<string | null>(null);
@@ -106,22 +106,26 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
   const [state, setState] = useState<SearchState>(submittedQuery ? 'loading' : 'first-use');
   const [error, setError] = useState<string | null>(null);
 
-  const syncUrl = (next: { q?: string; board?: string; status?: string; assignee?: string }) => {
+  const currentFilters: DataViewSearchFilters = useMemo(() => ({ board, status, assignee, priority }), [assignee, board, priority, status]);
+
+  const syncUrl = (next: { q?: string; board?: string; status?: string; assignee?: string; priority?: string }) => {
     const params = new URLSearchParams();
     const q = next.q ?? submittedQuery;
     const b = next.board ?? board;
     const s = next.status ?? status;
     const a = next.assignee ?? assignee;
+    const p = next.priority ?? priority;
     if (q) params.set('q', q);
-    if (b) params.set('board', b);
-    if (s) params.set('status', s);
-    if (a) params.set('assignee', a);
+    if (b) params.set('board', getSearchParamValue(b));
+    if (s) params.set('status', getSearchParamValue(s));
+    if (a) params.set('assignee', getSearchParamValue(a));
+    if (p) params.set('priority', getSearchParamValue(p));
     window.history.replaceState(null, '', `/tasks${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   useEffect(() => {
     let cancelled = false;
-    if (!submittedQuery && !board && !status && !assignee) {
+    if (!submittedQuery && !board && !status && !assignee && !priority) {
       queueMicrotask(() => {
         if (cancelled) return;
         setState('first-use');
@@ -137,9 +141,10 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
     });
     kanbanApi.searchTasks({
       q: submittedQuery,
-      board: board || undefined,
-      status: status || undefined,
-      assignee: assignee || undefined,
+      board: getSearchParamValue(board) || undefined,
+      status: getSearchParamValue(status) || undefined,
+      assignee: getSearchParamValue(assignee) || undefined,
+      priority: getSearchParamValue(priority) || undefined,
       limit: 50,
       sort: submittedQuery ? 'relevance' : 'updated',
     })
@@ -178,28 +183,32 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
     return () => {
       cancelled = true;
     };
-  }, [assignee, board, onOpenTask, status, submittedQuery]);
+  }, [assignee, board, onOpenTask, priority, status, submittedQuery]);
 
-  const submit = (event?: FormEvent) => {
-    event?.preventDefault();
+  const submit = () => {
     const nextQuery = query.trim();
     setSubmittedQuery(nextQuery);
     syncUrl({ q: nextQuery });
   };
 
-  const updateFilter = (key: 'board' | 'status' | 'assignee', value: string) => {
-    const nextValue = value === (key === 'board' ? board : key === 'status' ? status : assignee) ? '' : value;
-    if (key === 'board') setBoard(nextValue);
-    if (key === 'status') setStatus(nextValue);
-    if (key === 'assignee') setAssignee(nextValue);
-    syncUrl({ [key]: nextValue });
+  const updateFilters = (filters: DataViewSearchFilters) => {
+    const nextBoard = filters.board || '';
+    const nextStatus = filters.status || '';
+    const nextAssignee = filters.assignee || '';
+    const nextPriority = filters.priority || '';
+    setBoard(nextBoard);
+    setStatus(nextStatus);
+    setAssignee(nextAssignee);
+    setPriority(nextPriority);
+    syncUrl({ board: nextBoard, status: nextStatus, assignee: nextAssignee, priority: nextPriority });
   };
 
   const clearFilters = () => {
     setBoard('');
     setStatus('');
     setAssignee('');
-    syncUrl({ board: '', status: '', assignee: '' });
+    setPriority('');
+    syncUrl({ board: '', status: '', assignee: '', priority: '' });
   };
 
   const resultCountLabel = state === 'first-use' ? 'Ready' : state === 'loading' ? 'Searching…' : `${total} result${total === 1 ? '' : 's'}`;
@@ -216,57 +225,25 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
             </div>
             <p className="text-xs text-muted-foreground">All boards · {resultCountLabel} · {freshness}</p>
           </div>
-          <form onSubmit={submit} className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by task id, title, body, summary, comment, assignee, or status…"
-              className="h-12 rounded-2xl border-border/80 bg-background/70 pl-11 pr-24 text-base"
-              autoFocus
-              data-testid="task-search-input"
-            />
-            <Button type="submit" className="absolute right-1.5 top-1/2 h-9 -translate-y-1/2 rounded-xl bg-[#7C5CFF] px-4 text-xs font-semibold">Search</Button>
-          </form>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 md:hidden">
-            <SearchChip active={!!board} onClick={() => updateFilter('board', board ? board : activeBoard.id)}>Board</SearchChip>
-            <SearchChip active={!!status} onClick={() => updateFilter('status', status ? status : 'blocked')}>Status</SearchChip>
-            <SearchChip active={!!assignee} onClick={() => updateFilter('assignee', assignee ? assignee : assignees[0]?.name || 'developer')}>Assignee</SearchChip>
-            {(board || status || assignee) && <SearchChip onClick={clearFilters}><X size={12} className="mr-1 inline" />Clear</SearchChip>}
-          </div>
+          <DataViewSearchAndFilter
+            query={query}
+            filters={currentFilters}
+            boards={boards}
+            assignees={assignees}
+            onQueryChange={setQuery}
+            onFiltersChange={updateFilters}
+            onSubmit={(nextQuery) => {
+              setSubmittedQuery(nextQuery.trim());
+              syncUrl({ q: nextQuery.trim() });
+            }}
+            placeholder="Search by task id, title, body, summary, comment, assignee, or status…"
+            autoFocus
+            density="page"
+            testId="task-search-input"
+          />
         </div>
 
-        <div className="grid flex-1 gap-5 md:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="hidden rounded-3xl border border-border/70 bg-card/55 p-4 md:block">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Filters</h2>
-              {(board || status || assignee) && <button className="text-xs text-muted-foreground hover:text-foreground" onClick={clearFilters}>Clear</button>}
-            </div>
-            <div className="space-y-5">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Board</p>
-                <div className="flex flex-wrap gap-2">
-                  <SearchChip active={!board} onClick={() => updateFilter('board', '')}>All boards</SearchChip>
-                  <SearchChip active={board === activeBoard.id} onClick={() => updateFilter('board', activeBoard.id)}>Current</SearchChip>
-                  {boards.slice(0, 8).map((item) => <SearchChip key={item.id} active={board === item.id} onClick={() => updateFilter('board', item.id)}>{item.name}</SearchChip>)}
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</p>
-                <div className="flex flex-wrap gap-2">
-                  {STATUS_ORDER.map((item) => <SearchChip key={item} active={status === item} onClick={() => updateFilter('status', item)}>{STATUS_LABELS[item]}</SearchChip>)}
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assignee</p>
-                <div className="flex flex-wrap gap-2">
-                  {assignees.slice(0, 14).map((item) => <SearchChip key={item.id} active={assignee === item.name || assignee === item.id} onClick={() => updateFilter('assignee', item.name || item.id)}>{item.name}</SearchChip>)}
-                  {assignees.length === 0 && <p className="text-xs text-muted-foreground">Assignee list unavailable.</p>}
-                </div>
-              </div>
-            </div>
-          </aside>
-
+        <div className="flex-1">
           <div className="space-y-3">
             {state === 'loading' && [0, 1, 2].map((item) => <div key={item} className="h-40 animate-pulse rounded-2xl border border-border/60 bg-card/45" />)}
             {state === 'first-use' && (

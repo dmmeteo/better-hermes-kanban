@@ -14,6 +14,7 @@ import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel, type BoardSettingsMode } from '@/components/settings/BoardsSettingsPanel';
 import { TaskSearchPage } from '@/components/search/TaskSearchPage';
+import type { DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -56,6 +57,7 @@ function App() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchFilters, setSearchFilters] = useState<DataViewSearchFilters>({});
   const [boardFilterQuery, setBoardFilterQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -247,7 +249,7 @@ function App() {
     navigate(`${taskPath(taskId)}${params}`);
   }, [navigate]);
 
-  const handleGlobalSearch = useCallback(async (query?: string) => {
+  const handleGlobalSearch = useCallback(async (query?: string, filters: DataViewSearchFilters = searchFilters) => {
     const trimmed = (query ?? searchQuery).trim();
     const exactTaskId = normalizeExactTaskId(trimmed);
     if (EXACT_TASK_ID.test(exactTaskId)) {
@@ -264,8 +266,14 @@ function App() {
         // Fall through to the shareable search page where the bridge error is shown in context.
       }
     }
-    navigate(`/tasks${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''}`);
-  }, [navigate, searchQuery]);
+    const params = new URLSearchParams();
+    if (trimmed) params.set('q', trimmed);
+    (['board', 'status', 'assignee', 'priority'] as const).forEach((key) => {
+      const value = filters[key]?.replace(/^!/, '');
+      if (value) params.set(key, value);
+    });
+    navigate(`/tasks${params.toString() ? `?${params.toString()}` : ''}`);
+  }, [navigate, searchFilters, searchQuery]);
 
   const handleCloseDetail = useCallback(() => {
     if (isTaskPage) {
@@ -434,10 +442,13 @@ function App() {
       {/* Top Bar */}
       <TopBar
           boards={boards}
+          assignees={assignees}
           activeBoard={activeBoard}
           onBoardChange={handleBoardChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          searchFilters={searchFilters}
+          onSearchFiltersChange={setSearchFilters}
           onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
           onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
@@ -461,7 +472,6 @@ function App() {
           {isTaskSearchPage ? (
             <TaskSearchPage
               boards={boards}
-              activeBoard={activeBoard}
               assignees={assignees}
               onOpenTask={handleOpenSearchTask}
             />

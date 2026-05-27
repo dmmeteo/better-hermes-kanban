@@ -1,8 +1,8 @@
 import { Search, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import type { Board } from '@/lib/types';
+import type { Board, BotProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { DataViewSearchAndFilter, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,11 +18,14 @@ export type TaskDetailPresentation = 'drawer' | 'modal' | 'page';
 
 interface TopBarProps {
   boards: Board[];
+  assignees: BotProfile[];
   activeBoard: Board;
   onBoardChange: (board: Board) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onSearchSubmit?: (query?: string) => void;
+  searchFilters?: DataViewSearchFilters;
+  onSearchFiltersChange?: (filters: DataViewSearchFilters) => void;
+  onSearchSubmit?: (query?: string, filters?: DataViewSearchFilters) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
   onOpenNewBoard: () => void;
@@ -35,10 +38,13 @@ interface TopBarProps {
 
 export function TopBar({
   boards,
+  assignees,
   activeBoard,
   onBoardChange,
   searchQuery,
   onSearchChange,
+  searchFilters = {},
+  onSearchFiltersChange,
   onSearchSubmit,
   onOpenQuickCapture,
   onOpenSettings,
@@ -81,24 +87,18 @@ export function TopBar({
           </div>
         </div>
 
-        <div className="relative min-w-[360px] flex-1 max-w-5xl">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search all tasks…'}
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                onSearchSubmit?.(searchQuery);
-              }
-            }}
-            className="h-9 w-full rounded-xl border-border bg-secondary pl-8 text-xs"
-            data-testid="topbar-global-search"
-            aria-label="Search all tasks"
-            title="Global search: press Enter to open /tasks"
-          />
-        </div>
+        <DataViewSearchAndFilter
+          query={searchQuery}
+          filters={searchFilters}
+          boards={boards}
+          assignees={assignees}
+          onQueryChange={onSearchChange}
+          onFiltersChange={onSearchFiltersChange || (() => undefined)}
+          onSubmit={(query, filters) => onSearchSubmit?.(query, filters)}
+          placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search all tasks…'}
+          className="min-w-[360px] flex-1 max-w-5xl"
+          testId="topbar-global-search"
+        />
 
         <div className="flex shrink-0 items-center gap-3">
           {isTaskPage ? (
