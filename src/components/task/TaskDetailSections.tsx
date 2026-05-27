@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowLeft, ExternalLink, MoreHorizontal, RefreshCcw, X } from 'lucide-react';
 import type { Board, Task } from '@/lib/types';
+import { kanbanApi } from '@/lib/kanbanApi';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { MarkdownText } from '@/components/shared/MarkdownText';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
@@ -148,21 +149,43 @@ export function TaskCommentsPanel({ task, onAddComment }: { task: Task; onAddCom
 }
 
 export function TaskWorkerLogsPanel({ task }: { task: Task }) {
+  const [workerLog, setWorkerLog] = useState(task.workerLog);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshLog = async () => {
+    setIsRefreshing(true);
+    try {
+      setWorkerLog(await kanbanApi.getTaskWorkerLog(task.id, task.boardId));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+  const logText = workerLog?.text?.trim();
+
   return (
     <section className="space-y-3" data-testid="task-worker-logs-panel">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Worker logs</p>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-wait disabled:opacity-60"
           data-testid="task-worker-logs-refresh"
-          onClick={() => undefined}
+          onClick={refreshLog}
+          disabled={isRefreshing}
         >
-          <RefreshCcw size={12} />
+          <RefreshCcw size={12} className={isRefreshing ? 'animate-spin' : undefined} />
           Refresh
         </button>
       </div>
-      <TaskDiagnostics diagnostics={task.diagnostics} warningCount={task.warningCount} />
+      {logText ? (
+        <pre className="custom-scrollbar max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-background/70 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground" data-testid="task-worker-log-text">
+          {logText}
+        </pre>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border/70 p-3 text-xs text-muted-foreground" data-testid="task-worker-log-empty">
+          No worker log captured yet.
+        </div>
+      )}
+      {task.diagnostics.length > 0 || task.warningCount > 0 ? <TaskDiagnostics diagnostics={task.diagnostics} warningCount={task.warningCount} /> : null}
     </section>
   );
 }
