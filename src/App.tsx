@@ -40,6 +40,7 @@ function mergeTaskUpdate(existing: Task, updated: Task): Task {
     commentCount: updated.comments.length > 0 ? updated.commentCount : Math.max(existing.commentCount, updated.commentCount),
     activity: updated.activity.length > 0 ? updated.activity : existing.activity,
     runs: updated.runs.length > 0 ? updated.runs : existing.runs,
+    workerLog: updated.workerLog ?? existing.workerLog,
     linkedTasks: updated.linkedTasks.length > 0 ? updated.linkedTasks : existing.linkedTasks,
     linkCount: updated.linkedTasks.length > 0 ? updated.linkCount : Math.max(existing.linkCount, updated.linkCount),
     diagnostics: updated.diagnostics.length > 0 ? updated.diagnostics : existing.diagnostics,
