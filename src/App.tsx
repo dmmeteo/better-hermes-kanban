@@ -62,7 +62,7 @@ function App() {
   const [boardFilterQuery, setBoardFilterQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('list');
+  const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('settings');
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
     return saved === 'modal' || saved === 'page' ? saved : 'drawer';
@@ -161,7 +161,7 @@ function App() {
   // Load route data
   useEffect(() => {
     if (isSettingsPage) {
-      setSettingsMode('list');
+      setSettingsMode('settings');
       setIsSettingsOpen(true);
       navigate(boardPath(boardIdFromUrl), { replace: true });
       return;
@@ -452,7 +452,7 @@ function App() {
           onSearchFiltersChange={setSearchFilters}
           onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-          onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
+          onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
           onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
           detailPresentation={activeDetailPresentation}
           onDetailPresentationChange={handleDetailPresentationChange}
@@ -500,7 +500,7 @@ function App() {
               activeBoard={activeBoard}
               onBoardChange={handleBoardChange}
               onTaskClick={handleTaskClick}
-              onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
+              onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
               onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
@@ -562,6 +562,7 @@ function App() {
         activeBoard={activeBoard}
         onBoardChange={handleBoardChange}
         onBoardsRefresh={loadBoardData}
+        assignees={assignees}
       />
 
       {/* Quick Capture */}

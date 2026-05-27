@@ -114,7 +114,7 @@ export function TopBar({
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent">
+                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent" data-testid="board-selector-trigger">
                   <span className="text-muted-foreground">Board</span>
                   <span className="truncate">{activeBoard.name}</span>
                   <ChevronDown size={14} className="shrink-0 text-muted-foreground" />

@@ -5,7 +5,7 @@ import { kanbanApi } from '@/lib/kanbanApi';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
-export type BoardSettingsMode = 'settings' | 'create';
+export type BoardSettingsMode = 'settings' | 'list' | 'create';
 
 interface BoardsSettingsPanelProps {
   open: boolean;
