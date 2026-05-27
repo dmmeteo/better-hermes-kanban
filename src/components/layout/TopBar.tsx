@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack } from 'lucide-react';
+import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Board } from '@/lib/types';
@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export type TaskDetailPresentation = 'drawer' | 'modal';
+export type TaskDetailPresentation = 'drawer' | 'modal' | 'page';
 
 interface TopBarProps {
   boards: Board[];
@@ -111,8 +111,8 @@ export function TopBar({
                 className="h-8 text-xs gap-1.5"
                 data-testid="task-detail-presentation-trigger"
               >
-                {detailPresentation === 'modal' ? <SquareStack size={14} /> : <PanelRightOpen size={14} />}
-                <span>Detail: {detailPresentation === 'modal' ? 'Modal' : 'Drawer'}</span>
+                {detailPresentation === 'modal' ? <SquareStack size={14} /> : detailPresentation === 'page' ? <FileText size={14} /> : <PanelRightOpen size={14} />}
+                <span>Detail: {detailPresentation === 'modal' ? 'Modal' : detailPresentation === 'page' ? 'Page' : 'Drawer'}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
@@ -134,6 +134,12 @@ export function TopBar({
                   <div className="flex flex-col gap-0.5">
                     <span>Jira-style modal</span>
                     <span className="text-[11px] text-muted-foreground">Centered overlay with keyboard close/focus trap</span>
+                  </div>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="page" className="text-xs">
+                  <div className="flex flex-col gap-0.5">
+                    <span>Standalone page</span>
+                    <span className="text-[11px] text-muted-foreground">Full content canvas for comparing a task page layout</span>
                   </div>
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
