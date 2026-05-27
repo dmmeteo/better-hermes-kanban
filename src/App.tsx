@@ -12,9 +12,7 @@ import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
 import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
-import { NeedsMeDrawer } from '@/components/task/NeedsMeDrawer';
 import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
-import { getNeedsMeTasks } from '@/lib/attention';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -53,7 +51,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isBoardSettingsOpen, setIsBoardSettingsOpen] = useState(false);
-  const [isNeedsMeOpen, setIsNeedsMeOpen] = useState(false);
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
     return saved === 'modal' || saved === 'page' ? saved : 'drawer';
@@ -175,7 +172,6 @@ function App() {
     () => tasks.find((t) => t.id === selectedTaskId) || null,
     [tasks, selectedTaskId]
   );
-  const needsMeTasks = useMemo(() => getNeedsMeTasks(tasks), [tasks]);
 
   useEffect(() => {
     if (!selectedTaskId || isTaskPage) return;
@@ -213,7 +209,6 @@ function App() {
   }, [activeBoard, boards, routeTaskId, selectedTask]);
 
   const handleTaskClick = useCallback((task: Task) => {
-    setIsNeedsMeOpen(false);
     if (detailPresentation === 'page') {
       navigate(taskPath(task.id));
       return;
@@ -228,26 +223,6 @@ function App() {
     }
     setSelectedTaskId(null);
   }, [activeBoard, isTaskPage, navigate]);
-
-  const handleOpenNeedsMe = useCallback(() => {
-    setSelectedTaskId(null);
-    setIsNeedsMeOpen(true);
-  }, []);
-
-  const handleCloseNeedsMe = useCallback(() => {
-    setIsNeedsMeOpen(false);
-  }, []);
-
-  const handleOpenNeedsMeTask = useCallback((task: Task) => {
-    setIsNeedsMeOpen(false);
-    handleTaskClick(task);
-  }, [handleTaskClick]);
-
-  const handleReplyNeedsMeTask = useCallback((task: Task) => {
-    setIsNeedsMeOpen(false);
-    handleTaskClick(task);
-    toast.info('Reply from the task detail thread for now');
-  }, [handleTaskClick]);
 
   const handleDetailPresentationChange = useCallback((presentation: TaskDetailPresentation) => {
     setDetailPresentation(presentation);
@@ -414,8 +389,6 @@ function App() {
         onSearchChange={setSearchQuery}
         onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
         onOpenSettings={() => setIsBoardSettingsOpen(true)}
-        onOpenNeedsMe={handleOpenNeedsMe}
-        needsMeCount={needsMeTasks.length}
         detailPresentation={activeDetailPresentation}
         onDetailPresentationChange={handleDetailPresentationChange}
         isTaskPage={isTaskPage}
@@ -475,26 +448,11 @@ function App() {
               handleCloseDetail();
             } else if (tab === 'more') {
               setIsBoardSettingsOpen(true);
-            } else if (tab === 'mytasks') {
-              handleOpenNeedsMe();
             } else {
               toast.info(`${tab} coming soon`);
             }
           }}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-          needsMeCount={needsMeTasks.length}
-        />
-      )}
-
-      {!isTaskPage && (
-        <NeedsMeDrawer
-          open={isNeedsMeOpen}
-          tasks={needsMeTasks}
-          activeBoard={activeBoard}
-          onClose={handleCloseNeedsMe}
-          onOpenTask={handleOpenNeedsMeTask}
-          onReplyTask={handleReplyNeedsMeTask}
-          isMobile={isMobile}
         />
       )}
 

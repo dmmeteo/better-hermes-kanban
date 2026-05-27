@@ -253,17 +253,6 @@ function normalizeTask(raw: unknown, boardId: string): Task {
     item.latest_summary ?? item.latestSummary ?? item.summary ?? item.result,
     ''
   ) || null;
-  const waitingOn = asString(item.waiting_on ?? item.waitingOn, '').toLowerCase();
-  const normalizedWaitingOn =
-    waitingOn === 'user' || waitingOn === 'agent' || waitingOn === 'external' ? waitingOn : null;
-  const rawLastQuestion = item.last_question ?? item.lastQuestion;
-  const lastQuestion = isObject(rawLastQuestion)
-    ? {
-        text: asString(rawLastQuestion.text ?? rawLastQuestion.body ?? rawLastQuestion.message),
-        author: asString(rawLastQuestion.author ?? rawLastQuestion.profile ?? rawLastQuestion.created_by, 'agent'),
-        createdAt: toIso(rawLastQuestion.created_at ?? rawLastQuestion.createdAt),
-      }
-    : null;
 
   return {
     id,
@@ -273,11 +262,6 @@ function normalizeTask(raw: unknown, boardId: string): Task {
     priority: normalizePriority(item.priority),
     assignee: asString(item.assignee ?? item.profile ?? item.worker, '') || null,
     boardId: asString(item.board ?? item.board_id ?? item.boardId, boardId),
-    needsHumanInput: Boolean(item.needs_human_input ?? item.needsHumanInput ?? item.needs_user_input ?? item.needsUserInput),
-    waitingOn: normalizedWaitingOn,
-    waitingReason: asString(item.waiting_reason ?? item.waitingReason, '') || null,
-    waitingSince: item.waiting_since || item.waitingSince ? toIso(item.waiting_since ?? item.waitingSince) : null,
-    lastQuestion: lastQuestion?.text ? lastQuestion : null,
     parentIds: asStringArray(item.parents ?? item.parent_ids ?? item.parentIds),
     commentCount: asNumber(item.comment_count ?? item.commentCount, comments.length),
     linkCount: asNumber(item.link_count ?? item.linkCount, asStringArray(item.parents ?? item.parent_ids).length),
