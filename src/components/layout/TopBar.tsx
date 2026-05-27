@@ -22,11 +22,13 @@ interface TopBarProps {
   onBoardChange: (board: Board) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit?: (query?: string) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
   detailPresentation: TaskDetailPresentation;
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
   isTaskPage?: boolean;
+  isTaskSearchPage?: boolean;
   onNavigateToBoard?: () => void;
 }
 
@@ -36,11 +38,13 @@ export function TopBar({
   onBoardChange,
   searchQuery,
   onSearchChange,
+  onSearchSubmit,
   onOpenQuickCapture,
   onOpenSettings,
   detailPresentation,
   onDetailPresentationChange,
   isTaskPage = false,
+  isTaskSearchPage = false,
   onNavigateToBoard,
 }: TopBarProps) {
   return (
@@ -52,8 +56,14 @@ export function TopBar({
           <span className="font-bold text-sm">Hermes</span>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" aria-label="Search tasks" className="p-2 rounded-lg hover:bg-accent">
-            <Search size={18} className="text-muted-foreground" />
+          <button
+            type="button"
+            aria-label="Search tasks"
+            data-testid="mobile-global-search-button"
+            onClick={() => onSearchSubmit?.()}
+            className="p-2 rounded-lg hover:bg-accent"
+          >
+            <Search size={18} className={cn(isTaskSearchPage ? 'text-foreground' : 'text-muted-foreground')} />
           </button>
           <button
             type="button"
@@ -119,10 +129,17 @@ export function TopBar({
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search tasks..."
+              placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search tasks...'}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearchSubmit?.(searchQuery);
+                }
+              }}
               className="w-64 h-8 pl-8 text-xs bg-secondary border-border"
+              data-testid="topbar-global-search"
             />
           </div>
           {!isTaskPage && (
