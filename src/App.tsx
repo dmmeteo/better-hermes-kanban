@@ -98,11 +98,11 @@ function App() {
       ]);
       const taskBoardId = directTask?.boardId || boardIdFromUrl;
       const boardData = await kanbanApi.getBoard(taskBoardId);
-      const mergedTasks = boardData.tasks.some((task) => task.id === directTask?.id)
-        ? boardData.tasks
-        : directTask
-          ? [directTask, ...boardData.tasks]
-          : boardData.tasks;
+      const mergedTasks = directTask
+        ? boardData.tasks.some((task) => task.id === directTask.id)
+          ? boardData.tasks.map((task) => (task.id === directTask.id ? { ...task, ...directTask } : task))
+          : [directTask, ...boardData.tasks]
+        : boardData.tasks;
       setTasks(mergedTasks);
       setBoards(boardsResult.boards);
       setActiveBoard(boardData.board);

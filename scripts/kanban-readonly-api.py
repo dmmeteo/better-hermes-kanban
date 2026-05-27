@@ -502,6 +502,51 @@ def task_counts(conn, task_id: str) -> tuple[int, int, int]:
     return int(comment_count or 0), int(link_count or 0), int(warning_count or 0)
 
 
+def linked_tasks(conn, task_id: str, board: str) -> list[dict]:
+    """Return compact parent/child task records for the BHK detail UI."""
+    rows = conn.execute(
+        """
+        SELECT
+            links.parent_id,
+            links.child_id,
+            tasks.id AS task_id,
+            tasks.title,
+            tasks.status,
+            tasks.priority,
+            tasks.assignee
+        FROM task_links AS links
+        JOIN tasks
+            ON tasks.id = CASE
+                WHEN lower(links.parent_id) = lower(?) THEN links.child_id
+                ELSE links.parent_id
+            END
+        WHERE lower(links.parent_id) = lower(?) OR lower(links.child_id) = lower(?)
+        ORDER BY
+            CASE WHEN lower(links.parent_id) = lower(?) THEN 1 ELSE 0 END,
+            tasks.created_at ASC,
+            tasks.id ASC
+        """,
+        (task_id, task_id, task_id, task_id),
+    ).fetchall()
+    links: list[dict] = []
+    for index, row in enumerate(rows):
+        relation = "child" if str(row["parent_id"]).lower() == task_id.lower() else "parent"
+        related_task_id = str(row["task_id"])
+        links.append({
+            "id": f"link-{index}-{row['parent_id']}-{row['child_id']}",
+            "task_id": related_task_id,
+            "taskId": related_task_id,
+            "title": row["title"] or related_task_id,
+            "status": row["status"] or "todo",
+            "priority": row["priority"],
+            "assignee": row["assignee"],
+            "relation": relation,
+            "board": board,
+            "board_id": board,
+        })
+    return links
+
+
 def board_choices(slug: str | None) -> list[dict]:
     if slug and slug.lower() not in {"all", "*"}:
         board = resolve_board(slug)
@@ -556,6 +601,7 @@ def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, 
                 comments = conn.execute("SELECT author, body, created_at FROM task_comments WHERE task_id = ? ORDER BY created_at DESC LIMIT 8", (task_id,)).fetchall()
                 latest_summary, summary_updated_at = latest_run_summary(conn, task_id)
                 comment_count, link_count, warning_count = task_counts(conn, task_id)
+                links = linked_tasks(conn, task_id, board) if exact_id or link_count else []
                 if status_filter and row["status"].lower() != status_filter:
                     continue
                 if assignee_filter and (row["assignee"] or "").lower() != assignee_filter:
@@ -628,6 +674,8 @@ def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, 
                     "summary_updated_at": summary_updated_at,
                     "comment_count": comment_count,
                     "link_count": link_count,
+                    "links": links,
+                    "linkedTasks": links,
                     "warning_count": warning_count,
                     "updated_at": updated_at,
                 })
