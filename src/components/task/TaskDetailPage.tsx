@@ -116,40 +116,39 @@ export function TaskDetailPage({
   return (
     <section className="h-full overflow-y-auto bg-background" data-testid="task-detail-page">
       <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-4 px-3 pb-24 pt-3 md:px-6 md:py-5 lg:pb-5">
-        <div className="rounded-2xl border border-border/70 bg-card/75 px-3 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] md:px-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <Button variant="outline" size="sm" className="h-9 shrink-0 gap-2" onClick={onBack} data-testid="task-page-back">
-                <ArrowLeft size={15} />
-                <span className="hidden sm:inline">Open board</span>
-              </Button>
-              <div className="min-w-0 space-y-2">
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <a
-                    href={`/tasks/${encodeURIComponent(task.id)}`}
-                    className="font-mono rounded bg-secondary px-2 py-0.5 transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    data-testid="task-page-id-link"
-                  >
-                    {task.id}
-                  </a>
-                  <span>on {activeBoard.name || activeBoard.id}</span>
-                </div>
-                <div className="rounded-xl border border-transparent -mx-2 px-2 py-1 transition-colors hover:border-border/60 hover:bg-background/30" data-testid="task-page-title-slot">
-                  {isEditingDocument ? (
-                    <input
-                      value={draftTitle}
-                      onChange={(event) => setDraftTitle(event.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-lg font-bold leading-tight outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 md:text-2xl"
-                      aria-label="Task title"
-                      data-testid="task-page-title-input"
-                    />
-                  ) : (
-                    <h1 className="line-clamp-2 text-lg font-bold leading-tight md:text-2xl">{task.title}</h1>
-                  )}
-                </div>
+        <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.18)] md:px-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <Button variant="ghost" size="sm" className="-ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={onBack} data-testid="task-page-back">
+                  <ArrowLeft size={14} />
+                  Board
+                </Button>
+                <span className="text-border">/</span>
+                <a
+                  href={`/tasks/${encodeURIComponent(task.id)}`}
+                  className="font-mono rounded bg-secondary/80 px-2 py-0.5 transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  data-testid="task-page-id-link"
+                >
+                  {task.id}
+                </a>
+                <span>on {activeBoard.name || activeBoard.id}</span>
+              </div>
+              <div data-testid="task-page-title-slot">
+                {isEditingDocument ? (
+                  <input
+                    value={draftTitle}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    className="w-full rounded-xl border border-border bg-background/70 px-3 py-2 text-2xl font-bold leading-tight outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 md:text-3xl"
+                    aria-label="Task title"
+                    data-testid="task-page-title-input"
+                  />
+                ) : (
+                  <h1 className="max-w-4xl text-2xl font-bold leading-tight tracking-[-0.02em] md:text-3xl">{task.title}</h1>
+                )}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
               <BotAvatar name={task.assignee} />
@@ -174,50 +173,52 @@ export function TaskDetailPage({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/70 bg-card/55 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.14)]" data-testid="task-page-body-card">
-          {isEditingDocument ? (
-            <div className="space-y-2">
-              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Body</label>
-              <textarea
-                value={draftDescription}
-                onChange={(event) => setDraftDescription(event.target.value)}
-                rows={8}
-                className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                placeholder="Describe this task… Markdown is supported."
-                aria-label="Task body"
-                data-testid="task-page-body-input"
-              />
-              <p className="text-[11px] text-muted-foreground">Markdown-friendly body edit. Save is enabled after a valid change.</p>
+        <div className="grid min-h-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0 space-y-4">
+            <div className="rounded-2xl border border-border/70 bg-card/45 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.12)]" data-testid="task-page-body-card">
+              {isEditingDocument ? (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Body</label>
+                  <textarea
+                    value={draftDescription}
+                    onChange={(event) => setDraftDescription(event.target.value)}
+                    rows={10}
+                    className="custom-scrollbar w-full resize-y rounded-xl border border-border bg-background/75 px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                    placeholder="Describe this task… Markdown is supported."
+                    aria-label="Task body"
+                    data-testid="task-page-body-input"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Markdown-friendly body edit. Save is enabled after a valid change.</p>
+                </div>
+              ) : task.description ? (
+                <TaskDetailPageBody value={task.description} />
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+                  No body yet. Use Edit to add a task description.
+                </div>
+              )}
             </div>
-          ) : task.description ? (
-            <TaskDetailPageBody value={task.description} />
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
-              No body yet. Use Edit to add a task description.
-            </div>
-          )}
-        </div>
 
-        <div className="grid min-h-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="min-h-0 self-start overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
-            <TaskDetail
-              task={task}
-              allTasks={allTasks}
-              isMobile={isMobile}
-              onBack={onBack}
-              onStatusChange={onStatusChange}
-              onAddComment={onAddComment}
-              onBlock={onBlock}
-              onReclaim={onReclaim}
-              onDecompose={onDecompose}
-              onDelete={onDelete}
-              onUpdateTask={onUpdateTask}
-              isUpdating={isUpdating}
-              chrome="page"
-              showDescription={false}
-              showUpdatePanel={false}
-              showInlineActions={false}
-            />
+            <div className="min-h-0 self-start overflow-hidden rounded-2xl border border-border/70 bg-card/40 shadow-[0_18px_60px_rgba(0,0,0,0.14)]">
+              <TaskDetail
+                task={task}
+                allTasks={allTasks}
+                isMobile={isMobile}
+                onBack={onBack}
+                onStatusChange={onStatusChange}
+                onAddComment={onAddComment}
+                onBlock={onBlock}
+                onReclaim={onReclaim}
+                onDecompose={onDecompose}
+                onDelete={onDelete}
+                onUpdateTask={onUpdateTask}
+                isUpdating={isUpdating}
+                chrome="page"
+                showDescription={false}
+                showUpdatePanel={false}
+                showInlineActions={false}
+              />
+            </div>
           </div>
 
           <TaskActionsRail

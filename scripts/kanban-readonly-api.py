@@ -492,6 +492,99 @@ def latest_run_summary(conn, task_id: str) -> tuple[str, int | None]:
     return str(text or ""), row["ended_at"] or row["started_at"]
 
 
+def task_comments(conn, task_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, author, body, created_at FROM task_comments WHERE task_id = ? ORDER BY created_at DESC LIMIT 50",
+        (task_id,),
+    ).fetchall()
+    return [
+        {
+            "id": str(row["id"]),
+            "author": row["author"] or "user",
+            "body": row["body"] or "",
+            "text": row["body"] or "",
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def task_runs(conn, task_id: str) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT id, status, outcome, summary, error, started_at, ended_at
+        FROM task_runs
+        WHERE task_id = ?
+        ORDER BY started_at DESC, id DESC
+        LIMIT 20
+        """,
+        (task_id,),
+    ).fetchall()
+    return [
+        {
+            "id": str(row["id"]),
+            "status": row["status"] or row["outcome"] or "started",
+            "outcome": row["outcome"],
+            "summary": row["summary"],
+            "error": row["error"],
+            "started_at": row["started_at"],
+            "ended_at": row["ended_at"],
+        }
+        for row in rows
+    ]
+
+
+def activity_type(kind: str) -> str:
+    raw = (kind or "").lower()
+    if "comment" in raw:
+        return "comment"
+    if "assign" in raw:
+        return "assignment"
+    if "block" in raw:
+        return "block"
+    if "reclaim" in raw:
+        return "reclaim"
+    if "specify" in raw:
+        return "specify"
+    if "decompose" in raw:
+        return "decompose"
+    if "status" in raw or "complete" in raw or "ready" in raw or "schedule" in raw:
+        return "status_change"
+    return "run"
+
+
+def task_activity(conn, task_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, kind, payload, created_at FROM task_events WHERE task_id = ? ORDER BY created_at DESC, id DESC LIMIT 50",
+        (task_id,),
+    ).fetchall()
+    activity: list[dict] = []
+    for row in rows:
+        payload = row["payload"]
+        description = row["kind"] or "Activity"
+        metadata = None
+        if payload:
+            try:
+                metadata = json.loads(payload)
+                if isinstance(metadata, dict):
+                    detail = metadata.get("reason") or metadata.get("status") or metadata.get("assignee") or metadata.get("summary")
+                    if detail:
+                        description = f"{description}: {detail}"
+                else:
+                    metadata = {"value": metadata}
+            except json.JSONDecodeError:
+                metadata = {"value": payload}
+                description = f"{description}: {payload}"
+        activity.append({
+            "id": str(row["id"]),
+            "type": activity_type(row["kind"]),
+            "description": description.replace("_", " "),
+            "created_at": row["created_at"],
+            "payload": metadata,
+        })
+    return activity
+
+
 def task_counts(conn, task_id: str) -> tuple[int, int, int]:
     comment_count = conn.execute("SELECT COUNT(*) AS count FROM task_comments WHERE task_id = ?", (task_id,)).fetchone()["count"]
     link_count = conn.execute("SELECT COUNT(*) AS count FROM task_links WHERE parent_id = ? OR child_id = ?", (task_id, task_id)).fetchone()["count"]
@@ -598,7 +691,9 @@ def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, 
                 if source_key in seen_sources:
                     continue
                 seen_sources.add(source_key)
-                comments = conn.execute("SELECT author, body, created_at FROM task_comments WHERE task_id = ? ORDER BY created_at DESC LIMIT 8", (task_id,)).fetchall()
+                comments = task_comments(conn, task_id)
+                runs = task_runs(conn, task_id) if exact_id else []
+                events = task_activity(conn, task_id) if exact_id else []
                 latest_summary, summary_updated_at = latest_run_summary(conn, task_id)
                 comment_count, link_count, warning_count = task_counts(conn, task_id)
                 links = linked_tasks(conn, task_id, board) if exact_id or link_count else []
@@ -673,6 +768,10 @@ def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, 
                     "latest_summary": latest_summary or None,
                     "summary_updated_at": summary_updated_at,
                     "comment_count": comment_count,
+                    "comments": comments,
+                    "activity": events,
+                    "events": events,
+                    "runs": runs,
                     "link_count": link_count,
                     "links": links,
                     "linkedTasks": links,

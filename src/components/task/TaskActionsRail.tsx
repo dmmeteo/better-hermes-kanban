@@ -150,29 +150,19 @@ function TaskActionSet({
           />
         )}
         {state.showBlock && <ActionButton icon={Octagon} label="Block" tone="danger" onClick={onBlock} />}
-        <ActionButton icon={UserCog} label="Reassign" onClick={() => toast.info('Reassign coming soon')} />
-        {state.showReclaim ? (
-          <ActionButton icon={RotateCcw} label="Reclaim" onClick={onReclaim} />
-        ) : (
-          <ActionButton
-            icon={Calendar}
-            label="Schedule"
-            tone={state.showSchedule ? 'purple' : 'quiet'}
-            disabled={!state.showSchedule}
-            title={!state.showSchedule ? 'Schedule is only available for todo or triage tasks' : undefined}
-            onClick={() => onStatusChange('scheduled')}
-          />
-        )}
-        <ActionButton
-          icon={ListChecks}
-          label="Specify"
-          disabled={!state.showSpecify}
-          title={!state.showSpecify ? 'Specify is intended for triage/todo tasks' : undefined}
-          onClick={() => toast.info('Specify requirements coming soon')}
-        />
-        <ActionButton icon={GitBranch} label="Decompose" onClick={onDecompose} />
+        {task.status !== 'done' && <ActionButton icon={UserCog} label="Reassign" onClick={() => toast.info('Reassign coming soon')} />}
+        {state.showReclaim && <ActionButton icon={RotateCcw} label="Reclaim" onClick={onReclaim} />}
+        {state.showSchedule && <ActionButton icon={Calendar} label="Schedule" tone="purple" onClick={() => onStatusChange('scheduled')} />}
+        {state.showSpecify && <ActionButton icon={ListChecks} label="Specify" onClick={() => toast.info('Specify requirements coming soon')} />}
+        {task.status !== 'done' && <ActionButton icon={GitBranch} label="Decompose" onClick={onDecompose} />}
         {state.showDone && <ActionButton icon={CheckCircle} label="Done" tone="success" onClick={() => onStatusChange('done')} />}
       </div>
+
+      {task.status === 'done' && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200/80">
+          This task is done. Destructive controls are tucked below.
+        </div>
+      )}
 
       <div className="rounded-xl border border-border/60 bg-background/35 p-2">
         <button
@@ -198,8 +188,8 @@ export function TaskActionsRail({ task, allTasks, activeBoard, onStatusChange, o
       <div className="sticky top-4 space-y-4">
         <div className="space-y-1">
           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Task actions</p>
-          <p className="text-sm font-semibold">Workflow controls</p>
-          <p className="text-xs text-muted-foreground">Guarded actions show confirmation or read-only feedback before mutating.</p>
+          <p className="text-sm font-semibold">Actions</p>
+          <p className="text-xs text-muted-foreground">Only available workflow controls are shown here.</p>
         </div>
 
         <TaskActionSet

@@ -133,9 +133,20 @@ function normalizeActivity(raw: unknown): TaskActivity[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item, index) => {
     const event = isObject(item) ? item : {};
+    const rawType = asString(event.type ?? event.kind, 'run').replace(/-/g, '_');
+    const type = (
+      rawType === 'status_change' ||
+      rawType === 'assignment' ||
+      rawType === 'comment' ||
+      rawType === 'run' ||
+      rawType === 'block' ||
+      rawType === 'reclaim' ||
+      rawType === 'specify' ||
+      rawType === 'decompose'
+    ) ? rawType : 'run';
     return {
       id: asString(event.id ?? event.event_id, `a-${index}`),
-      type: 'run',
+      type,
       description: asString(event.description ?? event.kind ?? event.message ?? event.payload, 'Activity'),
       createdAt: toIso(event.created_at ?? event.createdAt ?? event.timestamp),
       metadata: isObject(event.payload) ? event.payload : undefined,
@@ -147,12 +158,13 @@ function normalizeRuns(raw: unknown): TaskRun[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item, index) => {
     const run = isObject(item) ? item : {};
-    const status = asString(run.status ?? run.outcome, 'started');
+    const status = asString(run.status ?? run.outcome, 'started').toLowerCase();
+    const ended = run.ended_at ?? run.completedAt;
     return {
       id: asString(run.id ?? run.run_id, `run-${index}`),
-      status: status === 'completed' || status === 'done' ? 'completed' : status === 'failed' || status === 'crashed' ? 'failed' : 'started',
+      status: status === 'completed' || status === 'done' || status === 'succeeded' || (ended && status !== 'failed' && status !== 'crashed' && status !== 'error') ? 'completed' : status === 'failed' || status === 'crashed' || status === 'error' ? 'failed' : 'started',
       startedAt: toIso(run.started_at ?? run.startedAt),
-      completedAt: run.ended_at || run.completedAt ? toIso(run.ended_at ?? run.completedAt) : undefined,
+      completedAt: ended ? toIso(ended) : undefined,
       output: asString(run.summary ?? run.result ?? run.error, ''),
     };
   });
