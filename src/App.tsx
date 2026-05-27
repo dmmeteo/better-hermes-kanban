@@ -201,6 +201,7 @@ function App() {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update task';
         toast.error(message);
+        throw error;
       } finally {
         setUpdatingTaskId(null);
       }

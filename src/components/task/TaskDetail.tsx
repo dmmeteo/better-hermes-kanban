@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ChevronLeft,
   MoreHorizontal,
@@ -42,6 +42,8 @@ interface TaskDetailProps {
   isUpdating?: boolean;
   showCloseButton?: boolean;
   chrome?: 'panel' | 'page';
+  showUpdatePanel?: boolean;
+  showInlineActions?: boolean;
 }
 
 export function TaskDetail({
@@ -59,6 +61,8 @@ export function TaskDetail({
   isUpdating = false,
   showCloseButton = false,
   chrome = 'panel',
+  showUpdatePanel = true,
+  showInlineActions = true,
 }: TaskDetailProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -78,6 +82,9 @@ export function TaskDetail({
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
   const taskHref = `/tasks/${encodeURIComponent(task.id)}`;
   const showPanelChrome = chrome === 'panel';
+  const hasLinkedTasks = task.linkedTasks.length > 0;
+  const hasDiagnostics = task.diagnostics.length > 0 || task.warningCount > 0;
+  const hasPlannedAttachments = task.plannedAttachments.length > 0;
 
   // Mobile sections
   const mobileSections = [
@@ -118,6 +125,12 @@ export function TaskDetail({
       count: task.plannedAttachments.length,
     },
   ];
+  const visibleMobileSections = mobileSections.filter((section) => {
+    if (section.key === 'links') return hasLinkedTasks;
+    if (section.key === 'diagnostics') return hasDiagnostics;
+    if (section.key === 'attachments') return hasPlannedAttachments;
+    return true;
+  });
 
   // Desktop tabs
   const desktopTabs = [
@@ -252,7 +265,7 @@ export function TaskDetail({
 
               {/* Expandable list */}
               <div className="space-y-1">
-                {mobileSections.map((section) => (
+                {visibleMobileSections.map((section) => (
                   <div key={section.key}>
                     <button
                       onClick={() => toggleSection(section.key)}
@@ -274,7 +287,7 @@ export function TaskDetail({
                       </div>
                     </button>
                     {expandedSections[section.key] && (
-                      <div className="px-3 py-2 ml-6">
+                      <div className="px-3 py-2 ml-6 rounded-lg bg-background/35">
                         {section.key === 'comments' && (
                           <TaskComments comments={task.comments} onAddComment={onAddComment} />
                         )}
@@ -293,23 +306,27 @@ export function TaskDetail({
                 ))}
               </div>
 
-              <TaskUpdatePanel
-                task={task}
-                onUpdate={onUpdateTask}
-                isSaving={isUpdating}
-                showTitleField={showPanelChrome}
-              />
+              {showUpdatePanel && (
+                <TaskUpdatePanel
+                  task={task}
+                  onUpdate={onUpdateTask}
+                  isSaving={isUpdating}
+                  showTitleField={showPanelChrome}
+                />
+              )}
 
               {/* Actions */}
-              <TaskActions
-                task={task}
-                allTasks={allTasks}
-                onStatusChange={onStatusChange}
-                onBlock={onBlock}
-                onReclaim={onReclaim}
-                onDecompose={onDecompose}
-                onDelete={onDelete}
-              />
+              {showInlineActions && (
+                <TaskActions
+                  task={task}
+                  allTasks={allTasks}
+                  onStatusChange={onStatusChange}
+                  onBlock={onBlock}
+                  onReclaim={onReclaim}
+                  onDecompose={onDecompose}
+                  onDelete={onDelete}
+                />
+              )}
             </>
           )}
 
@@ -351,36 +368,32 @@ export function TaskDetail({
                       />
                     )}
 
-                    <TaskUpdatePanel
-                      task={task}
-                      onUpdate={onUpdateTask}
-                      isSaving={isUpdating}
-                      showTitleField={showPanelChrome}
-                    />
+                    {showUpdatePanel && (
+                      <TaskUpdatePanel
+                        task={task}
+                        onUpdate={onUpdateTask}
+                        isSaving={isUpdating}
+                        showTitleField={showPanelChrome}
+                      />
+                    )}
 
-                    {/* Linked tasks */}
-                    <div>
-                      <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                        Linked tasks
-                      </h4>
-                      <TaskLinks linkedTasks={task.linkedTasks} />
-                    </div>
+                    {hasLinkedTasks && (
+                      <CompactSection title="Linked tasks" count={task.linkedTasks.length}>
+                        <TaskLinks linkedTasks={task.linkedTasks} />
+                      </CompactSection>
+                    )}
 
-                    {/* Diagnostics */}
-                    <div>
-                      <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                        Diagnostics
-                      </h4>
-                      <TaskDiagnostics diagnostics={task.diagnostics} />
-                    </div>
+                    {hasDiagnostics && (
+                      <CompactSection title="Diagnostics" count={task.diagnostics.length + task.warningCount}>
+                        <TaskDiagnostics diagnostics={task.diagnostics} />
+                      </CompactSection>
+                    )}
 
-                    {/* Attachments */}
-                    <div>
-                      <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                        Planned attachments
-                      </h4>
-                      <TaskAttachmentsPlanned attachments={task.plannedAttachments} />
-                    </div>
+                    {hasPlannedAttachments && (
+                      <CompactSection title="Planned attachments" count={task.plannedAttachments.length}>
+                        <TaskAttachmentsPlanned attachments={task.plannedAttachments} />
+                      </CompactSection>
+                    )}
                   </div>
                 )}
 
@@ -396,7 +409,7 @@ export function TaskDetail({
       </div>
 
       {/* Desktop: Bottom action bar */}
-      {!isMobile && (
+      {!isMobile && showInlineActions && (
         <div className="shrink-0 border-t border-border/50 p-3 space-y-2">
           <TaskActions
             task={task}
@@ -410,5 +423,21 @@ export function TaskDetail({
         </div>
       )}
     </div>
+  );
+}
+
+function CompactSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border/60 bg-background/35 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {title}
+        </h4>
+        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+          {count}
+        </span>
+      </div>
+      {children}
+    </section>
   );
 }

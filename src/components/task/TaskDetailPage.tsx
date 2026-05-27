@@ -1,11 +1,17 @@
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Edit3, ExternalLink, Loader2, Save, X } from 'lucide-react';
 import type { Board, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { BotAvatar } from '@/components/shared/BotAvatar';
-import { cn } from '@/lib/utils';
+import { MarkdownText } from '@/components/shared/MarkdownText';
 import { TaskDetail } from './TaskDetail';
+import { MobileTaskActionBar, TaskActionsRail } from './TaskActionsRail';
+
+function TaskDetailPageBody({ value }: { value: string }) {
+  return <MarkdownText value={value} className="text-sm leading-relaxed" />;
+}
 
 interface TaskDetailPageProps {
   task: Task | null;
@@ -40,9 +46,49 @@ export function TaskDetailPage({
   isUpdating = false,
   isMobile = false,
 }: TaskDetailPageProps) {
-  const nearbyTasks = allTasks
-    .filter((candidate) => candidate.id !== taskId)
-    .slice(0, 8);
+  const [isEditingDocument, setIsEditingDocument] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(task?.title || '');
+  const [draftDescription, setDraftDescription] = useState(task?.description || '');
+
+  useEffect(() => {
+    if (!isEditingDocument) {
+      setDraftTitle(task?.title || '');
+      setDraftDescription(task?.description || '');
+    }
+  }, [isEditingDocument, task]);
+
+  const trimmedTitle = draftTitle.trim();
+  const isDirty = useMemo(() => {
+    if (!task) return false;
+    return trimmedTitle !== task.title || draftDescription !== task.description;
+  }, [draftDescription, task, trimmedTitle]);
+  const canSave = Boolean(task && isDirty && trimmedTitle && !isUpdating);
+
+  const startEditing = () => {
+    if (!task) return;
+    setDraftTitle(task.title);
+    setDraftDescription(task.description);
+    setIsEditingDocument(true);
+  };
+
+  const cancelEditing = () => {
+    setDraftTitle(task?.title || '');
+    setDraftDescription(task?.description || '');
+    setIsEditingDocument(false);
+  };
+
+  const saveDocumentFields = async () => {
+    if (!task || !canSave) return;
+    const patch: UpdateTaskData = {};
+    if (trimmedTitle !== task.title) patch.title = trimmedTitle;
+    if (draftDescription !== task.description) patch.description = draftDescription;
+    try {
+      await onUpdateTask(patch);
+      setIsEditingDocument(false);
+    } catch {
+      // Parent update handler owns the error toast and keeps the previous task in local state.
+    }
+  };
 
   if (!task) {
     return (
@@ -69,7 +115,7 @@ export function TaskDetailPage({
 
   return (
     <section className="h-full overflow-y-auto bg-background" data-testid="task-detail-page">
-      <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-4 px-3 py-3 md:px-6 md:py-5">
+      <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-4 px-3 pb-24 pt-3 md:px-6 md:py-5 lg:pb-5">
         <div className="rounded-2xl border border-border/70 bg-card/75 px-3 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] md:px-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -89,7 +135,17 @@ export function TaskDetailPage({
                   <span>on {activeBoard.name || activeBoard.id}</span>
                 </div>
                 <div className="rounded-xl border border-transparent -mx-2 px-2 py-1 transition-colors hover:border-border/60 hover:bg-background/30" data-testid="task-page-title-slot">
-                  <h1 className="line-clamp-2 text-lg font-bold leading-tight md:text-2xl">{task.title}</h1>
+                  {isEditingDocument ? (
+                    <input
+                      value={draftTitle}
+                      onChange={(event) => setDraftTitle(event.target.value)}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-lg font-bold leading-tight outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 md:text-2xl"
+                      aria-label="Task title"
+                      data-testid="task-page-title-input"
+                    />
+                  ) : (
+                    <h1 className="line-clamp-2 text-lg font-bold leading-tight md:text-2xl">{task.title}</h1>
+                  )}
                 </div>
               </div>
             </div>
@@ -97,12 +153,53 @@ export function TaskDetailPage({
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
               <BotAvatar name={task.assignee} />
+              {isEditingDocument ? (
+                <>
+                  <Button variant="outline" size="sm" className="h-8 gap-2" onClick={cancelEditing} disabled={isUpdating} data-testid="task-page-edit-cancel">
+                    <X size={14} />
+                    Cancel
+                  </Button>
+                  <Button size="sm" className="h-8 gap-2" onClick={saveDocumentFields} disabled={!canSave} data-testid="task-page-edit-save">
+                    {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Save
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" size="sm" className="h-8 gap-2" onClick={startEditing} data-testid="task-page-edit">
+                  <Edit3 size={14} />
+                  Edit
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
+        <div className="rounded-2xl border border-border/70 bg-card/55 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.14)]" data-testid="task-page-body-card">
+          {isEditingDocument ? (
+            <div className="space-y-2">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Body</label>
+              <textarea
+                value={draftDescription}
+                onChange={(event) => setDraftDescription(event.target.value)}
+                rows={8}
+                className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                placeholder="Describe this task… Markdown is supported."
+                aria-label="Task body"
+                data-testid="task-page-body-input"
+              />
+              <p className="text-[11px] text-muted-foreground">Markdown-friendly body edit. Save is enabled after a valid change.</p>
+            </div>
+          ) : task.description ? (
+            <TaskDetailPageBody value={task.description} />
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+              No body yet. Use Edit to add a task description.
+            </div>
+          )}
+        </div>
+
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="min-h-[70vh] overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
+          <div className="min-h-0 overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
             <TaskDetail
               task={task}
               allTasks={allTasks}
@@ -117,38 +214,33 @@ export function TaskDetailPage({
               onUpdateTask={onUpdateTask}
               isUpdating={isUpdating}
               chrome="page"
+              showUpdatePanel={false}
+              showInlineActions={false}
             />
           </div>
 
-          <aside className="hidden rounded-2xl border border-border/70 bg-card/45 p-3 lg:block">
-            <div className="mb-3 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Board context</p>
-              <p className="text-sm font-semibold">{activeBoard.name || activeBoard.id}</p>
-              <p className="text-xs text-muted-foreground">Task page resolves this context from the task record.</p>
-            </div>
-            <div className="space-y-2">
-              {nearbyTasks.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border/70 p-3 text-xs text-muted-foreground">No sibling tasks loaded.</p>
-              ) : (
-                nearbyTasks.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    className={cn(
-                      'rounded-xl border border-border/60 bg-background/45 p-2.5 text-xs transition-colors hover:border-primary/40'
-                    )}
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] text-muted-foreground">{candidate.id}</span>
-                      <StatusBadge status={candidate.status} />
-                    </div>
-                    <p className="line-clamp-2 font-medium leading-snug">{candidate.title}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </aside>
+          <TaskActionsRail
+            task={task}
+            allTasks={allTasks}
+            activeBoard={activeBoard}
+            onStatusChange={onStatusChange}
+            onBlock={onBlock}
+            onReclaim={onReclaim}
+            onDecompose={onDecompose}
+            onDelete={onDelete}
+          />
         </div>
       </div>
+      <MobileTaskActionBar
+        task={task}
+        allTasks={allTasks}
+        activeBoard={activeBoard}
+        onStatusChange={onStatusChange}
+        onBlock={onBlock}
+        onReclaim={onReclaim}
+        onDecompose={onDecompose}
+        onDelete={onDelete}
+      />
     </section>
   );
 }
