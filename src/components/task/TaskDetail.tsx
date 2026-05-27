@@ -427,7 +427,7 @@ export function TaskDetail({
 
       {/* Desktop: Bottom action bar */}
       {!isMobile && showInlineActions && (
-        <div className="shrink-0 border-t border-border/50 p-3 space-y-2">
+        <div className="shrink-0 border-t border-border/50 p-2 [&_button]:!rounded-md [&_button]:!px-2.5 [&_button]:!py-2 [&_button]:!text-[11px] [&_svg]:!h-3.5 [&_svg]:!w-3.5">
           <TaskActions
             task={task}
             allTasks={allTasks}

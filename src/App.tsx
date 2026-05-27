@@ -174,6 +174,22 @@ function App() {
   );
 
   useEffect(() => {
+    if (!selectedTaskId || isTaskPage) return;
+    let cancelled = false;
+    kanbanApi.getTask(selectedTaskId)
+      .then((detailTask) => {
+        if (cancelled || !detailTask) return;
+        setTasks((current) => current.map((task) => (task.id === detailTask.id ? mergeTaskUpdate(task, detailTask) : task)));
+      })
+      .catch(() => {
+        // Board cards can still open from list data; detail hydration is best-effort for overlay tabs.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isTaskPage, selectedTaskId]);
+
+  useEffect(() => {
     const appSuffix = 'BHK';
     if (selectedTask) {
       document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
