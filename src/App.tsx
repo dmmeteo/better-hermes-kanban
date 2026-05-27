@@ -15,6 +15,14 @@ import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
+function taskPath(taskId: string) {
+  return `/tasks/${encodeURIComponent(taskId)}`;
+}
+
+function boardPath(boardId?: string | null) {
+  return boardId ? `/boards/${encodeURIComponent(boardId)}` : '/';
+}
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -38,7 +46,12 @@ function App() {
   const isMobile = useIsMobile();
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const boardIdFromUrl = searchParams.get('board') || undefined;
+  const legacyBoardIdFromUrl = searchParams.get('board') || undefined;
+  const boardIdFromPath = useMemo(() => {
+    const match = location.pathname.match(/^\/boards\/([^/]+)\/?$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  }, [location.pathname]);
+  const boardIdFromUrl = boardIdFromPath || legacyBoardIdFromUrl;
   const routeTaskId = useMemo(() => {
     const match = location.pathname.match(/^\/tasks\/([^/]+)\/?$/);
     return match?.[1] ? decodeURIComponent(match[1]) : null;
@@ -48,6 +61,7 @@ function App() {
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
     try {
+      setIsLoading(true);
       const boardsResult = await kanbanApi.getBoards();
       const preferredBoard =
         (preferredBoardId ? boardsResult.boards.find((board) => board.id === preferredBoardId) : null) ||
@@ -75,10 +89,54 @@ function App() {
     }
   }, []);
 
-  // Load initial data
-  useEffect(() => {
-    loadBoardData(boardIdFromUrl);
+  const loadTaskPageData = useCallback(async (taskId: string) => {
+    try {
+      setIsLoading(true);
+      const [boardsResult, directTask] = await Promise.all([
+        kanbanApi.getBoards(),
+        kanbanApi.getTask(taskId),
+      ]);
+      const taskBoardId = directTask?.boardId || boardIdFromUrl;
+      const boardData = await kanbanApi.getBoard(taskBoardId);
+      const mergedTasks = boardData.tasks.some((task) => task.id === directTask?.id)
+        ? boardData.tasks
+        : directTask
+          ? [directTask, ...boardData.tasks]
+          : boardData.tasks;
+      setTasks(mergedTasks);
+      setBoards(boardsResult.boards);
+      setActiveBoard(boardData.board);
+      setSelectedTaskId(taskId);
+      setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
+      setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+      try {
+        setAssignees(await kanbanApi.getAssignees(taskBoardId));
+      } catch {
+        setAssignees([]);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Task ${taskId} not found`;
+      setLoadError(message);
+      toast.error(message);
+      await loadBoardData(boardIdFromUrl);
+      setSelectedTaskId(taskId);
+    } finally {
+      setIsLoading(false);
+    }
   }, [boardIdFromUrl, loadBoardData]);
+
+  // Load route data
+  useEffect(() => {
+    if (legacyBoardIdFromUrl && !routeTaskId && !boardIdFromPath) {
+      navigate(boardPath(legacyBoardIdFromUrl), { replace: true });
+      return;
+    }
+    if (routeTaskId) {
+      loadTaskPageData(routeTaskId);
+      return;
+    }
+    loadBoardData(boardIdFromUrl);
+  }, [boardIdFromPath, boardIdFromUrl, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
 
   useEffect(() => {
     window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
@@ -99,17 +157,15 @@ function App() {
 
   const handleTaskClick = useCallback((task: Task) => {
     if (detailPresentation === 'page') {
-      const boardQuery = activeBoard ? `?board=${encodeURIComponent(activeBoard.id)}` : '';
-      navigate(`/tasks/${encodeURIComponent(task.id)}${boardQuery}`);
+      navigate(taskPath(task.id));
       return;
     }
     setSelectedTaskId(task.id);
-  }, [activeBoard, detailPresentation, navigate]);
+  }, [detailPresentation, navigate]);
 
   const handleCloseDetail = useCallback(() => {
     if (isTaskPage) {
-      const boardQuery = activeBoard ? `?board=${encodeURIComponent(activeBoard.id)}` : '';
-      navigate(`/${boardQuery}`);
+      navigate(boardPath(activeBoard?.id));
       return;
     }
     setSelectedTaskId(null);
@@ -118,8 +174,7 @@ function App() {
   const handleOpenDrawerVariant = useCallback(() => {
     setDetailPresentation('drawer');
     if (routeTaskId) {
-      const boardQuery = activeBoard ? `?board=${encodeURIComponent(activeBoard.id)}` : '';
-      navigate(`/${boardQuery}`);
+      navigate(boardPath(activeBoard?.id));
       setSelectedTaskId(routeTaskId);
     }
   }, [activeBoard, navigate, routeTaskId]);
@@ -127,13 +182,11 @@ function App() {
   const handleDetailPresentationChange = useCallback((presentation: TaskDetailPresentation) => {
     setDetailPresentation(presentation);
     if (presentation === 'page' && selectedTask) {
-      const boardQuery = activeBoard ? `?board=${encodeURIComponent(activeBoard.id)}` : '';
-      navigate(`/tasks/${encodeURIComponent(selectedTask.id)}${boardQuery}`);
+      navigate(taskPath(selectedTask.id));
       return;
     }
     if (isTaskPage && routeTaskId && presentation !== 'page') {
-      const boardQuery = activeBoard ? `?board=${encodeURIComponent(activeBoard.id)}` : '';
-      navigate(`/${boardQuery}`);
+      navigate(boardPath(activeBoard?.id));
       setSelectedTaskId(routeTaskId);
     }
   }, [activeBoard, isTaskPage, navigate, routeTaskId, selectedTask]);
@@ -233,13 +286,8 @@ function App() {
         setActiveBoard(data.board);
         setDataSource(data.source);
         setLoadError(data.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
-        if (isTaskPage && routeTaskId) {
-          navigate(`/tasks/${encodeURIComponent(routeTaskId)}?board=${encodeURIComponent(board.id)}`);
-          setSelectedTaskId(routeTaskId);
-        } else {
-          navigate(`/?board=${encodeURIComponent(board.id)}`);
-          setSelectedTaskId(null);
-        }
+        navigate(boardPath(board.id));
+        setSelectedTaskId(null);
         try {
           setAssignees(await kanbanApi.getAssignees(board.id));
         } catch {
@@ -251,7 +299,7 @@ function App() {
         setIsLoading(false);
       }
     },
-    [isTaskPage, navigate, routeTaskId]
+    [navigate]
   );
 
   if (isLoading) {

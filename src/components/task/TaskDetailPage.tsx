@@ -56,7 +56,7 @@ export function TaskDetailPage({
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Task page</p>
             <h1 className="text-2xl font-bold">Task {taskId} is not on this board</h1>
             <p className="max-w-md text-sm text-muted-foreground">
-              Switch board or return to the board context. Direct links keep the selected board in the URL so you can recover navigation state.
+              Switch board or return to the board context. Direct task links resolve their board from task data, without a board query parameter.
             </p>
           </div>
           <Button onClick={onBack} className="gap-2">
@@ -82,7 +82,7 @@ export function TaskDetailPage({
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="font-mono rounded bg-secondary px-2 py-0.5">{task.id}</span>
                   <span>on {activeBoard.name || activeBoard.id}</span>
-                  <span className="hidden md:inline">Direct-link task page</span>
+                  <span className="hidden md:inline">Direct task page</span>
                 </div>
                 <h1 className="line-clamp-2 text-lg font-bold leading-tight md:text-2xl">{task.title}</h1>
               </div>
@@ -120,7 +120,7 @@ export function TaskDetailPage({
             <div className="mb-3 space-y-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Board context</p>
               <p className="text-sm font-semibold">{activeBoard.name || activeBoard.id}</p>
-              <p className="text-xs text-muted-foreground">Task page keeps context without hiding the board route.</p>
+              <p className="text-xs text-muted-foreground">Task page resolves this context from the task record.</p>
             </div>
             <div className="space-y-2">
               {nearbyTasks.length === 0 ? (
