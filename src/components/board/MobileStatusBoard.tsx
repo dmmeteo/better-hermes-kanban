@@ -3,7 +3,8 @@ import type { Task, TaskStatus, Board } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/types';
 import { StatusTabs } from './StatusTabs';
 import { TaskCard } from './TaskCard';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface MobileStatusBoardProps {
   tasks: Task[];
@@ -12,6 +13,7 @@ interface MobileStatusBoardProps {
   onBoardChange: (board: Board) => void;
   onTaskClick: (task: Task) => void;
   searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
 export function MobileStatusBoard({
@@ -21,6 +23,7 @@ export function MobileStatusBoard({
   onBoardChange,
   onTaskClick,
   searchQuery,
+  onSearchChange,
 }: MobileStatusBoardProps) {
   const [activeStatus, setActiveStatus] = useState<TaskStatus>('triage');
   const [showBoardDropdown, setShowBoardDropdown] = useState(false);
@@ -39,6 +42,7 @@ export function MobileStatusBoard({
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (t) =>
+          t.id.toLowerCase().includes(q) ||
           t.title.toLowerCase().includes(q) ||
           t.description.toLowerCase().includes(q) ||
           (t.assignee && t.assignee.toLowerCase().includes(q))
@@ -78,6 +82,24 @@ export function MobileStatusBoard({
             ))}
           </div>
         )}
+
+        <div className="mt-2 rounded-lg border border-border/60 bg-card/60 p-2">
+          <label className="mb-1 block text-[11px] font-semibold text-muted-foreground" htmlFor="mobile-board-local-filter">
+            Filter this board
+          </label>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="mobile-board-local-filter"
+              aria-label="Filter this board"
+              placeholder="Title, task id, assignee…"
+              value={searchQuery}
+              onChange={(event) => onSearchChange(event.target.value)}
+              className="h-9 pl-8 text-xs bg-secondary border-border"
+              data-testid="mobile-board-local-filter"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Status tabs */}
@@ -90,7 +112,7 @@ export function MobileStatusBoard({
       {/* Task count + sort */}
       <div className="flex items-center justify-between px-4 py-2">
         <span className="text-xs text-muted-foreground">
-          {STATUS_LABELS[activeStatus]} · {filteredTasks.length} tasks
+          {STATUS_LABELS[activeStatus]} · {filteredTasks.length} tasks{searchQuery.trim() ? ' · filtered board' : ''}
         </span>
         <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
           Sort: Priority

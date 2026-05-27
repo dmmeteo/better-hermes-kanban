@@ -58,7 +58,8 @@ export function TopBar({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Search tasks"
+            aria-label="Search all tasks"
+            title="Search all tasks"
             data-testid="mobile-global-search-button"
             onClick={() => onSearchSubmit?.()}
             className="p-2 rounded-lg hover:bg-accent"
@@ -129,7 +130,7 @@ export function TopBar({
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search tasks...'}
+              placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search all tasks…'}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => {
@@ -140,6 +141,8 @@ export function TopBar({
               }}
               className="w-64 h-8 pl-8 text-xs bg-secondary border-border"
               data-testid="topbar-global-search"
+              aria-label="Search all tasks"
+              title="Global search: press Enter to open /tasks"
             />
           </div>
           {!isTaskPage && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { AlertTriangle, ArrowRight, Clock3, Link2, MessageSquare, Search, ShieldAlert, User, X } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Board, BotProfile, TaskSearchResult } from '@/lib/types';
 import { STATUS_COLORS, STATUS_LABELS, STATUS_ORDER } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -17,7 +18,7 @@ type TaskSearchPageProps = {
   onOpenTask: (taskId: string, boardId?: string) => void;
 };
 
-type SearchState = 'first-use' | 'loading' | 'ready' | 'no-results' | 'exact-id-not-found' | 'error';
+type SearchState = 'first-use' | 'loading' | 'ready' | 'no-results' | 'exact-id-not-found' | 'exact-id-ambiguous' | 'error';
 
 function formatRelative(value?: string | null) {
   if (!value) return 'updated recently';
@@ -148,7 +149,20 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
         setTotal(response.total);
         setIndexedAt(response.indexedAt);
         setSource(response.source);
-        if (response.results.length === 0 && EXACT_TASK_ID.test(submittedQuery.trim())) {
+        const exactTaskId = submittedQuery.trim().toLowerCase();
+        const exactMatches = EXACT_TASK_ID.test(exactTaskId)
+          ? response.results.filter((result) => result.id.toLowerCase() === exactTaskId)
+          : [];
+        if (exactMatches.length === 1) {
+          toast.success('Opened exact task match');
+          onOpenTask(exactMatches[0].id, exactMatches[0].boardId);
+          return;
+        }
+        if (EXACT_TASK_ID.test(exactTaskId) && exactMatches.length > 1) {
+          setResults(exactMatches);
+          setTotal(exactMatches.length);
+          setState('exact-id-ambiguous');
+        } else if (response.results.length === 0 && EXACT_TASK_ID.test(exactTaskId)) {
           setState('exact-id-not-found');
         } else {
           setState(response.results.length ? 'ready' : 'no-results');
@@ -164,7 +178,7 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
     return () => {
       cancelled = true;
     };
-  }, [assignee, board, status, submittedQuery]);
+  }, [assignee, board, onOpenTask, status, submittedQuery]);
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
@@ -279,7 +293,13 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
                 <Button variant="outline" onClick={clearFilters} className="mt-4">Clear filters</Button>
               </div>
             )}
-            {state === 'ready' && results.map((result) => (
+            {state === 'exact-id-ambiguous' && (
+              <div className="rounded-3xl border border-[#7C5CFF]/35 bg-[#7C5CFF]/10 p-5">
+                <h2 className="text-base font-semibold">Multiple exact task matches</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Choose the board copy to open for {submittedQuery}.</p>
+              </div>
+            )}
+            {(state === 'ready' || state === 'exact-id-ambiguous') && results.map((result) => (
               <ResultCard key={`${result.boardId}-${result.id}`} result={result} onOpen={() => onOpenTask(result.id, result.boardId)} />
             ))}
           </div>

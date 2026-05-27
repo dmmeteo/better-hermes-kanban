@@ -25,6 +25,12 @@ function boardPath(boardId?: string | null) {
   return boardId ? `/boards/${encodeURIComponent(boardId)}` : '/';
 }
 
+const EXACT_TASK_ID = /^t_[0-9a-f]{8}$/i;
+
+function normalizeExactTaskId(value: string) {
+  return value.trim().toLowerCase();
+}
+
 function mergeTaskUpdate(existing: Task, updated: Task): Task {
   return {
     ...existing,
@@ -50,6 +56,7 @@ function App() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [boardFilterQuery, setBoardFilterQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
@@ -112,9 +119,10 @@ function App() {
   const loadTaskPageData = useCallback(async (taskId: string) => {
     try {
       setIsLoading(true);
+      const lookupBoardId = boardIdFromUrl;
       const [boardsResult, directTask] = await Promise.all([
         kanbanApi.getBoards(),
-        kanbanApi.getTask(taskId),
+        kanbanApi.getTask(taskId, lookupBoardId),
       ]);
       const taskBoardId = directTask?.boardId || boardIdFromUrl;
       const boardData = await kanbanApi.getBoard(taskBoardId);
@@ -239,8 +247,23 @@ function App() {
     navigate(`${taskPath(taskId)}${params}`);
   }, [navigate]);
 
-  const handleGlobalSearch = useCallback((query?: string) => {
+  const handleGlobalSearch = useCallback(async (query?: string) => {
     const trimmed = (query ?? searchQuery).trim();
+    const exactTaskId = normalizeExactTaskId(trimmed);
+    if (EXACT_TASK_ID.test(exactTaskId)) {
+      try {
+        const response = await kanbanApi.searchTasks({ q: exactTaskId, limit: 20, sort: 'relevance' });
+        const exactMatches = response.results.filter((result) => result.id.toLowerCase() === exactTaskId);
+        if (exactMatches.length === 1) {
+          const match = exactMatches[0];
+          toast.success('Opened exact task match');
+          navigate(`${taskPath(match.id)}?board=${encodeURIComponent(match.boardId)}`);
+          return;
+        }
+      } catch {
+        // Fall through to the shareable search page where the bridge error is shown in context.
+      }
+    }
     navigate(`/tasks${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''}`);
   }, [navigate, searchQuery]);
 
@@ -477,7 +500,8 @@ function App() {
               onTaskClick={handleTaskClick}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
-              searchQuery={searchQuery}
+              boardFilterQuery={boardFilterQuery}
+              onBoardFilterChange={setBoardFilterQuery}
             />
           )}
         </div>
