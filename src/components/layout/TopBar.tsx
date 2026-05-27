@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Search, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Board } from '@/lib/types';
@@ -52,11 +52,17 @@ export function TopBar({
           <span className="font-bold text-sm">Hermes</span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="p-2 rounded-lg hover:bg-accent">
+          <button type="button" aria-label="Search tasks" className="p-2 rounded-lg hover:bg-accent">
             <Search size={18} className="text-muted-foreground" />
           </button>
-          <button className="p-2 rounded-lg hover:bg-accent">
-            <Filter size={18} className="text-muted-foreground" />
+          <button
+            type="button"
+            aria-label="Open settings"
+            data-testid="mobile-settings-button"
+            onClick={onOpenSettings}
+            className="p-2 rounded-lg hover:bg-accent"
+          >
+            <Settings size={18} className="text-muted-foreground" />
           </button>
         </div>
       </div>
@@ -168,10 +174,11 @@ export function TopBar({
             variant="outline"
             size="sm"
             className="h-8 text-xs gap-1.5"
+            data-testid="desktop-settings-button"
             onClick={onOpenSettings}
           >
             <Settings size={14} />
-            <span>Board settings</span>
+            <span>Settings</span>
           </Button>
           )}
           <Button
