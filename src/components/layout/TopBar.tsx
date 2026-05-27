@@ -130,12 +130,14 @@ export function TopBar({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1.5"
+                size="icon"
+                className="h-9 w-9 rounded-xl p-0"
                 data-testid="task-detail-presentation-trigger"
+                aria-label={`Task detail view: ${detailPresentation}`}
+                title={`Task detail view: ${detailPresentation}`}
               >
-                {detailPresentation === 'modal' ? <SquareStack size={14} /> : detailPresentation === 'page' ? <FileText size={14} /> : <PanelRightOpen size={14} />}
-                <span>Detail: {detailPresentation === 'modal' ? 'Modal' : detailPresentation === 'page' ? 'Page' : 'Drawer'}</span>
+                {detailPresentation === 'modal' ? <SquareStack size={17} /> : detailPresentation === 'page' ? <FileText size={17} /> : <PanelRightOpen size={17} />}
+                <span className="sr-only">Task detail view: {detailPresentation}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
@@ -172,13 +174,15 @@ export function TopBar({
           {!isTaskPage && (
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
+            size="icon"
+            className="h-9 w-9 rounded-xl p-0"
             data-testid="desktop-settings-button"
+            aria-label="Settings"
+            title="Settings"
             onClick={onOpenSettings}
           >
-            <Settings size={14} />
-            <span>Settings</span>
+            <Settings size={17} />
+            <span className="sr-only">Settings</span>
           </Button>
           )}
           <Button
