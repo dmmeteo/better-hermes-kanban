@@ -98,6 +98,15 @@ export interface Task {
   priority: Priority;
   assignee: string | null;
   boardId: string;
+  needsHumanInput?: boolean;
+  waitingOn?: 'user' | 'agent' | 'external' | null;
+  waitingReason?: string | null;
+  waitingSince?: string | null;
+  lastQuestion?: {
+    text: string;
+    author: string;
+    createdAt: string;
+  } | null;
   parentIds: string[];
   commentCount: number;
   linkCount: number;
