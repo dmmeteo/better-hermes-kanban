@@ -3,6 +3,7 @@ import type { Board, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
+import { BotAvatar } from '@/components/shared/BotAvatar';
 import { cn } from '@/lib/utils';
 import { TaskDetail } from './TaskDetail';
 
@@ -70,24 +71,32 @@ export function TaskDetailPage({
     <section className="h-full overflow-y-auto bg-background" data-testid="task-detail-page">
       <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-4 px-3 py-3 md:px-6 md:py-5">
         <div className="rounded-2xl border border-border/70 bg-card/75 px-3 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] md:px-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <Button variant="outline" size="sm" className="h-9 shrink-0 gap-2" onClick={onBack} data-testid="task-page-back">
                 <ArrowLeft size={15} />
                 <span className="hidden sm:inline">Open board</span>
               </Button>
-              <div className="min-w-0 space-y-1">
+              <div className="min-w-0 space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="font-mono rounded bg-secondary px-2 py-0.5">{task.id}</span>
+                  <a
+                    href={`/tasks/${encodeURIComponent(task.id)}`}
+                    className="font-mono rounded bg-secondary px-2 py-0.5 transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-testid="task-page-id-link"
+                  >
+                    {task.id}
+                  </a>
                   <span>on {activeBoard.name || activeBoard.id}</span>
-                  <span className="hidden md:inline">Direct task page</span>
                 </div>
-                <h1 className="line-clamp-2 text-lg font-bold leading-tight md:text-2xl">{task.title}</h1>
+                <div className="rounded-xl border border-transparent -mx-2 px-2 py-1 transition-colors hover:border-border/60 hover:bg-background/30" data-testid="task-page-title-slot">
+                  <h1 className="line-clamp-2 text-lg font-bold leading-tight md:text-2xl">{task.title}</h1>
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
+              <BotAvatar name={task.assignee} />
             </div>
           </div>
         </div>
@@ -107,6 +116,7 @@ export function TaskDetailPage({
               onDelete={onDelete}
               onUpdateTask={onUpdateTask}
               isUpdating={isUpdating}
+              chrome="page"
             />
           </div>
 

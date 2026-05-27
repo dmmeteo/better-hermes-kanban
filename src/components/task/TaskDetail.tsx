@@ -41,6 +41,7 @@ interface TaskDetailProps {
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
   isUpdating?: boolean;
   showCloseButton?: boolean;
+  chrome?: 'panel' | 'page';
 }
 
 export function TaskDetail({
@@ -57,6 +58,7 @@ export function TaskDetail({
   onUpdateTask,
   isUpdating = false,
   showCloseButton = false,
+  chrome = 'panel',
 }: TaskDetailProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -75,6 +77,7 @@ export function TaskDetail({
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
   const taskHref = `/tasks/${encodeURIComponent(task.id)}`;
+  const showPanelChrome = chrome === 'panel';
 
   // Mobile sections
   const mobileSections = [
@@ -127,51 +130,57 @@ export function TaskDetail({
   return (
     <div className={cn('h-full flex flex-col', isMobile ? 'bg-background' : '')}>
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50">
-        {isMobile && onBack && (
-          <button onClick={onBack} className="p-1 -ml-1 rounded-lg hover:bg-accent transition-colors" aria-label="Back to board">
-            <ChevronLeft size={20} />
+      {showPanelChrome && (
+        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/50">
+          {isMobile && onBack && (
+            <button onClick={onBack} className="p-1 -ml-1 rounded-lg hover:bg-accent transition-colors" aria-label="Back to board">
+              <ChevronLeft size={20} />
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            <a
+              href={taskHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Open task ${task.id} in a new tab`}
+              data-testid="task-detail-id-link"
+            >
+              {task.id}
+            </a>
+          </div>
+          <div className="flex-1" />
+          <StatusBadge status={task.status} />
+          <button className="p-1.5 rounded-lg hover:bg-accent transition-colors" aria-label="More task actions">
+            <MoreHorizontal size={16} className="text-muted-foreground" />
           </button>
-        )}
-        <div className="flex items-center gap-2">
-          <a
-            href={taskHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Open task ${task.id} in a new tab`}
-            data-testid="task-detail-id-link"
-          >
-            {task.id}
-          </a>
+          {showCloseButton && onBack && (
+            <button
+              onClick={onBack}
+              className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+              aria-label="Close task detail"
+              data-testid="task-detail-close"
+            >
+              <X size={16} className="text-muted-foreground" />
+            </button>
+          )}
         </div>
-        <div className="flex-1" />
-        <StatusBadge status={task.status} />
-        <button className="p-1.5 rounded-lg hover:bg-accent transition-colors" aria-label="More task actions">
-          <MoreHorizontal size={16} className="text-muted-foreground" />
-        </button>
-        {showCloseButton && onBack && (
-          <button
-            onClick={onBack}
-            className="p-1.5 rounded-lg hover:bg-accent transition-colors"
-            aria-label="Close task detail"
-            data-testid="task-detail-close"
-          >
-            <X size={16} className="text-muted-foreground" />
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-4 space-y-5">
-          {/* Title */}
-          <div className="space-y-1">
-            <div className="flex items-start gap-2">
-              <h2 className="text-lg font-bold leading-tight flex-1">{task.title}</h2>
-              <PriorityBadge priority={task.priority} />
-            </div>
-          </div>
+          {showPanelChrome && (
+            <>
+              {/* Title */}
+              <div className="space-y-1">
+                <div className="flex items-start gap-2">
+                  <h2 className="text-lg font-bold leading-tight flex-1">{task.title}</h2>
+                  <PriorityBadge priority={task.priority} />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Description */}
           {task.description && (
@@ -181,36 +190,38 @@ export function TaskDetail({
           )}
 
           {/* Meta grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Status
-              </label>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={task.status} />
+          {showPanelChrome && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Status
+                </label>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={task.status} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Priority
+                </label>
+                <div className="flex items-center gap-2">
+                  <PriorityBadge priority={task.priority} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Assignee / Profile
+                </label>
+                <BotAvatar name={task.assignee} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Comments
+                </label>
+                <span className="text-sm">{task.commentCount}</span>
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Priority
-              </label>
-              <div className="flex items-center gap-2">
-                <PriorityBadge priority={task.priority} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Assignee / Profile
-              </label>
-              <BotAvatar name={task.assignee} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Comments
-              </label>
-              <span className="text-sm">{task.commentCount}</span>
-            </div>
-          </div>
+          )}
 
           {/* Latest summary */}
           {task.latestSummary && (
