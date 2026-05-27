@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ChevronLeft,
   MoreHorizontal,
@@ -44,6 +44,7 @@ interface TaskDetailProps {
   chrome?: 'panel' | 'page';
   showUpdatePanel?: boolean;
   showInlineActions?: boolean;
+  showDescription?: boolean;
 }
 
 export function TaskDetail({
@@ -63,6 +64,7 @@ export function TaskDetail({
   chrome = 'panel',
   showUpdatePanel = true,
   showInlineActions = true,
+  showDescription = true,
 }: TaskDetailProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -132,13 +134,23 @@ export function TaskDetail({
     return true;
   });
 
-  // Desktop tabs
-  const desktopTabs = [
-    { key: 'details', label: 'Details' },
-    { key: 'activity', label: `Activity ${task.activity.length}` },
-    { key: 'runs', label: `Runs ${task.runs.length}` },
-    { key: 'comments', label: `Comments ${task.commentCount}` },
-  ];
+  const hasDetailsContent = showUpdatePanel || readyDisabled || hasLinkedTasks || hasDiagnostics || hasPlannedAttachments;
+  const desktopTabs = useMemo(
+    () => [
+      ...(hasDetailsContent ? [{ key: 'details', label: 'Details', count: null }] : []),
+      { key: 'activity', label: 'Activity', count: task.activity.length },
+      { key: 'runs', label: 'Runs', count: task.runs.length },
+      { key: 'comments', label: 'Comments', count: task.commentCount },
+    ],
+    [hasDetailsContent, task.activity.length, task.commentCount, task.runs.length]
+  );
+  const selectedTab = desktopTabs.some((tab) => tab.key === activeTab) ? activeTab : desktopTabs[0]?.key;
+
+  useEffect(() => {
+    if (!desktopTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(desktopTabs[0]?.key || 'comments');
+    }
+  }, [activeTab, desktopTabs]);
 
   return (
     <div className={cn('h-full flex flex-col', isMobile ? 'bg-background' : '')}>
@@ -196,7 +208,7 @@ export function TaskDetail({
           )}
 
           {/* Description */}
-          {task.description && (
+          {showDescription && task.description && (
             <div className="rounded-xl border border-border/60 bg-card/50 p-3.5">
               <MarkdownText value={task.description} />
             </div>
@@ -295,7 +307,7 @@ export function TaskDetail({
                         {section.key === 'runs' && <TaskRuns runs={task.runs} />}
                         {section.key === 'links' && <TaskLinks linkedTasks={task.linkedTasks} />}
                         {section.key === 'diagnostics' && (
-                          <TaskDiagnostics diagnostics={task.diagnostics} />
+                          <TaskDiagnostics diagnostics={task.diagnostics} warningCount={task.warningCount} />
                         )}
                         {section.key === 'attachments' && (
                           <TaskAttachmentsPlanned attachments={task.plannedAttachments} />
@@ -346,7 +358,12 @@ export function TaskDetail({
                         : 'text-muted-foreground hover:text-foreground'
                     )}
                   >
-                    {tab.label}
+                    <span>{tab.label}</span>
+                    {typeof tab.count === 'number' && tab.count > 0 && (
+                      <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {tab.count}
+                      </span>
+                    )}
                     {activeTab === tab.key && (
                       <div
                         className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full"
@@ -359,7 +376,7 @@ export function TaskDetail({
 
               {/* Tab content */}
               <div className="pt-2">
-                {activeTab === 'details' && (
+                {selectedTab === 'details' && (
                   <div className="space-y-4">
                     {/* Dependency gating */}
                     {readyDisabled && unfinishedParents.length > 0 && (
@@ -385,7 +402,7 @@ export function TaskDetail({
 
                     {hasDiagnostics && (
                       <CompactSection title="Diagnostics" count={task.diagnostics.length + task.warningCount}>
-                        <TaskDiagnostics diagnostics={task.diagnostics} />
+                        <TaskDiagnostics diagnostics={task.diagnostics} warningCount={task.warningCount} />
                       </CompactSection>
                     )}
 
@@ -397,9 +414,9 @@ export function TaskDetail({
                   </div>
                 )}
 
-                {activeTab === 'activity' && <TaskActivity activity={task.activity} />}
-                {activeTab === 'runs' && <TaskRuns runs={task.runs} />}
-                {activeTab === 'comments' && (
+                {selectedTab === 'activity' && <TaskActivity activity={task.activity} />}
+                {selectedTab === 'runs' && <TaskRuns runs={task.runs} />}
+                {selectedTab === 'comments' && (
                   <TaskComments comments={task.comments} onAddComment={onAddComment} />
                 )}
               </div>

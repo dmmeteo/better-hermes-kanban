@@ -3,12 +3,21 @@ import { cn } from '@/lib/utils';
 
 interface TaskDiagnosticsProps {
   diagnostics: TaskDiagnostic[];
+  warningCount?: number;
 }
 
-export function TaskDiagnostics({ diagnostics }: TaskDiagnosticsProps) {
+export function TaskDiagnostics({ diagnostics, warningCount = 0 }: TaskDiagnosticsProps) {
   if (diagnostics.length === 0) {
+    if (warningCount > 0) {
+      return (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-500/85">
+          {warningCount} warning{warningCount === 1 ? '' : 's'} flagged. No detailed diagnostics are attached yet.
+        </div>
+      );
+    }
+
     return (
-      <div className="text-center py-6 text-muted-foreground text-xs">
+      <div className="text-center py-4 text-muted-foreground text-xs">
         No diagnostics
       </div>
     );

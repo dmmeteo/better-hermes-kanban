@@ -198,8 +198,8 @@ export function TaskDetailPage({
           )}
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="min-h-0 overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
+        <div className="grid min-h-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="min-h-0 self-start overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
             <TaskDetail
               task={task}
               allTasks={allTasks}
@@ -214,6 +214,7 @@ export function TaskDetailPage({
               onUpdateTask={onUpdateTask}
               isUpdating={isUpdating}
               chrome="page"
+              showDescription={false}
               showUpdatePanel={false}
               showInlineActions={false}
             />
