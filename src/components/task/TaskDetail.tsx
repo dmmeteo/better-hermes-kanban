@@ -293,7 +293,12 @@ export function TaskDetail({
                 ))}
               </div>
 
-              <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} />
+              <TaskUpdatePanel
+                task={task}
+                onUpdate={onUpdateTask}
+                isSaving={isUpdating}
+                showTitleField={showPanelChrome}
+              />
 
               {/* Actions */}
               <TaskActions
@@ -346,7 +351,12 @@ export function TaskDetail({
                       />
                     )}
 
-                    <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} />
+                    <TaskUpdatePanel
+                      task={task}
+                      onUpdate={onUpdateTask}
+                      isSaving={isUpdating}
+                      showTitleField={showPanelChrome}
+                    />
 
                     {/* Linked tasks */}
                     <div>
