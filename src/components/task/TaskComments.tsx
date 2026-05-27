@@ -33,11 +33,13 @@ export function TaskComments({ comments, onAddComment }: TaskCommentsProps) {
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             placeholder="Add a comment..."
             className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
+            data-testid="task-comments-composer-input"
           />
           <button
             onClick={handleSubmit}
             disabled={!text.trim()}
             className="p-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
+            data-testid="task-comments-composer-submit"
           >
             <Send size={14} />
           </button>
