@@ -14,7 +14,7 @@ import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel, type BoardSettingsMode } from '@/components/settings/BoardsSettingsPanel';
 import { TaskSearchPage } from '@/components/search/TaskSearchPage';
-import type { DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
+import { DataViewSearchAndFilter, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -59,7 +59,6 @@ function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState<DataViewSearchFilters>({});
-  const [boardFilterQuery, setBoardFilterQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('settings');
@@ -221,7 +220,7 @@ function App() {
       return;
     }
     if (isTaskSearchPage) {
-      document.title = `🪽 Task finder — ${appSuffix}`;
+      document.title = `🪽 Search — ${appSuffix}`;
       return;
     }
     if (routeTaskId) {
@@ -461,6 +460,22 @@ function App() {
           onNavigateToBoard={handleCloseDetail}
         />
 
+      {!isTaskPage && (
+        <div className="shrink-0 border-b border-border/50 bg-card/80 px-4 py-2 md:hidden">
+          <DataViewSearchAndFilter
+            query={searchQuery}
+            filters={searchFilters}
+            boards={boards}
+            assignees={assignees}
+            onQueryChange={setSearchQuery}
+            onFiltersChange={setSearchFilters}
+            onSubmit={(query, filters) => handleGlobalSearch(query, filters)}
+            placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search this board…'}
+            testId="mobile-topbar-search"
+          />
+        </div>
+      )}
+
       {(dataSource === 'fallback' || loadError) && (
         <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
           {loadError || 'Showing offline demo data.'}
@@ -474,6 +489,11 @@ function App() {
             <TaskSearchPage
               boards={boards}
               assignees={assignees}
+              locationSearch={location.search}
+              query={searchQuery}
+              filters={searchFilters}
+              onQueryChange={setSearchQuery}
+              onFiltersChange={setSearchFilters}
               onOpenTask={handleOpenSearchTask}
             />
           ) : activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
@@ -504,8 +524,7 @@ function App() {
               onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
-              boardFilterQuery={boardFilterQuery}
-              onBoardFilterChange={setBoardFilterQuery}
+              searchQuery={searchQuery}
             />
           )}
         </div>

@@ -7,13 +7,18 @@ import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { DataViewSearchAndFilter, getSearchParamValue, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
+import { getSearchParamValue, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 
 const EXACT_TASK_ID = /^t_[0-9a-f]{8}$/i;
 
 type TaskSearchPageProps = {
   boards: Board[];
   assignees: BotProfile[];
+  locationSearch: string;
+  query: string;
+  filters: DataViewSearchFilters;
+  onQueryChange: (query: string) => void;
+  onFiltersChange: (filters: DataViewSearchFilters) => void;
   onOpenTask: (taskId: string, boardId?: string) => void;
 };
 
@@ -91,14 +96,9 @@ function ResultCard({ result, onOpen }: { result: TaskSearchResult; onOpen: () =
   );
 }
 
-export function TaskSearchPage({ boards, assignees, onOpenTask }: TaskSearchPageProps) {
-  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
-  const [query, setQuery] = useState(filterValue(urlParams, 'q'));
+export function TaskSearchPage({ locationSearch, query, filters, onQueryChange, onFiltersChange, onOpenTask }: TaskSearchPageProps) {
+  const urlParams = useMemo(() => new URLSearchParams(locationSearch), [locationSearch]);
   const [submittedQuery, setSubmittedQuery] = useState(filterValue(urlParams, 'q'));
-  const [board, setBoard] = useState(filterValue(urlParams, 'board'));
-  const [status, setStatus] = useState(filterValue(urlParams, 'status'));
-  const [assignee, setAssignee] = useState(filterValue(urlParams, 'assignee'));
-  const [priority, setPriority] = useState(filterValue(urlParams, 'priority'));
   const [results, setResults] = useState<TaskSearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [indexedAt, setIndexedAt] = useState<string | null>(null);
@@ -106,7 +106,25 @@ export function TaskSearchPage({ boards, assignees, onOpenTask }: TaskSearchPage
   const [state, setState] = useState<SearchState>(submittedQuery ? 'loading' : 'first-use');
   const [error, setError] = useState<string | null>(null);
 
-  const currentFilters: DataViewSearchFilters = useMemo(() => ({ board, status, assignee, priority }), [assignee, board, priority, status]);
+  useEffect(() => {
+    const nextQuery = filterValue(urlParams, 'q');
+    const nextFilters = {
+      board: filterValue(urlParams, 'board'),
+      status: filterValue(urlParams, 'status'),
+      assignee: filterValue(urlParams, 'assignee'),
+      priority: filterValue(urlParams, 'priority'),
+    };
+    queueMicrotask(() => {
+      onQueryChange(nextQuery);
+      setSubmittedQuery(nextQuery);
+      onFiltersChange(nextFilters);
+    });
+  }, [onFiltersChange, onQueryChange, urlParams]);
+
+  const board = filters.board || '';
+  const status = filters.status || '';
+  const assignee = filters.assignee || '';
+  const priority = filters.priority || '';
 
   const syncUrl = (next: { q?: string; board?: string; status?: string; assignee?: string; priority?: string }) => {
     const params = new URLSearchParams();
@@ -191,23 +209,8 @@ export function TaskSearchPage({ boards, assignees, onOpenTask }: TaskSearchPage
     syncUrl({ q: nextQuery });
   };
 
-  const updateFilters = (filters: DataViewSearchFilters) => {
-    const nextBoard = filters.board || '';
-    const nextStatus = filters.status || '';
-    const nextAssignee = filters.assignee || '';
-    const nextPriority = filters.priority || '';
-    setBoard(nextBoard);
-    setStatus(nextStatus);
-    setAssignee(nextAssignee);
-    setPriority(nextPriority);
-    syncUrl({ board: nextBoard, status: nextStatus, assignee: nextAssignee, priority: nextPriority });
-  };
-
   const clearFilters = () => {
-    setBoard('');
-    setStatus('');
-    setAssignee('');
-    setPriority('');
+    onFiltersChange({});
     syncUrl({ board: '', status: '', assignee: '', priority: '' });
   };
 
@@ -217,30 +220,8 @@ export function TaskSearchPage({ boards, assignees, onOpenTask }: TaskSearchPage
   return (
     <section className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(124,92,255,0.16),transparent_34%),linear-gradient(180deg,rgba(12,15,24,0.96),rgba(8,10,16,1))]" data-testid="task-search-page">
       <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-5 px-4 py-4 md:px-6 md:py-6">
-        <div className="rounded-3xl border border-border/70 bg-card/70 p-4 shadow-[0_24px_90px_rgba(0,0,0,0.25)] backdrop-blur md:p-5">
-          <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#B8A7FF]">Task finder</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">Find any Kanban task</h1>
-            </div>
-            <p className="text-xs text-muted-foreground">All boards · {resultCountLabel} · {freshness}</p>
-          </div>
-          <DataViewSearchAndFilter
-            query={query}
-            filters={currentFilters}
-            boards={boards}
-            assignees={assignees}
-            onQueryChange={setQuery}
-            onFiltersChange={updateFilters}
-            onSubmit={(nextQuery) => {
-              setSubmittedQuery(nextQuery.trim());
-              syncUrl({ q: nextQuery.trim() });
-            }}
-            placeholder="Search by task id, title, body, summary, comment, assignee, or status…"
-            autoFocus
-            density="page"
-            testId="task-search-input"
-          />
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/55 px-4 py-3 text-xs text-muted-foreground">
+          <span>All boards · {resultCountLabel} · {freshness}</span>
         </div>
 
         <div className="flex-1">
@@ -249,10 +230,10 @@ export function TaskSearchPage({ boards, assignees, onOpenTask }: TaskSearchPage
             {state === 'first-use' && (
               <div className="rounded-3xl border border-dashed border-[#7C5CFF]/35 bg-card/45 p-8 text-center">
                 <Search className="mx-auto mb-4 text-[#B8A7FF]" size={34} />
-                <h2 className="text-xl font-semibold">Find any Kanban task</h2>
+                <h2 className="text-xl font-semibold">Start with the header search</h2>
                 <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">Search by task id, title, body, summary, comment, assignee, or status.</p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {['t_ae86dc88', 'blocked', 'designer', 'review-required'].map((example) => <SearchChip key={example} onClick={() => { setQuery(example); setSubmittedQuery(example); syncUrl({ q: example }); }}>{example}</SearchChip>)}
+                  {['t_ae86dc88', 'blocked', 'designer', 'review-required'].map((example) => <SearchChip key={example} onClick={() => { onQueryChange(example); setSubmittedQuery(example); syncUrl({ q: example }); }}>{example}</SearchChip>)}
                 </div>
               </div>
             )}
