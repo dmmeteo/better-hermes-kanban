@@ -13,6 +13,7 @@ import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
+import { TaskSearchPage } from '@/components/search/TaskSearchPage';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -75,6 +76,7 @@ function App() {
     return match?.[1] ? decodeURIComponent(match[1]) : null;
   }, [location.pathname]);
   const isTaskPage = !!routeTaskId;
+  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/';
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
@@ -145,6 +147,10 @@ function App() {
 
   // Load route data
   useEffect(() => {
+    if (isTaskSearchPage) {
+      loadBoardData(boardIdFromUrl);
+      return;
+    }
     if (legacyBoardIdFromUrl && !routeTaskId && !boardIdFromPath) {
       navigate(boardPath(legacyBoardIdFromUrl), { replace: true });
       return;
@@ -154,7 +160,7 @@ function App() {
       return;
     }
     loadBoardData(boardIdFromUrl);
-  }, [boardIdFromPath, boardIdFromUrl, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
+  }, [boardIdFromPath, boardIdFromUrl, isTaskSearchPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
 
   useEffect(() => {
     window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
@@ -195,6 +201,10 @@ function App() {
       document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
       return;
     }
+    if (isTaskSearchPage) {
+      document.title = `🪽 Task finder — ${appSuffix}`;
+      return;
+    }
     if (routeTaskId) {
       document.title = `🪽 ${routeTaskId} — ${appSuffix}`;
       return;
@@ -206,7 +216,7 @@ function App() {
       return;
     }
     document.title = `🪽 ${appSuffix}`;
-  }, [activeBoard, boards, routeTaskId, selectedTask]);
+  }, [activeBoard, boards, isTaskSearchPage, routeTaskId, selectedTask]);
 
   const handleTaskClick = useCallback((task: Task) => {
     if (detailPresentation === 'page') {
@@ -215,6 +225,16 @@ function App() {
     }
     setSelectedTaskId(task.id);
   }, [detailPresentation, navigate]);
+
+  const handleOpenSearchTask = useCallback((taskId: string, taskBoardId?: string) => {
+    const params = taskBoardId ? `?board=${encodeURIComponent(taskBoardId)}` : '';
+    navigate(`${taskPath(taskId)}${params}`);
+  }, [navigate]);
+
+  const handleGlobalSearch = useCallback((query?: string) => {
+    const trimmed = (query ?? searchQuery).trim();
+    navigate(`/tasks${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''}`);
+  }, [navigate, searchQuery]);
 
   const handleCloseDetail = useCallback(() => {
     if (isTaskPage) {
@@ -387,11 +407,13 @@ function App() {
         onBoardChange={handleBoardChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onSearchSubmit={handleGlobalSearch}
         onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
         onOpenSettings={() => setIsBoardSettingsOpen(true)}
         detailPresentation={activeDetailPresentation}
         onDetailPresentationChange={handleDetailPresentationChange}
         isTaskPage={isTaskPage}
+        isTaskSearchPage={isTaskSearchPage}
         onNavigateToBoard={handleCloseDetail}
       />
 
@@ -404,7 +426,14 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          {activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
+          {isTaskSearchPage ? (
+            <TaskSearchPage
+              boards={boards}
+              activeBoard={activeBoard}
+              assignees={assignees}
+              onOpenTask={handleOpenSearchTask}
+            />
+          ) : activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
             <TaskDetailPage
               task={selectedTask}
               taskId={selectedTask?.id || routeTaskId || ''}
@@ -437,10 +466,10 @@ function App() {
       </main>
 
       {/* Desktop Footer Bar */}
-      {!isTaskPage && <DesktopFooterBar tasks={tasks} />}
+      {!isTaskPage && !isTaskSearchPage && <DesktopFooterBar tasks={tasks} />}
 
       {/* Mobile Bottom Nav */}
-      {!isTaskPage && (
+      {!isTaskPage && !isTaskSearchPage && (
         <MobileBottomNav
           activeTab="boards"
           onTabChange={(tab) => {
@@ -457,7 +486,7 @@ function App() {
       )}
 
       {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
-      {!isTaskPage && detailPresentation === 'drawer' ? (
+      {!isTaskPage && !isTaskSearchPage && detailPresentation === 'drawer' ? (
         <TaskDetailSheet
           task={selectedTask}
           allTasks={tasks}
@@ -473,7 +502,7 @@ function App() {
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
-      ) : !isTaskPage && detailPresentation === 'modal' ? (
+      ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
         <TaskDetailModal
           task={selectedTask}
           allTasks={tasks}
