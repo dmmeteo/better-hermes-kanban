@@ -171,14 +171,6 @@ function App() {
     setSelectedTaskId(null);
   }, [activeBoard, isTaskPage, navigate]);
 
-  const handleOpenDrawerVariant = useCallback(() => {
-    setDetailPresentation('drawer');
-    if (routeTaskId) {
-      navigate(boardPath(activeBoard?.id));
-      setSelectedTaskId(routeTaskId);
-    }
-  }, [activeBoard, navigate, routeTaskId]);
-
   const handleDetailPresentationChange = useCallback((presentation: TaskDetailPresentation) => {
     setDetailPresentation(presentation);
     if (presentation === 'page' && selectedTask) {
@@ -345,6 +337,8 @@ function App() {
         onOpenSettings={() => setIsBoardSettingsOpen(true)}
         detailPresentation={activeDetailPresentation}
         onDetailPresentationChange={handleDetailPresentationChange}
+        isTaskPage={isTaskPage}
+        onNavigateToBoard={handleCloseDetail}
       />
 
       {(dataSource === 'fallback' || loadError) && (
@@ -363,7 +357,6 @@ function App() {
               allTasks={tasks}
               activeBoard={activeBoard}
               onBack={handleCloseDetail}
-              onOpenDrawer={handleOpenDrawerVariant}
               onStatusChange={handleStatusChange}
               onAddComment={handleAddComment}
               onBlock={handleBlock}
@@ -390,22 +383,24 @@ function App() {
       </main>
 
       {/* Desktop Footer Bar */}
-      <DesktopFooterBar tasks={tasks} />
+      {!isTaskPage && <DesktopFooterBar tasks={tasks} />}
 
       {/* Mobile Bottom Nav */}
-      <MobileBottomNav
-        activeTab="boards"
-        onTabChange={(tab) => {
-          if (tab === 'boards') {
-            handleCloseDetail();
-          } else if (tab === 'more') {
-            setIsBoardSettingsOpen(true);
-          } else {
-            toast.info(`${tab} coming soon`);
-          }
-        }}
-        onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-      />
+      {!isTaskPage && (
+        <MobileBottomNav
+          activeTab="boards"
+          onTabChange={(tab) => {
+            if (tab === 'boards') {
+              handleCloseDetail();
+            } else if (tab === 'more') {
+              setIsBoardSettingsOpen(true);
+            } else {
+              toast.info(`${tab} coming soon`);
+            }
+          }}
+          onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+        />
+      )}
 
       {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
       {!isTaskPage && detailPresentation === 'drawer' ? (

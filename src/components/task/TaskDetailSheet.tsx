@@ -1,6 +1,6 @@
 import type { Task } from '@/lib/types';
 import { TaskDetail } from './TaskDetail';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import type { TaskStatus, UpdateTaskData } from '@/lib/types';
 
 interface TaskDetailSheetProps {
@@ -42,6 +42,8 @@ export function TaskDetailSheet({
         side="right"
         className="!w-screen !max-w-none p-0 border-l border-border bg-background md:!w-[50vw] md:!max-w-none"
       >
+        <SheetTitle className="sr-only">Task detail: {task.title}</SheetTitle>
+        <SheetDescription className="sr-only">Read and update task {task.id}</SheetDescription>
         <TaskDetail
           task={task}
           allTasks={allTasks}

@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText } from 'lucide-react';
+import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Board } from '@/lib/types';
@@ -26,6 +26,8 @@ interface TopBarProps {
   onOpenSettings: () => void;
   detailPresentation: TaskDetailPresentation;
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
+  isTaskPage?: boolean;
+  onNavigateToBoard?: () => void;
 }
 
 export function TopBar({
@@ -38,6 +40,8 @@ export function TopBar({
   onOpenSettings,
   detailPresentation,
   onDetailPresentationChange,
+  isTaskPage = false,
+  onNavigateToBoard,
 }: TopBarProps) {
   return (
     <header className="shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
@@ -70,27 +74,39 @@ export function TopBar({
             </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-accent transition-colors">
-                <span className="text-muted-foreground">Board</span>
-                <span>{activeBoard.name}</span>
-                <ChevronDown size={14} className="text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              {boards.map((board) => (
-                <DropdownMenuItem
-                  key={board.id}
-                  onClick={() => onBoardChange(board)}
-                  className={cn(board.id === activeBoard.id && 'bg-accent')}
-                >
-                  <span className="flex-1">{board.name}</span>
-                  <span className="text-muted-foreground text-xs">{board.taskCount}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isTaskPage ? (
+            <button
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-accent transition-colors"
+              onClick={onNavigateToBoard}
+              data-testid="task-page-board-link"
+            >
+              <ArrowLeft size={14} className="text-muted-foreground" />
+              <span className="text-muted-foreground">Board</span>
+              <span>{activeBoard.name}</span>
+            </button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-secondary text-xs font-medium hover:bg-accent transition-colors">
+                  <span className="text-muted-foreground">Board</span>
+                  <span>{activeBoard.name}</span>
+                  <ChevronDown size={14} className="text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {boards.map((board) => (
+                  <DropdownMenuItem
+                    key={board.id}
+                    onClick={() => onBoardChange(board)}
+                    className={cn(board.id === activeBoard.id && 'bg-accent')}
+                  >
+                    <span className="flex-1">{board.name}</span>
+                    <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -103,6 +119,7 @@ export function TopBar({
               className="w-64 h-8 pl-8 text-xs bg-secondary border-border"
             />
           </div>
+          {!isTaskPage && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -145,6 +162,8 @@ export function TopBar({
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
+          {!isTaskPage && (
           <Button
             variant="outline"
             size="sm"
@@ -154,6 +173,7 @@ export function TopBar({
             <Settings size={14} />
             <span>Board settings</span>
           </Button>
+          )}
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 font-semibold"

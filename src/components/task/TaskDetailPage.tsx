@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, PanelRightOpen } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import type { Board, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -12,7 +12,6 @@ interface TaskDetailPageProps {
   allTasks: Task[];
   activeBoard: Board;
   onBack: () => void;
-  onOpenDrawer: () => void;
   onStatusChange: (status: TaskStatus) => void;
   onAddComment: (text: string) => void;
   onBlock: () => void;
@@ -30,7 +29,6 @@ export function TaskDetailPage({
   allTasks,
   activeBoard,
   onBack,
-  onOpenDrawer,
   onStatusChange,
   onAddComment,
   onBlock,
@@ -76,7 +74,7 @@ export function TaskDetailPage({
             <div className="flex min-w-0 items-start gap-3">
               <Button variant="outline" size="sm" className="h-9 shrink-0 gap-2" onClick={onBack} data-testid="task-page-back">
                 <ArrowLeft size={15} />
-                <span className="hidden sm:inline">Board</span>
+                <span className="hidden sm:inline">Open board</span>
               </Button>
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -90,10 +88,6 @@ export function TaskDetailPage({
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onOpenDrawer} data-testid="task-page-open-drawer">
-                <PanelRightOpen size={14} />
-                Drawer variant
-              </Button>
             </div>
           </div>
         </div>

@@ -74,6 +74,7 @@ export function TaskDetail({
 
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
+  const taskHref = `/tasks/${encodeURIComponent(task.id)}`;
 
   // Mobile sections
   const mobileSections = [
@@ -133,9 +134,16 @@ export function TaskDetail({
           </button>
         )}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+          <a
+            href={taskHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`Open task ${task.id} in a new tab`}
+            data-testid="task-detail-id-link"
+          >
             {task.id}
-          </span>
+          </a>
         </div>
         <div className="flex-1" />
         <StatusBadge status={task.status} />
