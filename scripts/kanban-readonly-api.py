@@ -655,7 +655,23 @@ def task_detail_payload(task_id: str, slug: str | None = None) -> dict:
     return {"task": exact["results"][0]["task"]}
 
 
-def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, limit_override: int | None = None) -> dict:
+def empty_search_response(now: int | None = None) -> dict:
+    return {
+        "results": [],
+        "total": 0,
+        "nextCursor": None,
+        "source": "sqlite",
+        "indexedAt": now or int(time.time()),
+    }
+
+
+def search_tasks(
+    qs: dict[str, list[str]],
+    *,
+    exact_task_id: str | None = None,
+    limit_override: int | None = None,
+    empty_on_unknown_board: bool = False,
+) -> dict:
     query = (qs.get("q") or [""])[0].strip()
     board_filter = (qs.get("board") or [None])[0]
     status_filter = (qs.get("status") or [""])[0].strip().lower()
@@ -672,7 +688,14 @@ def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, 
     results: list[dict] = []
     seen_sources: set[tuple[str, str]] = set()
 
-    for board_meta in board_choices(board_filter):
+    try:
+        boards = board_choices(board_filter)
+    except ValueError:
+        if empty_on_unknown_board:
+            return empty_search_response(now)
+        raise
+
+    for board_meta in boards:
         board = board_meta.get("slug") or board_meta.get("id") or kanban_db.DEFAULT_BOARD
         db_identity = str(board_meta.get("db_path") or board)
         try:
@@ -956,7 +979,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, orchestration_payload())
                 return
             if parsed.path == "/api/plugins/kanban/search":
-                self.send_json(200, search_tasks(parse_qs(parsed.query)))
+                self.send_json(200, search_tasks(parse_qs(parsed.query), empty_on_unknown_board=True))
                 return
             prefix = "/api/plugins/kanban/tasks/"
             if parsed.path.startswith(prefix):

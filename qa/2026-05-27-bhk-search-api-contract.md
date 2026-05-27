@@ -95,17 +95,11 @@ curl -sS 'http://172.17.0.1:9120/api/plugins/kanban/search?q=t_74a91ec0&limit=1'
 curl -sS 'http://172.17.0.1:9120/api/plugins/kanban/search?board=better-hermes-kanban&status=definitely-not-a-status&limit=2'
 # returns {"results": [], "total": 0, "nextCursor": null, "source": "sqlite", ...}
 
+curl -sS 'http://172.17.0.1:9120/api/plugins/kanban/search?board=no-such-board&q=whatever&limit=2'
+# returns HTTP 200 with {"results": [], "total": 0, "nextCursor": null, "source": "sqlite", ...}
+
 curl -sS 'http://172.17.0.1:9120/healthz'
 # returns {"ok": true}
 ```
 
-## Gap / follow-up
-
-Unknown `board` currently returns an error payload from the bridge instead of a normal empty search response:
-
-```bash
-curl -sS 'http://172.17.0.1:9120/api/plugins/kanban/search?board=no-such-board&q=whatever&limit=2'
-# current: {"detail": "BHK read-only API error: board 'no-such-board' does not exist"}
-```
-
-This should become a follow-up backend hardening task because the current task scope says missing backend behavior should become follow-up work, not an in-chat patch.
+Unknown `board` handling is intentionally search-endpoint-only. Exact task detail lookup (`/api/plugins/kanban/tasks/<id>?board=<slug>`) continues to use the stricter board resolution path.
