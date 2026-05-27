@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Plus, Star, Bot, ChevronRight, Radio, Plug, Sliders, Stethoscope, Save, Lock } from 'lucide-react';
+import { X, Plus, Star, Bot, ChevronRight, Radio, Plug, Sliders, Stethoscope, Save, Lock, Pencil, Archive } from 'lucide-react';
 import type { Board, BotProfile, KanbanOrchestrationSettings } from '@/lib/types';
 import { BOT_PROFILES } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -30,12 +30,42 @@ type FormState = {
   autoPromoteChildren: boolean;
 };
 
+type BoardFormState = {
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  defaultWorkdir: string;
+};
+
 const emptyForm: FormState = {
   orchestratorProfile: '',
   defaultAssignee: '',
   autoDecompose: true,
   autoPromoteChildren: true,
 };
+
+const emptyBoardForm: BoardFormState = {
+  slug: '',
+  name: '',
+  description: '',
+  icon: '',
+  color: '',
+  defaultWorkdir: '',
+};
+
+function boardToForm(board?: Board): BoardFormState {
+  if (!board) return emptyBoardForm;
+  return {
+    slug: board.id,
+    name: board.name || board.id,
+    description: board.description || '',
+    icon: board.icon || '',
+    color: board.color || '',
+    defaultWorkdir: '',
+  };
+}
 
 function toForm(settings: KanbanOrchestrationSettings | null): FormState {
   if (!settings) return emptyForm;
@@ -86,6 +116,7 @@ export function BoardsSettingsPanel({
   boards,
   activeBoard,
   onBoardChange,
+  onBoardsRefresh,
   isMobile = false,
 }: BoardsSettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'boards' | 'settings'>('boards');
@@ -93,8 +124,21 @@ export function BoardsSettingsPanel({
   const [assignees, setAssignees] = useState<BotProfile[]>([]);
   const [orchestration, setOrchestration] = useState<KanbanOrchestrationSettings | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [boardMode, setBoardMode] = useState<'list' | 'create' | 'edit'>('list');
+  const [selectedBoardId, setSelectedBoardId] = useState(activeBoard.id);
+  const [boardForm, setBoardForm] = useState<BoardFormState>(emptyBoardForm);
+  const [boardSaving, setBoardSaving] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const selectedBoard = boards.find((board) => board.id === selectedBoardId) || activeBoard;
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedBoardId(activeBoard.id);
+    if (boardMode === 'list') setBoardForm(boardToForm(activeBoard));
+  }, [activeBoard, boardMode, open]);
 
   useEffect(() => {
     if (!open || activeTab !== 'settings') return;
@@ -120,6 +164,73 @@ export function BoardsSettingsPanel({
     [...profiles, ...assignees].forEach((profile) => byName.set(profile.name, profile));
     return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [profiles, assignees]);
+
+  const refreshBoards = async (preferredBoardId?: string) => {
+    if (onBoardsRefresh) await onBoardsRefresh(preferredBoardId);
+  };
+
+  const openCreateBoard = () => {
+    setBoardMode('create');
+    setConfirmArchive(false);
+    setBoardForm(emptyBoardForm);
+  };
+
+  const openEditBoard = (board: Board) => {
+    setSelectedBoardId(board.id);
+    setBoardMode('edit');
+    setConfirmArchive(false);
+    setBoardForm(boardToForm(board));
+  };
+
+  const saveBoard = async () => {
+    const slug = boardForm.slug.trim().toLowerCase();
+    const name = boardForm.name.trim();
+    if (boardMode === 'create' && !slug) {
+      toast.error('Board slug is required');
+      return;
+    }
+    if (!name) {
+      toast.error('Board name is required');
+      return;
+    }
+    setBoardSaving(true);
+    try {
+      const payload = {
+        name,
+        description: boardForm.description.trim(),
+        icon: boardForm.icon.trim(),
+        color: boardForm.color.trim(),
+        defaultWorkdir: boardForm.defaultWorkdir.trim(),
+      };
+      const next = boardMode === 'create'
+        ? await kanbanApi.createBoard({ slug, ...payload })
+        : await kanbanApi.updateBoard(selectedBoard.id, payload);
+      await refreshBoards(next.id);
+      setSelectedBoardId(next.id);
+      setBoardForm(boardToForm(next));
+      setBoardMode('edit');
+      toast.success(boardMode === 'create' ? `Created ${next.name}` : `Updated ${next.name}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save board');
+    } finally {
+      setBoardSaving(false);
+    }
+  };
+
+  const archiveBoard = async () => {
+    setBoardSaving(true);
+    try {
+      await kanbanApi.deleteBoard(selectedBoard.id);
+      await refreshBoards();
+      setBoardMode('list');
+      setConfirmArchive(false);
+      toast.success(`Archived ${selectedBoard.name}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to archive board');
+    } finally {
+      setBoardSaving(false);
+    }
+  };
 
   const saveSettings = async () => {
     const allowed = new Set(profileOptions.map((profile) => profile.name));
@@ -174,12 +285,63 @@ export function BoardsSettingsPanel({
 
       {activeTab === 'boards' && (
         <div className="space-y-1">
+          {boardMode !== 'list' && (
+            <div className="mb-3 space-y-3 rounded-xl border border-border/50 bg-card/40 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-semibold">{boardMode === 'create' ? 'Create board' : 'Edit board metadata'}</h4>
+                  <p className="text-[11px] text-muted-foreground">Guarded API-backed board management. Archive requires confirmation.</p>
+                </div>
+                <button onClick={() => setBoardMode('list')} className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent">Back</button>
+              </div>
+              <div className="grid gap-2">
+                {boardMode === 'create' && (
+                  <label className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Slug</span>
+                    <input value={boardForm.slug} onChange={(event) => setBoardForm((current) => ({ ...current, slug: event.target.value }))} placeholder="my-board" className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs" />
+                  </label>
+                )}
+                <label className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Name</span>
+                  <input value={boardForm.name} onChange={(event) => setBoardForm((current) => ({ ...current, name: event.target.value }))} placeholder="Board name" className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs" />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Description</span>
+                  <textarea value={boardForm.description} onChange={(event) => setBoardForm((current) => ({ ...current, description: event.target.value }))} rows={2} className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs" />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Icon</span>
+                    <input value={boardForm.icon} onChange={(event) => setBoardForm((current) => ({ ...current, icon: event.target.value }))} placeholder="kanban" className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs" />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Color</span>
+                    <input value={boardForm.color} onChange={(event) => setBoardForm((current) => ({ ...current, color: event.target.value }))} placeholder="#7C5CFF" className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs" />
+                  </label>
+                </div>
+                <label className="space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Default workdir</span>
+                  <input value={boardForm.defaultWorkdir} onChange={(event) => setBoardForm((current) => ({ ...current, defaultWorkdir: event.target.value }))} placeholder="/home/me/projects/..." className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs" />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={saveBoard} disabled={boardSaving} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-medium text-primary-foreground disabled:opacity-60"><Save size={12} />{boardSaving ? 'Saving…' : 'Save board'}</button>
+                {boardMode === 'edit' && !confirmArchive && <button onClick={() => setConfirmArchive(true)} disabled={boardSaving} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-2.5 py-1.5 text-[11px] font-medium text-destructive"><Archive size={12} />Archive…</button>}
+              </div>
+              {boardMode === 'edit' && confirmArchive && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px]">
+                  <p className="mb-2 font-medium text-destructive">Archive “{selectedBoard.name}”? Tasks remain in the board database, but the board is hidden from normal lists.</p>
+                  <div className="flex gap-2"><button onClick={archiveBoard} disabled={boardSaving} className="rounded-md bg-destructive px-2 py-1 text-destructive-foreground">Confirm archive</button><button onClick={() => setConfirmArchive(false)} className="rounded-md border border-border px-2 py-1">Cancel</button></div>
+                </div>
+              )}
+            </div>
+          )}
           {boards.map((board) => (
             <button
               key={board.id}
               onClick={() => {
                 onBoardChange(board);
-                toast.success(`Switched to ${board.name}`);
+                openEditBoard(board);
               }}
               className={cn(
                 'w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors',
@@ -192,12 +354,12 @@ export function BoardsSettingsPanel({
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{board.taskCount}</span>
-                <ChevronRight size={14} className="text-muted-foreground" />
+                <Pencil size={14} className="text-muted-foreground" />
               </div>
             </button>
           ))}
           <button
-            onClick={() => toast.info('Create board coming soon')}
+            onClick={openCreateBoard}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent/50 transition-colors mt-2"
           >
             <Plus size={14} />
