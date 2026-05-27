@@ -155,6 +155,25 @@ function App() {
     [tasks, selectedTaskId]
   );
 
+  useEffect(() => {
+    const appSuffix = 'BHK';
+    if (selectedTask) {
+      document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
+      return;
+    }
+    if (routeTaskId) {
+      document.title = `🪽 ${routeTaskId} — ${appSuffix}`;
+      return;
+    }
+    if (activeBoard) {
+      const board = boards.find((item) => item.id === activeBoard.id) || activeBoard;
+      const count = board.taskCount === 1 ? '1 task' : `${board.taskCount} tasks`;
+      document.title = `🪽 ${board.name || board.id} · ${count} — ${appSuffix}`;
+      return;
+    }
+    document.title = `🪽 ${appSuffix}`;
+  }, [activeBoard, boards, routeTaskId, selectedTask]);
+
   const handleTaskClick = useCallback((task: Task) => {
     if (detailPresentation === 'page') {
       navigate(taskPath(task.id));
