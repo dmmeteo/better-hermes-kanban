@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import type { Board, BotProfile, Priority, TaskStatus } from '@/lib/types';
 import { PRIORITY_LABELS, STATUS_LABELS, STATUS_ORDER } from '@/lib/types';
@@ -81,7 +81,13 @@ export function DataViewSearchAndFilter({
   const [isOpen, setIsOpen] = useState(false);
   const [activeField, setActiveField] = useState<FilterKey | null>(null);
   const [operator, setOperator] = useState<Operator>('is');
+  const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const closePicker = () => {
+    setIsOpen(false);
+    setActiveField(null);
+  };
 
   const activeTokens = (Object.entries(filters) as [FilterKey, string | undefined][]).filter(([, value]) => !!value);
 
@@ -102,6 +108,32 @@ export function DataViewSearchAndFilter({
     if (activeField === 'assignee') return assignees.map((item) => ({ value: item.name || item.id, label: item.name || item.id, meta: item.taskCount != null ? `${item.taskCount} tasks` : item.source || 'profile' }));
     return [];
   }, [activeField, assignees, boards]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (rootRef.current?.contains(target)) return;
+      closePicker();
+    };
+
+    const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closePicker();
+      inputRef.current?.blur();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleDocumentKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [isOpen]);
 
   const setFilter = (key: FilterKey, value: string, nextOperator = operator) => {
     onFiltersChange({ ...filters, [key]: serializeToken(nextOperator, value) });
@@ -126,20 +158,30 @@ export function DataViewSearchAndFilter({
     if (event.key === 'Enter') {
       event.preventDefault();
       onSubmit?.(query.trim(), filters);
-      setIsOpen(false);
+      closePicker();
       return;
     }
     if (event.key === 'Escape') {
-      setIsOpen(false);
-      setActiveField(null);
+      event.preventDefault();
+      closePicker();
       inputRef.current?.blur();
     }
+  };
+
+  const handleTogglePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    setIsOpen((current) => {
+      const next = !current;
+      if (!next) setActiveField(null);
+      return next;
+    });
+    inputRef.current?.focus();
   };
 
   const panelId = `${testId}-panel`;
 
   return (
-    <div className={cn('relative min-w-0', className)} data-testid={testId}>
+    <div ref={rootRef} className={cn('relative min-w-0', className)} data-testid={testId}>
       <div
         className={cn(
           'group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-secondary/95 px-2 text-xs shadow-[0_12px_36px_rgba(0,0,0,0.18)] transition-colors focus-within:border-[#7C5CFF]/70 focus-within:ring-2 focus-within:ring-[#7C5CFF]/20',
@@ -187,11 +229,7 @@ export function DataViewSearchAndFilter({
         )}
         <button
           type="button"
-          onClick={() => {
-            setIsOpen((current) => !current);
-            setActiveField(null);
-            inputRef.current?.focus();
-          }}
+          onPointerDown={handleTogglePointerDown}
           className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
           aria-label="Open filter picker"
           data-testid={`${testId}-toggle`}
