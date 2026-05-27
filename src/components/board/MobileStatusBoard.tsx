@@ -1,33 +1,21 @@
 import { useState, useMemo } from 'react';
-import type { Task, TaskStatus, Board } from '@/lib/types';
+import type { Task, TaskStatus } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/types';
 import { StatusTabs } from './StatusTabs';
 import { TaskCard } from './TaskCard';
-import { ChevronDown, Plus, Settings } from 'lucide-react';
 
 interface MobileStatusBoardProps {
   tasks: Task[];
-  boards: Board[];
-  activeBoard: Board;
-  onBoardChange: (board: Board) => void;
-  onOpenSettings: () => void;
-  onOpenNewBoard: () => void;
   onTaskClick: (task: Task) => void;
   searchQuery: string;
 }
 
 export function MobileStatusBoard({
   tasks,
-  boards,
-  activeBoard,
-  onBoardChange,
-  onOpenSettings,
-  onOpenNewBoard,
   onTaskClick,
   searchQuery,
 }: MobileStatusBoardProps) {
   const [activeStatus, setActiveStatus] = useState<TaskStatus>('triage');
-  const [showBoardDropdown, setShowBoardDropdown] = useState(false);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -54,62 +42,6 @@ export function MobileStatusBoard({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header section */}
-      <div className="px-4 pt-3 pb-2">
-        <div className="flex items-stretch gap-2">
-          <button
-            data-testid="mobile-board-selector-trigger"
-            onClick={() => setShowBoardDropdown(!showBoardDropdown)}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-left"
-          >
-            <span className="truncate text-xs text-muted-foreground">{activeBoard.id}</span>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{activeBoard.name}</span>
-            <ChevronDown size={16} className="shrink-0 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            aria-label="Open settings"
-            title="Open settings"
-            data-testid="mobile-settings-button"
-            onClick={onOpenSettings}
-            className="inline-flex h-auto w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <Settings size={18} />
-          </button>
-        </div>
-
-        {showBoardDropdown && (
-          <div className="mt-1 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
-            {boards.map((board) => (
-              <button
-                key={board.id}
-                onClick={() => {
-                  onBoardChange(board);
-                  setShowBoardDropdown(false);
-                }}
-                className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-accent"
-              >
-                <span className="text-sm">{board.name}</span>
-                <span className="text-xs text-muted-foreground">{board.taskCount} tasks</span>
-              </button>
-            ))}
-            <button
-              type="button"
-              data-testid="mobile-board-dropdown-new-board"
-              onClick={() => {
-                setShowBoardDropdown(false);
-                onOpenNewBoard();
-              }}
-              className="flex w-full items-center gap-2 border-t border-border/60 px-3 py-2.5 text-left text-sm font-medium text-primary transition-colors hover:bg-accent"
-            >
-              <Plus size={14} />
-              New board
-            </button>
-          </div>
-        )}
-
-      </div>
-
       {/* Status tabs */}
       <StatusTabs
         activeStatus={activeStatus}

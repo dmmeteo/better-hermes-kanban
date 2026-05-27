@@ -1,4 +1,4 @@
-import { Search, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import type { Board, BotProfile } from '@/lib/types';
@@ -61,27 +61,60 @@ export function TopBar({
   return (
     <header className="shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
       {/* Mobile header */}
-      <div className="md:hidden flex items-center justify-between h-12 px-4">
+      <div className="md:hidden flex items-center gap-2 h-12 px-4">
         <Link
           to={logoHomeHref}
           aria-label={`Go to ${activeBoard.name || activeBoard.id} board`}
           title={`Go to ${activeBoard.name || activeBoard.id} board`}
           data-testid="app-logo-home-link"
-          className="flex items-center gap-2 rounded-lg transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="flex min-w-0 shrink-0 items-center gap-2 rounded-lg transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Feather size={20} style={{ color: '#7C5CFF' }} />
           <span className="font-bold text-sm">Hermes</span>
         </Link>
-        <button
-          type="button"
-          aria-label="Search all tasks"
-          title="Search all tasks"
-          data-testid="mobile-global-search-button"
-          onClick={() => onSearchSubmit?.()}
-          className="p-2 rounded-lg hover:bg-accent"
-        >
-          <Search size={18} className={cn(isTaskSearchPage ? 'text-foreground' : 'text-muted-foreground')} />
-        </button>
+        {!isTaskPage && (
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-testid="mobile-board-selector-trigger"
+                  className="flex min-w-0 max-w-[180px] flex-1 items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                >
+                  <span className="truncate">{activeBoard.name}</span>
+                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {boards.map((board) => (
+                  <DropdownMenuItem
+                    key={board.id}
+                    onClick={() => onBoardChange(board)}
+                    className={cn(board.id === activeBoard.id && 'bg-accent')}
+                  >
+                    <span className="flex-1 truncate">{board.name}</span>
+                    <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onOpenNewBoard} data-testid="mobile-board-dropdown-new-board">
+                  <Plus size={14} className="mr-2" />
+                  New board
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <button
+              type="button"
+              aria-label="Open settings"
+              title="Open settings"
+              data-testid="mobile-settings-button"
+              onClick={onOpenSettings}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Settings size={17} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Desktop header */}

@@ -89,7 +89,7 @@ function App() {
   }, [location.pathname]);
   const isTaskPage = !!routeTaskId;
   const isSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
-  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/';
+  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/' || location.pathname === '/search' || location.pathname === '/search/';
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
@@ -519,12 +519,7 @@ function App() {
           ) : (
             <BoardView
               tasks={tasks}
-              boards={boards}
-              activeBoard={activeBoard}
-              onBoardChange={handleBoardChange}
               onTaskClick={handleTaskClick}
-              onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
-              onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
               searchQuery={searchQuery}
