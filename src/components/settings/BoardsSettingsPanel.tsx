@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react';
 import { Save, X } from 'lucide-react';
 import type { Board, BotProfile, KanbanOrchestrationSettings } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -67,6 +67,7 @@ export function BoardsSettingsPanel({
   const [profiles, setProfiles] = useState<BotProfile[]>([]);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
   const profileOptions = useMemo(() => mergeOptions(profiles, assignees), [assignees, profiles]);
 
@@ -119,13 +120,31 @@ export function BoardsSettingsPanel({
     }
   };
 
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (!swipeStart.current) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - swipeStart.current.x;
+    const deltaY = touch.clientY - swipeStart.current.y;
+    swipeStart.current = null;
+    if (deltaX > 80 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
+      onClose();
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
         data-testid="settings-drawer"
-        className="w-[92vw] gap-0 border-border bg-background p-0 sm:max-w-[460px]"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="inset-0 h-[100dvh] w-screen max-w-none gap-0 overflow-hidden border-0 bg-background p-0 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[460px] sm:max-w-[460px] sm:border-l"
       >
         <SheetHeader className="border-b border-border/50 px-4 py-4">
           <div className="flex items-start justify-between gap-3 pr-8">
@@ -147,7 +166,7 @@ export function BoardsSettingsPanel({
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4">
           <div className="space-y-4">
               <section className="rounded-xl border border-border/60 bg-card/30 p-3">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active board</div>
@@ -252,7 +271,7 @@ export function BoardsSettingsPanel({
             </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border/50 px-4 py-3">
+        <div className="shrink-0 flex items-center justify-end gap-2 border-t border-border/50 bg-background px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             data-testid="settings-cancel-button"

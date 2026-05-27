@@ -72,7 +72,7 @@ export function MobileStatusBoard({
             title="Open settings"
             data-testid="mobile-settings-button"
             onClick={onOpenSettings}
-            className="inline-flex w-11 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="inline-flex h-auto w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Settings size={18} />
           </button>
