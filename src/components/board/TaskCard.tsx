@@ -74,6 +74,12 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
           )}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
+          <span
+            className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/35 select-text"
+            title={`Task ID: ${task.id}`}
+          >
+            {task.id}
+          </span>
           {task.commentCount > 0 && (
             <span className="inline-flex items-center gap-1 text-[11px]">
               <MessageSquare size={12} />
