@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowLeft, ChevronDown, Edit3, ExternalLink, MoreHorizontal, RefreshCcw, X } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MoreHorizontal, RefreshCcw, X } from 'lucide-react';
 import type { Board, Task } from '@/lib/types';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { MarkdownText } from '@/components/shared/MarkdownText';
@@ -8,7 +8,6 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { cn, timeAgo } from '@/lib/utils';
 import { TaskActivity } from './TaskActivity';
-import { TaskAttachmentsPlanned } from './TaskAttachmentsPlanned';
 import { TaskComments } from './TaskComments';
 import { TaskDiagnostics } from './TaskDiagnostics';
 import { TaskLinks } from './TaskLinks';

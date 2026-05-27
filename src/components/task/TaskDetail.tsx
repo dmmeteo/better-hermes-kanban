@@ -4,7 +4,6 @@ import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { WarningBanner } from '@/components/shared/WarningBanner';
 import { TaskActions } from './TaskActions';
 import { TaskAttachmentsPlanned } from './TaskAttachmentsPlanned';
-import { TaskDiagnostics } from './TaskDiagnostics';
 import { TaskUpdatePanel } from './TaskUpdatePanel';
 import { getUnfinishedParents, isReadyDisabled } from '@/lib/utils';
 import { cn } from '@/lib/utils';
