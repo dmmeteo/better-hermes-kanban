@@ -12,6 +12,9 @@ import type {
   TaskRun,
   UpdateTaskData,
   CreateTaskData,
+  TaskSearchParams,
+  TaskSearchResponse,
+  TaskSearchResult,
 } from './types';
 import { mockTasks, boards as mockBoards, BOT_PROFILES } from '@/data/mockTasks';
 
@@ -264,6 +267,35 @@ function normalizeTask(raw: unknown, boardId: string): Task {
   };
 }
 
+function normalizeSearchResult(raw: unknown, index = 0): TaskSearchResult {
+  const item = isObject(raw) ? raw : {};
+  const boardId = asString(item.boardId ?? item.board_id ?? item.board ?? 'current', 'current');
+  const task = item.task ? normalizeTask(item.task, boardId) : undefined;
+  const id = asString(item.id ?? item.task_id ?? item.taskId ?? task?.id, `result-${index}`);
+  return {
+    id,
+    title: asString(item.title ?? task?.title, id),
+    body: asString(item.body ?? item.description ?? task?.description, ''),
+    snippet: asString(item.snippet ?? item.excerpt ?? item.body ?? task?.latestSummary ?? task?.description, ''),
+    matchField: asString(item.matchField ?? item.match_field, 'title') as TaskSearchResult['matchField'],
+    exact: Boolean(item.exact ?? item.isExact),
+    status: normalizeStatus(item.status ?? task?.status),
+    priority: normalizePriority(item.priority ?? task?.priority),
+    assignee: asString(item.assignee ?? task?.assignee, '') || null,
+    boardId,
+    boardName: asString(item.boardName ?? item.board_name ?? item.board_title, boardId),
+    commentCount: asNumber(item.commentCount ?? item.comment_count ?? task?.commentCount, 0),
+    linkCount: asNumber(item.linkCount ?? item.link_count ?? task?.linkCount, 0),
+    warningCount: asNumber(item.warningCount ?? item.warning_count ?? task?.warningCount, 0),
+    latestSummary: asString(item.latestSummary ?? item.latest_summary ?? task?.latestSummary, '') || null,
+    createdAt: toIso(item.createdAt ?? item.created_at ?? task?.createdAt),
+    updatedAt: toIso(item.updatedAt ?? item.updated_at ?? task?.updatedAt),
+    source: asString(item.source, 'live'),
+    indexedAt: toIso(item.indexedAt ?? item.indexed_at),
+    task,
+  };
+}
+
 function flattenTasksFromBoard(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (!isObject(payload)) return [];
@@ -353,10 +385,36 @@ export const kanbanApi = {
     }
   },
 
-  async getTask(taskId: string): Promise<Task | null> {
-    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}`);
+  async getTask(taskId: string, boardId?: string): Promise<Task | null> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query}`);
     const rawTask = isObject(payload) && payload.task ? payload.task : payload;
-    return normalizeTask(rawTask, 'current');
+    return normalizeTask(rawTask, boardId || 'current');
+  },
+
+  async searchTasks(params: TaskSearchParams = {}): Promise<TaskSearchResponse> {
+    const search = new URLSearchParams();
+    if (params.q) search.set('q', params.q);
+    if (params.board) search.set('board', params.board);
+    if (params.status) search.set('status', params.status);
+    if (params.assignee) search.set('assignee', params.assignee);
+    if (params.priority) search.set('priority', params.priority);
+    if (params.hasWarnings !== undefined) search.set('has_warnings', String(params.hasWarnings));
+    if (params.hasLinks !== undefined) search.set('has_links', String(params.hasLinks));
+    if (params.limit !== undefined) search.set('limit', String(params.limit));
+    if (params.cursor) search.set('cursor', params.cursor);
+    if (params.offset !== undefined) search.set('offset', String(params.offset));
+    if (params.sort) search.set('sort', params.sort);
+    const payload = await requestJson<unknown>(`/search${search.toString() ? `?${search.toString()}` : ''}`);
+    const item = isObject(payload) ? payload : {};
+    const rawResults = Array.isArray(item.results) ? item.results : [];
+    return {
+      results: rawResults.map(normalizeSearchResult),
+      total: asNumber(item.total, rawResults.length),
+      nextCursor: asString(item.nextCursor ?? item.next_cursor, '') || null,
+      source: asString(item.source, 'live'),
+      indexedAt: toIso(item.indexedAt ?? item.indexed_at),
+    };
   },
 
   async createBoard(input: { slug: string; name?: string; description?: string; icon?: string; color?: string; defaultWorkdir?: string }): Promise<Board> {

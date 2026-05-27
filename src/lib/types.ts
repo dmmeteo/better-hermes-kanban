@@ -146,6 +146,51 @@ export interface CreateTaskData {
   workspacePath?: string;
 }
 
+export interface TaskSearchParams {
+  q?: string;
+  board?: string;
+  status?: TaskStatus | string;
+  assignee?: string;
+  priority?: Priority | string;
+  hasWarnings?: boolean;
+  hasLinks?: boolean;
+  limit?: number;
+  cursor?: string;
+  offset?: number;
+  sort?: 'relevance' | 'updated' | 'newest' | 'priority';
+}
+
+export interface TaskSearchResult {
+  id: string;
+  title: string;
+  body: string;
+  snippet: string;
+  matchField: 'id' | 'title' | 'body' | 'summary' | 'comment' | 'metadata';
+  exact: boolean;
+  status: TaskStatus;
+  priority: Priority;
+  assignee: string | null;
+  boardId: string;
+  boardName: string;
+  commentCount: number;
+  linkCount: number;
+  warningCount: number;
+  latestSummary: string | null;
+  createdAt: string;
+  updatedAt: string;
+  source: string;
+  indexedAt: string;
+  task?: Task;
+}
+
+export interface TaskSearchResponse {
+  results: TaskSearchResult[];
+  total: number;
+  nextCursor: string | null;
+  source: string;
+  indexedAt: string;
+}
+
 export const STATUS_ORDER: TaskStatus[] = [
   'triage',
   'todo',
