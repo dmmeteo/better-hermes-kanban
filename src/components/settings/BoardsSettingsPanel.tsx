@@ -5,7 +5,7 @@ import { kanbanApi } from '@/lib/kanbanApi';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
-export type BoardSettingsMode = 'settings' | 'list' | 'create';
+export type BoardSettingsMode = 'settings' | 'list';
 
 interface BoardsSettingsPanelProps {
   open: boolean;
@@ -72,7 +72,7 @@ export function BoardsSettingsPanel({
 
   useEffect(() => {
     if (!open) return;
-    setPanelMode(mode === 'create' ? 'create' : 'settings');
+    setPanelMode(mode === 'list' ? 'list' : 'settings');
   }, [mode, open]);
 
   useEffect(() => {
@@ -119,7 +119,6 @@ export function BoardsSettingsPanel({
     }
   };
 
-  const showCreateShim = panelMode === 'create';
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -131,11 +130,9 @@ export function BoardsSettingsPanel({
         <SheetHeader className="border-b border-border/50 px-4 py-4">
           <div className="flex items-start justify-between gap-3 pr-8">
             <div>
-              <SheetTitle className="text-base">{showCreateShim ? 'New board' : 'Settings'}</SheetTitle>
+              <SheetTitle className="text-base">Settings</SheetTitle>
               <SheetDescription className="text-xs">
-                {showCreateShim
-                  ? 'New board creation lives in the board selector. Use the selector to continue.'
-                  : `Active board settings for ${activeBoard.name || activeBoard.id}.`}
+                Active board settings for {activeBoard.name || activeBoard.id}.
               </SheetDescription>
             </div>
             <button
@@ -151,12 +148,7 @@ export function BoardsSettingsPanel({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          {showCreateShim ? (
-            <div data-testid="new-board-modal" className="rounded-xl border border-border/60 bg-card/30 p-4 text-sm text-muted-foreground">
-              Open the board selector and choose “New board” to create a board.
-            </div>
-          ) : (
-            <div className="space-y-4">
+          <div className="space-y-4">
               <section className="rounded-xl border border-border/60 bg-card/30 p-3">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active board</div>
                 <div className="mt-3 space-y-2 text-sm">
@@ -258,31 +250,28 @@ export function BoardsSettingsPanel({
                 </div>
               </section>
             </div>
-          )}
         </div>
 
-        {!showCreateShim && (
-          <div className="flex items-center justify-end gap-2 border-t border-border/50 px-4 py-3">
-            <button
-              type="button"
-              data-testid="settings-cancel-button"
-              onClick={onClose}
-              className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-accent"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              data-testid="settings-save-button"
-              onClick={saveSettings}
-              disabled={settingsLoading || settingsSaving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
-            >
-              <Save size={13} />
-              {settingsSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-end gap-2 border-t border-border/50 px-4 py-3">
+          <button
+            type="button"
+            data-testid="settings-cancel-button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-accent"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="settings-save-button"
+            onClick={saveSettings}
+            disabled={settingsLoading || settingsSaving}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
+          >
+            <Save size={13} />
+            {settingsSaving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </SheetContent>
     </Sheet>
   );

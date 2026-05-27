@@ -8,6 +8,7 @@ import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar'
 import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
 import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
+import { NewBoardModal } from '@/components/board/NewBoardModal';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
 import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskDetailPage } from '@/components/task/TaskDetailPage';
@@ -61,6 +62,7 @@ function App() {
   const [searchFilters, setSearchFilters] = useState<DataViewSearchFilters>({});
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNewBoardOpen, setIsNewBoardOpen] = useState(false);
   const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('settings');
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
@@ -452,7 +454,7 @@ function App() {
           onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
           onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
-          onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
+          onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
           detailPresentation={activeDetailPresentation}
           onDetailPresentationChange={handleDetailPresentationChange}
           isTaskPage={isTaskPage}
@@ -521,7 +523,7 @@ function App() {
               onBoardChange={handleBoardChange}
               onTaskClick={handleTaskClick}
               onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
-              onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
+              onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
               searchQuery={searchQuery}
@@ -582,6 +584,16 @@ function App() {
         onBoardChange={handleBoardChange}
         onBoardsRefresh={loadBoardData}
         assignees={assignees}
+      />
+
+      <NewBoardModal
+        open={isNewBoardOpen}
+        boards={boards}
+        onClose={() => setIsNewBoardOpen(false)}
+        onCreated={async (board) => {
+          await loadBoardData(board.id);
+          navigate(boardPath(board.id));
+        }}
       />
 
       {/* Quick Capture */}
