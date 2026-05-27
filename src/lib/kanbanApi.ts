@@ -18,6 +18,8 @@ import type {
   TaskSearchResult,
 } from './types';
 import { mockTasks, boards as mockBoards, BOT_PROFILES } from '@/data/mockTasks';
+import { nativeKanbanClient } from './nativeKanbanClient';
+import { nativeBoardFromPayload, nativeBoardsFromPayload, nativeTasksFromBoardPayload, mapNativeTask } from './nativeKanbanMappers';
 
 const API_BASE = '/api/plugins/kanban';
 const NATIVE_STATUSES: TaskStatus[] = [
@@ -328,30 +330,6 @@ function normalizeSearchResult(raw: unknown, index = 0): TaskSearchResult {
   };
 }
 
-function flattenTasksFromBoard(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return payload;
-  if (!isObject(payload)) return [];
-  if (Array.isArray(payload.tasks)) return payload.tasks;
-  if (Array.isArray(payload.cards)) return payload.cards;
-
-  const columns = payload.columns;
-  if (Array.isArray(columns)) {
-    return columns.flatMap((column) => {
-      if (!isObject(column)) return [];
-      const status = column.status ?? column.id ?? column.name;
-      const cards = Array.isArray(column.tasks) ? column.tasks : Array.isArray(column.cards) ? column.cards : [];
-      return cards.map((card) => (isObject(card) ? { ...card, status: card.status ?? status } : card));
-    });
-  }
-  if (isObject(columns)) {
-    return Object.entries(columns).flatMap(([status, value]) => {
-      const cards = Array.isArray(value) ? value : isObject(value) && Array.isArray(value.tasks) ? value.tasks : [];
-      return cards.map((card) => (isObject(card) ? { ...card, status: card.status ?? status } : card));
-    });
-  }
-  return [];
-}
-
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
@@ -373,19 +351,12 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function boardFromPayload(payload: unknown, fallbackBoardId?: string): Board {
-  if (isObject(payload) && isObject(payload.board)) return normalizeBoard(payload.board);
-  const id = fallbackBoardId || (isObject(payload) ? asString(payload.board_slug ?? payload.board ?? payload.slug, 'current') : 'current');
-  return { id, name: id, taskCount: flattenTasksFromBoard(payload).length, isDefault: true };
-}
-
 export const kanbanApi = {
   async getBoard(boardId?: string): Promise<{ tasks: Task[]; board: Board; source: 'live' | 'fallback' }> {
-    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     try {
-      const payload = await requestJson<unknown>(`/board${query}`);
-      const board = boardFromPayload(payload, boardId);
-      const tasks = flattenTasksFromBoard(payload).map((task) => normalizeTask(task, board.id));
+      const payload = await nativeKanbanClient.getBoard(boardId);
+      const board = nativeBoardFromPayload(payload, boardId);
+      const tasks = nativeTasksFromBoardPayload(payload).map((task) => mapNativeTask(task, board.id));
       return { tasks, board: { ...board, taskCount: tasks.length }, source: 'live' };
     } catch (error) {
       const board = mockBoards.find((b) => b.id === boardId) || mockBoards[0];
@@ -402,13 +373,8 @@ export const kanbanApi = {
 
   async getBoards(): Promise<{ boards: Board[]; source: 'live' | 'fallback' }> {
     try {
-      const payload = await requestJson<unknown>('/boards');
-      const rawBoards = Array.isArray(payload)
-        ? payload
-        : isObject(payload) && Array.isArray(payload.boards)
-          ? payload.boards
-          : [];
-      const boards = rawBoards.map(normalizeBoard);
+      const payload = await nativeKanbanClient.getBoards();
+      const boards = nativeBoardsFromPayload(payload);
       return { boards, source: 'live' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load live boards';
