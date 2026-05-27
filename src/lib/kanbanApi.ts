@@ -426,7 +426,7 @@ export const kanbanApi = {
 
   async getTaskWorkerLog(taskId: string, boardId?: string): Promise<TaskWorkerLog | null> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
-    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/logs${query}`);
+    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/log${query}`);
     const rawLog = isObject(payload) && payload.worker_log ? payload.worker_log : payload;
     return normalizeWorkerLog(rawLog, taskId, boardId || 'current');
   },

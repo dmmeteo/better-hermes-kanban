@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft, ExternalLink, MoreHorizontal, RefreshCcw, X } from 'lucide-react';
 import type { Board, Task } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -151,14 +151,38 @@ export function TaskCommentsPanel({ task, onAddComment }: { task: Task; onAddCom
 export function TaskWorkerLogsPanel({ task }: { task: Task }) {
   const [workerLog, setWorkerLog] = useState(task.workerLog);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const refreshLog = async () => {
     setIsRefreshing(true);
+    setLoadError(null);
     try {
       setWorkerLog(await kanbanApi.getTaskWorkerLog(task.id, task.boardId));
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to load worker log');
     } finally {
       setIsRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    setWorkerLog(task.workerLog);
+    setLoadError(null);
+    let cancelled = false;
+    setIsRefreshing(true);
+    kanbanApi.getTaskWorkerLog(task.id, task.boardId)
+      .then((log) => {
+        if (!cancelled) setWorkerLog(log);
+      })
+      .catch((error) => {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Failed to load worker log');
+      })
+      .finally(() => {
+        if (!cancelled) setIsRefreshing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [task.id, task.boardId, task.workerLog]);
   const logText = workerLog?.text?.trim();
 
   return (
@@ -180,9 +204,13 @@ export function TaskWorkerLogsPanel({ task }: { task: Task }) {
         <pre className="custom-scrollbar max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-background/70 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground" data-testid="task-worker-log-text">
           {logText}
         </pre>
+      ) : loadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" data-testid="task-worker-log-error">
+          {loadError}
+        </div>
       ) : (
         <div className="rounded-xl border border-dashed border-border/70 p-3 text-xs text-muted-foreground" data-testid="task-worker-log-empty">
-          No worker log captured yet.
+          {isRefreshing ? 'Loading worker log…' : 'No worker log captured yet.'}
         </div>
       )}
       {task.diagnostics.length > 0 || task.warningCount > 0 ? <TaskDiagnostics diagnostics={task.diagnostics} warningCount={task.warningCount} /> : null}
