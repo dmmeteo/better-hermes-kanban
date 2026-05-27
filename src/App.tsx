@@ -218,7 +218,7 @@ function App() {
       return;
     }
     if (isTaskSearchPage) {
-      document.title = `🪽 Task finder — ${appSuffix}`;
+      document.title = `🪽 Task search — ${appSuffix}`;
       return;
     }
     if (routeTaskId) {
