@@ -22,12 +22,14 @@ interface TopBarProps {
   onBoardChange: (board: Board) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit?: (query?: string) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
   onOpenNewBoard: () => void;
   detailPresentation: TaskDetailPresentation;
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
   isTaskPage?: boolean;
+  isTaskSearchPage?: boolean;
   onNavigateToBoard?: () => void;
 }
 
@@ -37,12 +39,14 @@ export function TopBar({
   onBoardChange,
   searchQuery,
   onSearchChange,
+  onSearchSubmit,
   onOpenQuickCapture,
   onOpenSettings,
   onOpenNewBoard,
   detailPresentation,
   onDetailPresentationChange,
   isTaskPage = false,
+  isTaskSearchPage = false,
   onNavigateToBoard,
 }: TopBarProps) {
   return (
@@ -53,11 +57,16 @@ export function TopBar({
           <Feather size={20} style={{ color: '#7C5CFF' }} />
           <span className="font-bold text-sm">Hermes</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" aria-label="Search tasks" className="p-2 rounded-lg hover:bg-accent">
-            <Search size={18} className="text-muted-foreground" />
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-label="Search all tasks"
+          title="Search all tasks"
+          data-testid="mobile-global-search-button"
+          onClick={() => onSearchSubmit?.()}
+          className="p-2 rounded-lg hover:bg-accent"
+        >
+          <Search size={18} className={cn(isTaskSearchPage ? 'text-foreground' : 'text-muted-foreground')} />
+        </button>
       </div>
 
       {/* Desktop header */}
@@ -72,13 +81,22 @@ export function TopBar({
           </div>
         </div>
 
-        <div className="relative min-w-[280px] flex-1 max-w-3xl">
+        <div className="relative min-w-[360px] flex-1 max-w-5xl">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search tasks..."
+            placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search all tasks…'}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onSearchSubmit?.(searchQuery);
+              }
+            }}
             className="h-9 w-full rounded-xl border-border bg-secondary pl-8 text-xs"
+            data-testid="topbar-global-search"
+            aria-label="Search all tasks"
+            title="Global search: press Enter to open /tasks"
           />
         </div>
 

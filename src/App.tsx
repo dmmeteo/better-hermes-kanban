@@ -13,6 +13,7 @@ import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel, type BoardSettingsMode } from '@/components/settings/BoardsSettingsPanel';
+import { TaskSearchPage } from '@/components/search/TaskSearchPage';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -22,6 +23,12 @@ function taskPath(taskId: string) {
 
 function boardPath(boardId?: string | null) {
   return boardId ? `/boards/${encodeURIComponent(boardId)}` : '/';
+}
+
+const EXACT_TASK_ID = /^t_[0-9a-f]{8}$/i;
+
+function normalizeExactTaskId(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function mergeTaskUpdate(existing: Task, updated: Task): Task {
@@ -49,6 +56,7 @@ function App() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [boardFilterQuery, setBoardFilterQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('list');
@@ -76,6 +84,8 @@ function App() {
     return match?.[1] ? decodeURIComponent(match[1]) : null;
   }, [location.pathname]);
   const isTaskPage = !!routeTaskId;
+  const isSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
+  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/';
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
@@ -111,9 +121,10 @@ function App() {
   const loadTaskPageData = useCallback(async (taskId: string) => {
     try {
       setIsLoading(true);
+      const lookupBoardId = boardIdFromUrl;
       const [boardsResult, directTask] = await Promise.all([
         kanbanApi.getBoards(),
-        kanbanApi.getTask(taskId),
+        kanbanApi.getTask(taskId, lookupBoardId),
       ]);
       const taskBoardId = directTask?.boardId || boardIdFromUrl;
       const boardData = await kanbanApi.getBoard(taskBoardId);
@@ -146,10 +157,14 @@ function App() {
 
   // Load route data
   useEffect(() => {
-    if (location.pathname === '/settings' || location.pathname === '/settings/') {
+    if (isSettingsPage) {
       setSettingsMode('list');
       setIsSettingsOpen(true);
       navigate(boardPath(boardIdFromUrl), { replace: true });
+      return;
+    }
+    if (isTaskSearchPage) {
+      loadBoardData(boardIdFromUrl);
       return;
     }
     if (legacyBoardIdFromUrl && !routeTaskId && !boardIdFromPath) {
@@ -161,7 +176,7 @@ function App() {
       return;
     }
     loadBoardData(boardIdFromUrl);
-  }, [boardIdFromPath, boardIdFromUrl, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, location.pathname, navigate, routeTaskId]);
+  }, [boardIdFromPath, boardIdFromUrl, isSettingsPage, isTaskSearchPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
 
   useEffect(() => {
     window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
@@ -202,6 +217,10 @@ function App() {
       document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
       return;
     }
+    if (isTaskSearchPage) {
+      document.title = `🪽 Task finder — ${appSuffix}`;
+      return;
+    }
     if (routeTaskId) {
       document.title = `🪽 ${routeTaskId} — ${appSuffix}`;
       return;
@@ -213,7 +232,7 @@ function App() {
       return;
     }
     document.title = `🪽 ${appSuffix}`;
-  }, [activeBoard, boards, routeTaskId, selectedTask]);
+  }, [activeBoard, boards, isTaskSearchPage, routeTaskId, selectedTask]);
 
   const handleTaskClick = useCallback((task: Task) => {
     if (detailPresentation === 'page') {
@@ -222,6 +241,31 @@ function App() {
     }
     setSelectedTaskId(task.id);
   }, [detailPresentation, navigate]);
+
+  const handleOpenSearchTask = useCallback((taskId: string, taskBoardId?: string) => {
+    const params = taskBoardId ? `?board=${encodeURIComponent(taskBoardId)}` : '';
+    navigate(`${taskPath(taskId)}${params}`);
+  }, [navigate]);
+
+  const handleGlobalSearch = useCallback(async (query?: string) => {
+    const trimmed = (query ?? searchQuery).trim();
+    const exactTaskId = normalizeExactTaskId(trimmed);
+    if (EXACT_TASK_ID.test(exactTaskId)) {
+      try {
+        const response = await kanbanApi.searchTasks({ q: exactTaskId, limit: 20, sort: 'relevance' });
+        const exactMatches = response.results.filter((result) => result.id.toLowerCase() === exactTaskId);
+        if (exactMatches.length === 1) {
+          const match = exactMatches[0];
+          toast.success('Opened exact task match');
+          navigate(`${taskPath(match.id)}?board=${encodeURIComponent(match.boardId)}`);
+          return;
+        }
+      } catch {
+        // Fall through to the shareable search page where the bridge error is shown in context.
+      }
+    }
+    navigate(`/tasks${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''}`);
+  }, [navigate, searchQuery]);
 
   const handleCloseDetail = useCallback(() => {
     if (isTaskPage) {
@@ -394,12 +438,14 @@ function App() {
           onBoardChange={handleBoardChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
           onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
           onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
           detailPresentation={activeDetailPresentation}
           onDetailPresentationChange={handleDetailPresentationChange}
           isTaskPage={isTaskPage}
+          isTaskSearchPage={isTaskSearchPage}
           onNavigateToBoard={handleCloseDetail}
         />
 
@@ -412,7 +458,14 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          {activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
+          {isTaskSearchPage ? (
+            <TaskSearchPage
+              boards={boards}
+              activeBoard={activeBoard}
+              assignees={assignees}
+              onOpenTask={handleOpenSearchTask}
+            />
+          ) : activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
             <TaskDetailPage
               task={selectedTask}
               taskId={selectedTask?.id || routeTaskId || ''}
@@ -440,22 +493,23 @@ function App() {
               onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
-              searchQuery={searchQuery}
+              boardFilterQuery={boardFilterQuery}
+              onBoardFilterChange={setBoardFilterQuery}
             />
           )}
         </div>
       </main>
 
       {/* Desktop Footer Bar */}
-      {!isTaskPage && <DesktopFooterBar tasks={tasks} />}
+      {!isTaskPage && !isTaskSearchPage && <DesktopFooterBar tasks={tasks} />}
 
       {/* Mobile Create FAB */}
-      {!isTaskPage && (
+      {!isTaskPage && !isTaskSearchPage && (
         <MobileCreateTaskFab onOpenQuickCapture={() => setIsQuickCaptureOpen(true)} />
       )}
 
       {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
-      {!isTaskPage && detailPresentation === 'drawer' ? (
+      {!isTaskPage && !isTaskSearchPage && detailPresentation === 'drawer' ? (
         <TaskDetailSheet
           task={selectedTask}
           allTasks={tasks}
@@ -471,7 +525,7 @@ function App() {
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
-      ) : !isTaskPage && detailPresentation === 'modal' ? (
+      ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
         <TaskDetailModal
           task={selectedTask}
           allTasks={tasks}

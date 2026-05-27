@@ -46,9 +46,10 @@ export function DesktopKanbanBoard({
     const q = searchQuery.toLowerCase();
     return tasks.filter(
       (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        (t.assignee && t.assignee.toLowerCase().includes(q))
+      t.id.toLowerCase().includes(q) ||
+      t.title.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      (t.assignee && t.assignee.toLowerCase().includes(q))
     );
   }, [tasks, searchQuery]);
 
