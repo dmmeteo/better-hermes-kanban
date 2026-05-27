@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft, Inbox } from 'lucide-react';
+import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Board } from '@/lib/types';
@@ -24,8 +24,6 @@ interface TopBarProps {
   onSearchChange: (query: string) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
-  onOpenNeedsMe: () => void;
-  needsMeCount: number;
   detailPresentation: TaskDetailPresentation;
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
   isTaskPage?: boolean;
@@ -40,8 +38,6 @@ export function TopBar({
   onSearchChange,
   onOpenQuickCapture,
   onOpenSettings,
-  onOpenNeedsMe,
-  needsMeCount,
   detailPresentation,
   onDetailPresentationChange,
   isTaskPage = false,
@@ -110,31 +106,6 @@ export function TopBar({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-
-          {!isTaskPage && (
-            <button
-              type="button"
-              onClick={onOpenNeedsMe}
-              data-testid="desktop-needs-me-trigger"
-              className={cn(
-                'hidden md:inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors',
-                needsMeCount > 0
-                  ? 'border-primary/35 bg-primary/10 text-primary hover:bg-primary/15'
-                  : 'border-border bg-secondary text-muted-foreground hover:bg-accent'
-              )}
-            >
-              <Inbox size={14} />
-              <span>Needs me</span>
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[10px] leading-none',
-                  needsMeCount > 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                )}
-              >
-                {needsMeCount}
-              </span>
-            </button>
           )}
         </div>
 
