@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, TaskStatus } from '@/lib/types';
-import { STATUS_ORDER } from '@/lib/types';
+import { DROPPABLE_TASK_STATUSES, STATUS_ORDER, isStatusDropEnabled } from '@/lib/types';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { toast } from 'sonner';
@@ -82,17 +82,12 @@ export function DesktopKanbanBoard({
     const overId = over.id as string;
 
     // Check if dropped over a column (status)
-    const overStatus = STATUS_ORDER.find((s) => s === overId);
+    const overStatus = DROPPABLE_TASK_STATUSES.find((s) => s === overId);
     const activeTaskItem = tasks.find((t) => t.id === activeTaskId);
 
     if (!activeTaskItem) return;
 
     if (overStatus) {
-      if (overStatus === 'running') {
-        toast.error('Cannot drop into Running — status is read-only');
-        return;
-      }
-
       if (activeTaskItem.status !== overStatus) {
         const updated = tasks.map((t) =>
           t.id === activeTaskId
@@ -130,7 +125,7 @@ export function DesktopKanbanBoard({
         }
       } else if (overTask) {
         // Move to different status
-        if (overTask.status === 'running') {
+        if (!isStatusDropEnabled(overTask.status)) {
           toast.error('Cannot drop into Running — status is read-only');
           return;
         }

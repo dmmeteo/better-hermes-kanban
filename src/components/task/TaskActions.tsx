@@ -50,8 +50,8 @@ export function TaskActions({
   const showReady = task.status !== 'ready' && task.status !== 'running' && task.status !== 'done';
   const showBlock = task.status !== 'blocked' && task.status !== 'done' && task.status !== 'running';
   const showSchedule = task.status === 'todo' || task.status === 'triage';
-  const showReview = task.status === 'ready' || task.status === 'running';
-  const showDone = task.status === 'review' || task.status === 'running';
+  const showReview = task.status === 'ready';
+  const showDone = task.status === 'review';
   const showReclaim = isRunning;
   const showSpecify = task.status === 'triage' || task.status === 'todo';
   const showDecompose = task.status !== 'done';

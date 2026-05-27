@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
 import type { Task, Board, BotProfile, CreateTaskData, TaskStatus, UpdateTaskData } from '@/lib/types';
+import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
@@ -205,7 +206,7 @@ function App() {
   const updateSelectedTask = useCallback(
     async (patch: UpdateTaskData) => {
       if (!selectedTask || !activeBoard) return;
-      if (patch.status === 'running') {
+      if (patch.status && !isStatusSelectable(patch.status)) {
         toast.error('Running status is dispatcher-owned and cannot be set manually');
         return;
       }
@@ -254,7 +255,7 @@ function App() {
   const handleCreateTask = useCallback(
     async (data: CreateTaskData) => {
       if (!activeBoard) return;
-      if (data.status === 'running' || data.status === 'done' || data.status === 'review') {
+      if (!isStatusCreateSelectable(data.status)) {
         toast.error('Choose a safe starting status: triage, todo, scheduled, ready, or blocked');
         return;
       }

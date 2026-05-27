@@ -95,8 +95,8 @@ function getTaskActionState(task: Task, allTasks: Task[]) {
     showSchedule: task.status === 'todo' || task.status === 'triage',
     showReclaim: isRunning,
     showSpecify: task.status === 'triage' || task.status === 'todo',
-    showDone: task.status === 'review' || task.status === 'running',
-    primaryLabel: task.status === 'running' ? 'Mark done' : task.status === 'done' ? 'Done' : 'Ready / Send',
+    showDone: task.status === 'review',
+    primaryLabel: task.status === 'running' ? 'Running' : task.status === 'done' ? 'Done' : 'Ready / Send',
   };
 }
 
@@ -233,12 +233,8 @@ export function TaskActionsRail({ task, allTasks, activeBoard, onStatusChange, o
 export function MobileTaskActionBar({ task, allTasks, activeBoard, onStatusChange, onBlock, onReclaim, onDecompose, onDelete }: TaskActionsRailProps) {
   const [open, setOpen] = useState(false);
   const state = getTaskActionState(task, allTasks);
-  const primaryDisabled = task.status === 'done' || state.readyDisabled;
+  const primaryDisabled = task.status === 'done' || task.status === 'running' || state.readyDisabled;
   const primaryAction = () => {
-    if (task.status === 'running') {
-      onStatusChange('done');
-      return;
-    }
     onStatusChange('ready');
   };
 

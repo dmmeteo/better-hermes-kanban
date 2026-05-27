@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { Priority, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
-import { PRIORITY_LABELS, STATUS_LABELS } from '@/lib/types';
+import { PRIORITY_LABELS, SELECTABLE_TASK_STATUSES, STATUS_LABELS, isStatusReadOnly } from '@/lib/types';
 
-const STATUS_OPTIONS: TaskStatus[] = ['triage', 'todo', 'scheduled', 'ready', 'blocked', 'done'];
+const STATUS_OPTIONS: TaskStatus[] = SELECTABLE_TASK_STATUSES;
 const PRIORITY_OPTIONS: Priority[] = ['p0', 'p1', 'p2', 'p3'];
+
+function getInitialStatus(status: TaskStatus): TaskStatus {
+  return isStatusReadOnly(status) ? 'ready' : status;
+}
 
 interface TaskUpdatePanelProps {
   task: Task;
@@ -17,14 +21,14 @@ export function TaskUpdatePanel({ task, isSaving = false, onUpdate, showTitleFie
   const [description, setDescription] = useState(task.description);
   const [assignee, setAssignee] = useState(task.assignee || '');
   const [priority, setPriority] = useState<Priority>(task.priority);
-  const [status, setStatus] = useState<TaskStatus>(task.status === 'running' || task.status === 'review' ? 'ready' : task.status);
+  const [status, setStatus] = useState<TaskStatus>(getInitialStatus(task.status));
 
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.description);
     setAssignee(task.assignee || '');
     setPriority(task.priority);
-    setStatus(task.status === 'running' || task.status === 'review' ? 'ready' : task.status);
+    setStatus(getInitialStatus(task.status));
   }, [task]);
 
   const updateDetails = () => {

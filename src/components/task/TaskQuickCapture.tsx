@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Bot, ChevronDown } from 'lucide-react';
 import type { BotProfile, CreateTaskData, Priority, TaskStatus } from '@/lib/types';
-import { BOT_PROFILES } from '@/lib/types';
+import { BOT_PROFILES, CREATE_TASK_STATUSES, STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   Dialog,
@@ -29,12 +29,11 @@ const priorityOptions: { value: Priority; label: string; color: string }[] = [
   { value: 'p3', label: 'P3 - Low', color: '#6B7280' },
 ];
 
-const statusOptions: { value: TaskStatus; label: string; color: string }[] = [
-  { value: 'triage', label: 'Triage', color: '#6B7280' },
-  { value: 'todo', label: 'Todo', color: '#3B82F6' },
-  { value: 'scheduled', label: 'Scheduled', color: '#8B5CF6' },
-  { value: 'ready', label: 'Ready', color: '#10B981' },
-];
+const statusOptions: { value: TaskStatus; label: string; color: string }[] = CREATE_TASK_STATUSES.map((value) => ({
+  value,
+  label: STATUS_LABELS[value],
+  color: STATUS_COLORS[value],
+}));
 
 export function TaskQuickCapture({ open, onClose, onCreate, assignees = BOT_PROFILES, isSubmitting = false, boardName, isMobile = false }: TaskQuickCaptureProps) {
   const [title, setTitle] = useState('');
