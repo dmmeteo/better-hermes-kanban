@@ -10,6 +10,7 @@ import type {
   TaskActivity,
   LinkedTask,
   TaskRun,
+  TaskWorkerLog,
   UpdateTaskData,
   CreateTaskData,
   TaskSearchParams,
@@ -182,8 +183,26 @@ function normalizeLinks(raw: unknown): LinkedTask[] {
       title: asString(link.title, 'Linked task'),
       status,
       relation,
+      boardId: asString(link.board ?? link.board_id ?? link.boardId, ''),
     };
   }).filter((link) => link.taskId);
+}
+
+function normalizeWorkerLog(raw: unknown, taskId: string, boardId: string): TaskWorkerLog | null {
+  if (!isObject(raw)) return null;
+  const text = asString(raw.text ?? raw.content ?? raw.tail, '');
+  const path = asString(raw.path, '');
+  const sizeBytes = asNumber(raw.size_bytes ?? raw.sizeBytes, text.length);
+  if (!text && sizeBytes <= 0 && !path) return null;
+  return {
+    taskId: asString(raw.task_id ?? raw.taskId, taskId),
+    boardId: asString(raw.board ?? raw.board_id ?? raw.boardId, boardId),
+    text,
+    sizeBytes,
+    truncated: Boolean(raw.truncated),
+    path: path || undefined,
+    refreshedAt: toIso(raw.refreshed_at ?? raw.refreshedAt ?? raw.read_at),
+  };
 }
 
 function normalizeProfile(raw: unknown, index = 0): BotProfile {
@@ -271,6 +290,7 @@ function normalizeTask(raw: unknown, boardId: string): Task {
     comments,
     activity: normalizeActivity(item.events ?? item.activity),
     runs: normalizeRuns(item.runs),
+    workerLog: normalizeWorkerLog(item.worker_log ?? item.workerLog ?? item.logs, id, asString(item.board ?? item.board_id ?? item.boardId, boardId)),
     linkedTasks: normalizeLinks(item.links ?? item.linkedTasks),
     plannedAttachments: [],
     warningCount: asNumber(item.warning_count ?? item.warningCount ?? item.warnings, diagnostics.length),
@@ -402,6 +422,13 @@ export const kanbanApi = {
     const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query}`);
     const rawTask = isObject(payload) && payload.task ? payload.task : payload;
     return normalizeTask(rawTask, boardId || 'current');
+  },
+
+  async getTaskWorkerLog(taskId: string, boardId?: string): Promise<TaskWorkerLog | null> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/logs${query}`);
+    const rawLog = isObject(payload) && payload.worker_log ? payload.worker_log : payload;
+    return normalizeWorkerLog(rawLog, taskId, boardId || 'current');
   },
 
   async searchTasks(params: TaskSearchParams = {}): Promise<TaskSearchResponse> {
