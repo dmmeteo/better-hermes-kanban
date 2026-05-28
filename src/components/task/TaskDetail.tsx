@@ -60,7 +60,7 @@ export function TaskDetail({
   showInlineActions = true,
   showDescription = true,
 }: TaskDetailProps) {
-  const [activeTab, setActiveTab] = useState('links');
+  const [activeTab, setActiveTab] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     comments: false,
     activity: false,
@@ -78,8 +78,9 @@ export function TaskDetail({
   const hasDiagnostics = task.diagnostics.length > 0 || task.warningCount > 0;
   const hasPlannedAttachments = task.plannedAttachments.length > 0;
 
+  const hasLinkedTasks = task.linkedTasks.length > 0;
+
   const mobileSections = [
-    { key: 'comments', label: 'Comments', icon: MessageSquare, count: task.commentCount },
     { key: 'links', label: 'Linked tasks', icon: Link2, count: task.linkedTasks.length },
     { key: 'comments', label: 'Comments', icon: MessageSquare, count: task.commentCount },
     { key: 'logs', label: 'Worker log', icon: Activity, count: task.diagnostics.length + task.warningCount },
@@ -87,6 +88,7 @@ export function TaskDetail({
     { key: 'attachments', label: 'Attachments (planned)', icon: Paperclip, count: task.plannedAttachments.length },
   ];
   const visibleMobileSections = mobileSections.filter((section) => {
+    if (section.key === 'links') return hasLinkedTasks;
     if (section.key === 'logs') return hasDiagnostics;
     if (section.key === 'attachments') return hasPlannedAttachments;
     return true;
@@ -94,18 +96,19 @@ export function TaskDetail({
 
   const desktopTabs = useMemo(
     () => [
-      { key: 'links', label: 'Linked tasks', count: task.linkedTasks.length },
+      ...(hasLinkedTasks ? [{ key: 'links', label: 'Linked tasks', count: task.linkedTasks.length }] : []),
       { key: 'comments', label: 'Comments', count: task.commentCount },
-      { key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount },
-      { key: 'runs', label: 'Run history', count: task.runs.length },
+      ...(hasDiagnostics ? [{ key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount }] : []),
+      ...(task.runs.length > 0 ? [{ key: 'runs', label: 'Run history', count: task.runs.length }] : []),
+      ...(!hasLinkedTasks ? [{ key: 'links', label: 'Link tasks', count: 0 }] : []),
     ],
-    [task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount]
+    [hasDiagnostics, hasLinkedTasks, task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount]
   );
   const selectedTab = desktopTabs.some((tab) => tab.key === activeTab) ? activeTab : desktopTabs[0]?.key;
 
   useEffect(() => {
     if (!desktopTabs.some((tab) => tab.key === activeTab)) {
-      setActiveTab(desktopTabs[0]?.key || 'links');
+      setActiveTab(desktopTabs[0]?.key || 'comments');
     }
   }, [activeTab, desktopTabs]);
 
