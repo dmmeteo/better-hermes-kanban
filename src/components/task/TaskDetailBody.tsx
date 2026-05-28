@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Board, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
+import { GitBranch, ListChecks } from 'lucide-react';
+import { toast } from 'sonner';
+import type { Board, LinkedTask, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
+import {
+  NATIVE_STATUS_ORDER,
+  STATUS_DESCRIPTIONS,
+  isStatusReadOnly,
+  isStatusSelectable,
+} from '@/lib/types';
 import { MarkdownText } from '@/components/shared/MarkdownText';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { WarningBanner } from '@/components/shared/WarningBanner';
 import { InlineEditField } from '@/components/shared/InlineEditField';
+import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
+import { Button } from '@/components/ui/button';
 import { getUnfinishedParents, isReadyDisabled, cn } from '@/lib/utils';
 import {
-  TaskBreadcrumbs,
   TaskCommentsPanel,
   TaskRunHistoryPanel,
   TaskWorkerLogsPanel,
@@ -23,6 +33,8 @@ interface TaskDetailBodyProps {
   onAddComment: (text: string) => void;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
+  onSpecify: () => Promise<void>;
+  onDecompose: () => Promise<void>;
   headerExtra?: ReactNode;
 }
 
@@ -31,12 +43,14 @@ type TabKey = 'links' | 'comments' | 'logs' | 'runs';
 export function TaskDetailBody({
   task,
   allTasks,
-  activeBoard,
+  activeBoard: _activeBoard,
   layout,
   onUpdateTask,
   onAddComment,
   onLinkTask,
   onUnlinkTask,
+  onSpecify,
+  onDecompose,
   headerExtra,
 }: TaskDetailBodyProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('links');
@@ -52,12 +66,26 @@ export function TaskDetailBody({
     [task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount],
   );
 
+  const statusOptions: InlineSelectOption<TaskStatus>[] = useMemo(
+    () =>
+      NATIVE_STATUS_ORDER.map((status) => ({
+        value: status,
+        key: status,
+        label: <StatusBadge status={status} />,
+        description: STATUS_DESCRIPTIONS[status],
+        disabled: !isStatusSelectable(status),
+      })),
+    [],
+  );
+
   useEffect(() => {
     if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('links');
   }, [tabs, activeTab]);
 
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
+  const statusFieldDisabled = isStatusReadOnly(task.status);
+  const showTriageActions = task.status === 'triage';
 
   const handleSaveTitle = async (next: string) => {
     await onUpdateTask({ title: next.trim() });
@@ -65,28 +93,72 @@ export function TaskDetailBody({
   const handleSaveDescription = async (next: string) => {
     await onUpdateTask({ description: next });
   };
+  const handleStatus = async (next: TaskStatus) => {
+    await onUpdateTask({ status: next });
+  };
 
   return (
     <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-4', layout === 'mobile' && 'gap-3')} data-testid="task-detail-body">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-3">
-          <TaskBreadcrumbs
-            task={task}
-            activeBoard={activeBoard}
-            className="flex-1"
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3" data-testid="task-title-row">
+        <div className="min-w-0 flex-1">
+          <InlineEditField
+            value={task.title}
+            onSave={handleSaveTitle}
+            ariaLabel="Edit task title"
+            dataTestId="task-title-field"
+            inputClassName="text-base font-semibold"
+            displayClassName="text-base font-semibold leading-tight break-words"
+            validate={(v) => (v.trim() ? null : 'Title is required')}
+            placeholder="Untitled task"
+          />
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {showTriageActions && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-[11px]"
+                onClick={() => void toast.promise(onSpecify(), {
+                  loading: 'Marking ready…',
+                  success: 'Specified',
+                  error: 'Specify failed',
+                })}
+                data-testid="task-action-specify"
+              >
+                <ListChecks size={12} /> Specify
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-[11px]"
+                onClick={() => void toast.promise(onDecompose(), {
+                  loading: 'Decomposing…',
+                  success: 'Decompose started',
+                  error: 'Decompose failed',
+                })}
+                data-testid="task-action-decompose"
+              >
+                <GitBranch size={12} /> Decompose
+              </Button>
+            </>
+          )}
+          <InlineSelectField
+            value={task.status}
+            options={statusOptions}
+            onChange={handleStatus}
+            disabled={statusFieldDisabled}
+            disabledReason={statusFieldDisabled ? 'Dispatcher-owned status; cannot edit manually.' : undefined}
+            renderTrigger={(opt) => <StatusBadge status={(opt?.value as TaskStatus) ?? task.status} />}
+            ariaLabel="Edit status"
+            dataTestId="task-status-field"
+            className="px-1"
+            align="end"
           />
           {headerExtra}
         </div>
-        <InlineEditField
-          value={task.title}
-          onSave={handleSaveTitle}
-          ariaLabel="Edit task title"
-          dataTestId="task-title-field"
-          inputClassName="text-base font-semibold"
-          displayClassName="text-base font-semibold leading-tight break-words"
-          validate={(v) => (v.trim() ? null : 'Title is required')}
-          placeholder="Untitled task"
-        />
       </header>
 
       {readyDisabled && unfinishedParents.length > 0 && (

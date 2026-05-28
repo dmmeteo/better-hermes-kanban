@@ -3,6 +3,7 @@ import type { BotProfile, Board, LinkedTask, Task, UpdateTaskData } from '@/lib/
 import { Button } from '@/components/ui/button';
 import { TaskDetailBody } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
+import { TaskBreadcrumbs } from './TaskDetailSections';
 
 interface TaskDetailPageProps {
   task: Task | null;
@@ -60,29 +61,34 @@ export function TaskDetailPage({
 
   return (
     <section className="h-full overflow-y-auto overflow-x-hidden bg-background" data-testid="task-detail-page">
-      <div className="mx-auto grid w-full max-w-7xl gap-4 px-3 py-3 md:px-6 md:py-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          <TaskDetailBody
-            task={task}
-            allTasks={allTasks}
-            activeBoard={activeBoard}
-            layout="page"
-            onUpdateTask={onUpdateTask}
-            onAddComment={onAddComment}
-            onLinkTask={onLinkTask}
-            onUnlinkTask={onUnlinkTask}
-          />
+      <div className="mx-auto w-full max-w-7xl px-3 py-3 md:px-6 md:py-5">
+        <div className="mb-3" data-testid="task-page-breadcrumbs">
+          <TaskBreadcrumbs task={task} activeBoard={activeBoard} />
         </div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0">
+            <TaskDetailBody
+              task={task}
+              allTasks={allTasks}
+              activeBoard={activeBoard}
+              layout="page"
+              onUpdateTask={onUpdateTask}
+              onAddComment={onAddComment}
+              onLinkTask={onLinkTask}
+              onUnlinkTask={onUnlinkTask}
+              onSpecify={onSpecify}
+              onDecompose={onDecompose}
+            />
+          </div>
 
-        <div className="min-w-0 lg:sticky lg:top-3 lg:self-start">
-          <TaskDetailSidebar
-            task={task}
-            assignees={assignees}
-            onUpdate={onUpdateTask}
-            onNotify={onNotify}
-            onSpecify={onSpecify}
-            onDecompose={onDecompose}
-          />
+          <div className="min-w-0 lg:sticky lg:top-3 lg:self-start">
+            <TaskDetailSidebar
+              task={task}
+              assignees={assignees}
+              onUpdate={onUpdateTask}
+              onNotify={onNotify}
+            />
+          </div>
         </div>
       </div>
     </section>

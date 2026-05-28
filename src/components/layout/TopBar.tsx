@@ -147,32 +147,34 @@ export function TopBar({
         />
 
         <div className="flex shrink-0 items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent" data-testid="board-selector-trigger">
-                <span className="text-muted-foreground">Board</span>
-                <span className="truncate">{activeBoard.name}</span>
-                <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              {boards.map((board) => (
-                <DropdownMenuItem
-                  key={board.id}
-                  onClick={() => onBoardChange(board)}
-                  className={cn(board.id === activeBoard.id && 'bg-accent')}
-                >
-                  <span className="flex-1 truncate">{board.name}</span>
-                  <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+          {!isTaskPage && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent" data-testid="board-selector-trigger">
+                  <span className="text-muted-foreground">Board</span>
+                  <span className="truncate">{activeBoard.name}</span>
+                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {boards.map((board) => (
+                  <DropdownMenuItem
+                    key={board.id}
+                    onClick={() => onBoardChange(board)}
+                    className={cn(board.id === activeBoard.id && 'bg-accent')}
+                  >
+                    <span className="flex-1 truncate">{board.name}</span>
+                    <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onOpenNewBoard} data-testid="board-dropdown-new-board">
+                  <Plus size={14} className="mr-2" />
+                  New board
                 </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onOpenNewBoard} data-testid="board-dropdown-new-board">
-                <Plus size={14} className="mr-2" />
-                New board
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {!isTaskPage && (
             <DropdownMenu>

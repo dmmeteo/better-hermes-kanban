@@ -1,19 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Bell, ChevronDown, GitBranch, ListChecks } from 'lucide-react';
+import { Bell, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import type { BotProfile, Priority, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
-import {
-  NATIVE_STATUS_ORDER,
-  PRIORITY_LABELS,
-  STATUS_DESCRIPTIONS,
-  isStatusReadOnly,
-  isStatusSelectable,
-} from '@/lib/types';
+import type { BotProfile, Priority, Task, UpdateTaskData } from '@/lib/types';
+import { PRIORITY_LABELS } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
-import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
 import { TaskActivity } from './TaskActivity';
 
@@ -24,8 +17,6 @@ interface TaskDetailSidebarProps {
   assignees: BotProfile[];
   onUpdate: (patch: UpdateTaskData) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
-  onSpecify: () => Promise<void>;
-  onDecompose: () => Promise<void>;
   className?: string;
 }
 
@@ -42,23 +33,9 @@ export function TaskDetailSidebar({
   assignees,
   onUpdate,
   onNotify,
-  onSpecify,
-  onDecompose,
   className,
 }: TaskDetailSidebarProps) {
   const [eventsOpen, setEventsOpen] = useState(false);
-
-  const statusOptions: InlineSelectOption<TaskStatus>[] = useMemo(
-    () =>
-      NATIVE_STATUS_ORDER.map((status) => ({
-        value: status,
-        key: status,
-        label: <StatusBadge status={status} />,
-        description: STATUS_DESCRIPTIONS[status],
-        disabled: !isStatusSelectable(status),
-      })),
-    [],
-  );
 
   const assigneeOptions: InlineSelectOption<string | null>[] = useMemo(() => {
     const unassigned: InlineSelectOption<string | null> = {
@@ -90,13 +67,8 @@ export function TaskDetailSidebar({
     [],
   );
 
-  const statusFieldDisabled = isStatusReadOnly(task.status);
-  const showTriageActions = task.status === 'triage';
   const workspaceKind: WorkspaceKind | null = task.workspaceKind ?? null;
 
-  const handleStatus = async (next: TaskStatus) => {
-    await onUpdate({ status: next });
-  };
   const handleAssignee = async (next: string | null) => {
     await onUpdate({ assignee: next });
   };
@@ -116,51 +88,6 @@ export function TaskDetailSidebar({
       className={`flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/30 p-3 ${className ?? ''}`}
       data-testid="task-detail-sidebar"
     >
-      <SidebarRow label="Status">
-        <InlineSelectField
-          value={task.status}
-          options={statusOptions}
-          onChange={handleStatus}
-          disabled={statusFieldDisabled}
-          disabledReason={statusFieldDisabled ? 'Dispatcher-owned status; cannot edit manually.' : undefined}
-          renderTrigger={(opt) => <StatusBadge status={(opt?.value as TaskStatus) ?? task.status} />}
-          ariaLabel="Edit status"
-          dataTestId="task-status-field"
-        />
-        {showTriageActions && (
-          <div className="flex flex-wrap gap-2 pt-1" data-testid="task-triage-actions">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 text-[11px]"
-              onClick={() => void toast.promise(onSpecify(), {
-                loading: 'Marking ready…',
-                success: 'Specified',
-                error: 'Specify failed',
-              })}
-              data-testid="task-action-specify"
-            >
-              <ListChecks size={12} /> Specify
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 text-[11px]"
-              onClick={() => void toast.promise(onDecompose(), {
-                loading: 'Decomposing…',
-                success: 'Decompose started',
-                error: 'Decompose failed',
-              })}
-              data-testid="task-action-decompose"
-            >
-              <GitBranch size={12} /> Decompose
-            </Button>
-          </div>
-        )}
-      </SidebarRow>
-
       <SidebarRow label="Assignee">
         <InlineSelectField
           value={task.assignee}
