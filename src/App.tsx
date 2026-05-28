@@ -163,6 +163,7 @@ function App() {
   useEffect(() => {
     if (isSettingsPage) {
       setSettingsMode('settings');
+      setIsNewBoardOpen(false);
       setIsSettingsOpen(true);
       navigate(boardPath(boardIdFromUrl), { replace: true });
       return;
@@ -481,7 +482,7 @@ function App() {
           onSearchFiltersChange={setSearchFilters}
           onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-          onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
+          onOpenSettings={() => { setIsNewBoardOpen(false); setSettingsMode('settings'); setIsSettingsOpen(true); }}
           onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
           detailPresentation={activeDetailPresentation}
           onDetailPresentationChange={handleDetailPresentationChange}
