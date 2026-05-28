@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Bell, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
+import { ChevronDown } from 'lucide-react';
 import type { BotProfile, Priority, Task, UpdateTaskData } from '@/lib/types';
 import { PRIORITY_LABELS } from '@/lib/types';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
@@ -17,8 +15,6 @@ interface TaskDetailSidebarProps {
   task: Task;
   assignees: BotProfile[];
   onUpdate: (patch: UpdateTaskData) => Promise<void>;
-  onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
-  subscribedChannels?: { telegram: boolean; discord: boolean };
   className?: string;
 }
 
@@ -34,11 +30,8 @@ export function TaskDetailSidebar({
   task,
   assignees,
   onUpdate,
-  onNotify,
-  subscribedChannels,
   className,
 }: TaskDetailSidebarProps) {
-  const subscribed = subscribedChannels ?? { telegram: false, discord: false };
   const [eventsOpen, setEventsOpen] = useState(false);
 
   const assigneeOptions: InlineSelectOption<string | null>[] = useMemo(() => {
@@ -80,15 +73,6 @@ export function TaskDetailSidebar({
   const handlePriority = async (next: Priority) => {
     await onUpdate({ priority: next });
   };
-  const handleNotify = async (channel: 'telegram' | 'discord') => {
-    const isSubscribed = subscribed[channel];
-    await toast.promise(onNotify(channel), {
-      loading: isSubscribed ? `Re-sending ${channel}…` : `Subscribing to ${channel}…`,
-      success: isSubscribed ? `Re-sent ${channel}` : `Subscribed to ${channel}`,
-      error: `Failed to notify ${channel}`,
-    });
-  };
-
   return (
     <aside
       className={cn(
@@ -164,33 +148,6 @@ export function TaskDetailSidebar({
               {task.workspacePath}
             </span>
           )}
-        </div>
-      </SidebarRow>
-
-      <Separator />
-
-      <SidebarRow label="Notify" icon={<Bell size={12} />}>
-        <div className="flex flex-wrap gap-2 px-1 py-0.5">
-          <Button
-            type="button"
-            variant={subscribed.telegram ? 'default' : 'outline'}
-            size="sm"
-            aria-pressed={subscribed.telegram}
-            onClick={() => void handleNotify('telegram')}
-            data-testid="task-notify-telegram"
-          >
-            Telegram
-          </Button>
-          <Button
-            type="button"
-            variant={subscribed.discord ? 'default' : 'outline'}
-            size="sm"
-            aria-pressed={subscribed.discord}
-            onClick={() => void handleNotify('discord')}
-            data-testid="task-notify-discord"
-          >
-            Discord
-          </Button>
         </div>
       </SidebarRow>
 

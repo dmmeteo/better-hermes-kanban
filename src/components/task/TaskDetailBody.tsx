@@ -21,6 +21,7 @@ import {
   TaskWorkerLogsPanel,
 } from './TaskDetailSections';
 import { TaskLinkedTasksTab } from './TaskLinkedTasksTab';
+import { TaskNotifyMenu } from './TaskNotifyMenu';
 
 type Layout = 'page' | 'overlay' | 'mobile';
 
@@ -123,6 +124,8 @@ interface TaskDetailBodyProps {
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
+  onNotify?: (channel: 'telegram' | 'discord') => Promise<void>;
+  subscribedChannels?: { telegram: boolean; discord: boolean };
   headerExtra?: ReactNode;
 }
 
@@ -135,6 +138,8 @@ export function TaskDetailBody({
   onUnlinkTask,
   onSpecify,
   onDecompose,
+  onNotify,
+  subscribedChannels,
   headerExtra,
 }: TaskDetailBodyProps) {
   const readyDisabled = isReadyDisabled(task, allTasks);
@@ -165,9 +170,9 @@ export function TaskDetailBody({
           </div>
           {headerExtra}
         </div>
-        {/* Status + triage-actions render under the title up to lg.
-            On lg+ the same control renders above the sidebar — see Page/Sheet/Modal. */}
-        <div className="lg:hidden">
+        {/* Status + Notify render under the title up to lg (status left, notify right).
+            On lg+ the same row renders above the sidebar — see Page/Sheet/Modal. */}
+        <div className="flex items-center justify-between gap-2 lg:hidden">
           <TaskStatusControl
             task={task}
             onUpdateTask={onUpdateTask}
@@ -175,6 +180,12 @@ export function TaskDetailBody({
             onDecompose={onDecompose}
             align="start"
           />
+          {onNotify && (
+            <TaskNotifyMenu
+              subscribed={subscribedChannels ?? { telegram: false, discord: false }}
+              onToggle={onNotify}
+            />
+          )}
         </div>
       </header>
 

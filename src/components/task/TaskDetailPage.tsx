@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
 import { TaskBreadcrumbs } from './TaskDetailSections';
+import { TaskNotifyMenu } from './TaskNotifyMenu';
 
 interface TaskDetailPageProps {
   task: Task | null;
@@ -63,11 +64,11 @@ export function TaskDetailPage({
 
   return (
     <section className="h-full overflow-y-auto overflow-x-hidden bg-background" data-testid="task-detail-page">
-      <div className="mx-auto w-full max-w-7xl px-3 py-3 md:px-6 md:py-5">
+      <div className="mx-auto w-full max-w-screen-2xl px-3 py-3 md:px-6 md:py-5 2xl:px-8">
         <div className="mb-3" data-testid="task-page-breadcrumbs">
           <TaskBreadcrumbs task={task} activeBoard={activeBoard} />
         </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <TaskDetailBody
               task={task}
@@ -78,11 +79,13 @@ export function TaskDetailPage({
               onUnlinkTask={onUnlinkTask}
               onSpecify={onSpecify}
               onDecompose={onDecompose}
+              onNotify={onNotify}
+              subscribedChannels={subscribedChannels}
             />
           </div>
 
           <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-3 lg:self-start">
-            <div className="mb-3 hidden lg:flex lg:justify-start" data-testid="task-page-status-row">
+            <div className="mb-3 hidden lg:flex lg:items-center lg:justify-between lg:gap-2" data-testid="task-page-status-row">
               <TaskStatusControl
                 task={task}
                 onUpdateTask={onUpdateTask}
@@ -90,13 +93,15 @@ export function TaskDetailPage({
                 onDecompose={onDecompose}
                 align="start"
               />
+              <TaskNotifyMenu
+                subscribed={subscribedChannels ?? { telegram: false, discord: false }}
+                onToggle={onNotify}
+              />
             </div>
             <TaskDetailSidebar
               task={task}
               assignees={assignees}
               onUpdate={onUpdateTask}
-              onNotify={onNotify}
-              subscribedChannels={subscribedChannels}
             />
           </div>
 

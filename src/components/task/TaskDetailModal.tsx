@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
 import { TaskBreadcrumbs } from './TaskDetailSections';
+import { TaskNotifyMenu } from './TaskNotifyMenu';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -66,7 +67,7 @@ export function TaskDetailModal({
             <X size={16} />
           </Button>
         </header>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <TaskDetailBody
               task={task}
@@ -77,10 +78,12 @@ export function TaskDetailModal({
               onUnlinkTask={onUnlinkTask}
               onSpecify={onSpecify}
               onDecompose={onDecompose}
+              onNotify={onNotify}
+              subscribedChannels={subscribedChannels}
             />
           </div>
           <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            <div className="mb-3 hidden lg:flex lg:justify-start" data-testid="task-modal-status-row">
+            <div className="mb-3 hidden lg:flex lg:items-center lg:justify-between lg:gap-2" data-testid="task-modal-status-row">
               <TaskStatusControl
                 task={task}
                 onUpdateTask={onUpdateTask}
@@ -88,13 +91,15 @@ export function TaskDetailModal({
                 onDecompose={onDecompose}
                 align="start"
               />
+              <TaskNotifyMenu
+                subscribed={subscribedChannels ?? { telegram: false, discord: false }}
+                onToggle={onNotify}
+              />
             </div>
             <TaskDetailSidebar
               task={task}
               assignees={assignees}
               onUpdate={onUpdateTask}
-              onNotify={onNotify}
-              subscribedChannels={subscribedChannels}
             />
           </div>
           <div className="min-w-0 lg:col-start-1 lg:row-start-2">

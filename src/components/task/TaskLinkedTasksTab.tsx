@@ -51,7 +51,7 @@ export function TaskLinkedTasksTab({ task, onLinkTask, onUnlinkTask }: TaskLinke
     <section className="space-y-5" data-testid="task-linked-tasks-tab">
       <LinkedTaskGroup
         task={task}
-        title="Dependencies / Parents"
+        title="Parents"
         helpText="Selected task becomes a parent of this task."
         relation="parent"
         links={parents}
@@ -60,7 +60,7 @@ export function TaskLinkedTasksTab({ task, onLinkTask, onUnlinkTask }: TaskLinke
       />
       <LinkedTaskGroup
         task={task}
-        title="Dependents / Children"
+        title="Children"
         helpText="Selected task becomes a child of this task."
         relation="child"
         links={children}
