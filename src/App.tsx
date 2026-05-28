@@ -138,19 +138,32 @@ function App() {
   const loadTaskPageData = useCallback(async (taskId: string) => {
     try {
       setIsLoading(true);
-      // Resolve the board *before* fetching the task: Hermes scopes
-      // /tasks/{id} to the requested board (omitting `?board=` 404s when
-      // the task isn't on the dispatcher's current board, which is the
-      // common case when a deep link lands on /tasks/{id} without a
-      // board segment in the URL).
+      // Hermes scopes /tasks/{id} to a board — and the dispatcher's
+      // current board often isn't the task's home, so we need to find
+      // the right one. Try the URL board first, then current/default,
+      // then every other non-archived board until the task resolves.
       const boardsResult = await kanbanApi.getBoards();
-      const fallbackBoardId =
-        boardsResult.boards.find((b) => b.isCurrent)?.id
-        ?? boardsResult.boards.find((b) => b.isDefault)?.id
-        ?? boardsResult.boards[0]?.id;
-      const lookupBoardId = boardIdFromUrl ?? fallbackBoardId;
-      const directTask = await kanbanApi.getTask(taskId, lookupBoardId);
-      const taskBoardId = directTask?.boardId || lookupBoardId;
+      const ordered: string[] = [];
+      const push = (id?: string) => { if (id && !ordered.includes(id)) ordered.push(id); };
+      push(boardIdFromUrl);
+      push(boardsResult.boards.find((b) => b.isCurrent)?.id);
+      push(boardsResult.boards.find((b) => b.isDefault)?.id);
+      for (const b of boardsResult.boards) if (!b.archived) push(b.id);
+      let directTask = null;
+      let lastError: unknown = null;
+      for (const candidate of ordered) {
+        try {
+          directTask = await kanbanApi.getTask(taskId, candidate);
+          if (directTask) break;
+        } catch (err) {
+          lastError = err;
+          // 404 on this board — try the next one.
+        }
+      }
+      if (!directTask) {
+        throw lastError instanceof Error ? lastError : new Error(`Task ${taskId} not found on any board`);
+      }
+      const taskBoardId = directTask.boardId || boardIdFromUrl;
       const boardData = await kanbanApi.getBoard(taskBoardId);
       const mergedTasks = directTask
         ? boardData.tasks.some((task) => task.id === directTask.id)
