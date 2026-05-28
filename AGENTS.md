@@ -7,18 +7,30 @@ re-exports this file via `@AGENTS.md`.
 ## Local setup
 
 1. `cp .env.example .env.local`
-2. Fill `HERMES_BASIC_USER` / `HERMES_BASIC_PASS` (Hermes Infra Basic Auth creds).
-   `HERMES_API_URL` defaults to `https://bhk.dmmeteo.dev` — leave it unless you
-   know you want a different Hermes instance.
+2. Pick one of two auth modes (both talk to the same kanban database):
+   - **Basic Auth against bhk.dmmeteo.dev (default).** Fill
+     `HERMES_BASIC_USER` / `HERMES_BASIC_PASS` and leave `HERMES_API_URL` as
+     `https://bhk.dmmeteo.dev`. Good for quick boot; some newer
+     dashboard-level routes (`/home-subscribe/{channel}`,
+     `/home-channels`) are not exposed by this host yet, so notify channels
+     will return 404 until the bhk deploy gets parity.
+   - **Dashboard session auth against her.dmmeteo.dev.** Set
+     `HERMES_API_URL=https://her.dmmeteo.dev` and fill
+     `HERMES_SESSION_COOKIE` (value of the `hermes_session` cookie) +
+     `HERMES_SESSION_TOKEN` (value of the `x-hermes-session-token` request
+     header). Grab both from a logged-in DevTools session on her.dmmeteo.dev.
+     When both are set they take precedence over Basic Auth. her exposes the
+     full route set (notify channels, home-channels, unlink, etc.). Tokens
+     are short-lived — refresh from DevTools when requests start 401-ing.
 3. `npm install`
 4. `npm run dev` — Vite serves on `http://localhost:3000`. Requests to `/api/**`
-   are reverse-proxied to `HERMES_API_URL` and the proxy attaches the Basic Auth
+   are reverse-proxied to `HERMES_API_URL` and the proxy attaches the auth
    header from `.env.local`, so creds never leave the dev process.
 
-Why `bhk.dmmeteo.dev` and not `her.dmmeteo.dev`: the public Hermes site already
-proxies `/api/plugins/kanban/*` to the correct internal kanban service
-(`infra-hermes-dashboard:9119`). `her.dmmeteo.dev` is a different Hermes
-instance that rejects requests even when Basic Auth passes.
+bhk and her point at the same kanban service / database; her exposes the full
+dashboard-level route set while bhk only ships the kanban plugin. If a
+route 404s on bhk but you saw it work in the her network log, switch to
+session auth as in step 2.
 
 ## Non-negotiable git workflow
 
