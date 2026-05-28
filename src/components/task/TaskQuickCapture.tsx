@@ -5,19 +5,20 @@ import type {
   BotProfile,
   CreateTaskData,
   Priority,
-  TaskSearchResult,
+  Task,
   TaskStatus,
 } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
 import { getStatusOptions } from '@/lib/boardSettings';
 import { BOT_PROFILES, CREATE_TASK_STATUSES, PRIORITY_LABELS } from '@/lib/types';
+import { kanbanApi } from '@/lib/kanbanApi';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { BotAvatar } from '@/components/shared/BotAvatar';
-import { LinkedTaskSearch } from './LinkedTaskSearch';
+import { LinkedTaskSearch, type LinkedTaskCandidate } from './LinkedTaskSearch';
 import { toast } from 'sonner';
 
 const PRIORITIES: Priority[] = ['p0', 'p1', 'p2', 'p3'];
@@ -28,6 +29,10 @@ interface TaskQuickCaptureProps {
   onCreate: (data: CreateTaskData, boardId: string) => void | Promise<void>;
   boards: Board[];
   activeBoard: Board;
+  /** Loaded tasks of the active board, used as parent-search candidates. */
+  boardTasks: Task[];
+  /** Pre-selected status (e.g. when opened from a column's "+"). */
+  initialStatus?: TaskStatus;
   assignees?: BotProfile[];
   isSubmitting?: boolean;
   boardSettings: BoardSettings;
@@ -56,6 +61,8 @@ function CreateTaskForm({
   onCreate,
   boards,
   activeBoard,
+  boardTasks,
+  initialStatus,
   assignees = BOT_PROFILES,
   isSubmitting = false,
   boardSettings,
@@ -65,11 +72,30 @@ function CreateTaskForm({
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('p2');
   const [assignee, setAssignee] = useState<string | null>(null);
-  const [status, setStatus] = useState<TaskStatus>('triage');
+  const [status, setStatus] = useState<TaskStatus>(initialStatus ?? 'triage');
   const [workspaceKind, setWorkspaceKind] = useState<CreateTaskData['workspaceKind']>('scratch');
   const [workspacePath, setWorkspacePath] = useState('');
   const [skillsInput, setSkillsInput] = useState('');
-  const [parent, setParent] = useState<TaskSearchResult | null>(null);
+  const [parent, setParent] = useState<LinkedTaskCandidate | null>(null);
+  // Tasks of a non-active board, lazily fetched when the board is switched
+  // (the active board's tasks come in via the boardTasks prop).
+  const [extraTasks, setExtraTasks] = useState<Task[] | null>(null);
+
+  const parentCandidates: LinkedTaskCandidate[] =
+    selectedBoardId === activeBoard.id ? boardTasks : extraTasks ?? [];
+
+  const loadCandidates = async (boardId: string) => {
+    if (boardId === activeBoard.id) {
+      setExtraTasks(null);
+      return;
+    }
+    try {
+      const result = await kanbanApi.getBoard(boardId);
+      setExtraTasks(result.tasks);
+    } catch {
+      setExtraTasks([]);
+    }
+  };
 
   const selectedBoard = useMemo(
     () => boards.find((board) => board.id === selectedBoardId) ?? activeBoard,
@@ -184,6 +210,7 @@ function CreateTaskForm({
             onChange={(next) => {
               setSelectedBoardId(next);
               setParent(null); // parent is board-scoped
+              void loadCandidates(next);
             }}
             renderTrigger={() => (
               <span className="text-sm">{selectedBoard.name || selectedBoard.id}</span>
@@ -262,6 +289,8 @@ function CreateTaskForm({
           ) : (
             <LinkedTaskSearch
               boardId={selectedBoardId}
+              localTasks={parentCandidates}
+              placeholder="Search task id or title on this board…"
               testIdSuffix="parent"
               onSelect={(result) => setParent(result)}
             />

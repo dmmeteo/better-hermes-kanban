@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
-import type { LinkedTask, Task, TaskSearchResult } from '@/lib/types';
+import type { LinkedTask, Task } from '@/lib/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { LinkedTaskSearch } from './LinkedTaskSearch';
+import { LinkedTaskSearch, type LinkedTaskCandidate } from './LinkedTaskSearch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -212,7 +212,7 @@ function AddLinkedTaskSearch({
   onLinkTask: TaskLinkedTasksTabProps['onLinkTask'];
   onDone: () => void;
 }) {
-  const checkDisabled = (result: TaskSearchResult): string | null => {
+  const checkDisabled = (result: LinkedTaskCandidate): string | null => {
     if (result.id.toLowerCase() === task.id.toLowerCase()) return 'Cannot link a task to itself.';
     if (existingIds.has(result.id.toLowerCase())) return `${result.id} is already linked in this group.`;
     return null;

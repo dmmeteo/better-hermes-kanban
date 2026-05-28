@@ -72,6 +72,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState<DataViewSearchFilters>({});
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
+  const [presetStatus, setPresetStatus] = useState<TaskStatus | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNewBoardOpen, setIsNewBoardOpen] = useState(false);
   const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('settings');
@@ -647,7 +648,7 @@ function App() {
           searchFilters={searchFilters}
           onSearchFiltersChange={handleSearchFiltersChange}
           onSearchSubmit={handleGlobalSearch}
-          onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+          onOpenQuickCapture={() => { setPresetStatus(undefined); setIsQuickCaptureOpen(true); }}
           onOpenSettings={() => { setIsNewBoardOpen(false); setSettingsMode('settings'); setIsSettingsOpen(true); }}
           onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
           detailPresentation={activeDetailPresentation}
@@ -715,7 +716,10 @@ function App() {
               tasks={tasks}
               onTaskClick={handleTaskClick}
               onMoveTask={handleMoveTask}
-              onAddTask={() => setIsQuickCaptureOpen(true)}
+              onAddTask={(status) => {
+                setPresetStatus(isStatusCreateSelectable(status) ? status : undefined);
+                setIsQuickCaptureOpen(true);
+              }}
               searchQuery={searchQuery}
               boardSettings={boardSettings}
               onRenameStatus={handleRenameStatus}
@@ -727,7 +731,7 @@ function App() {
 
       {/* Mobile Create FAB */}
       {!isTaskPage && !isTaskSearchPage && (
-        <MobileCreateTaskFab onOpenQuickCapture={() => setIsQuickCaptureOpen(true)} />
+        <MobileCreateTaskFab onOpenQuickCapture={() => { setPresetStatus(undefined); setIsQuickCaptureOpen(true); }} />
       )}
 
       {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
@@ -799,6 +803,8 @@ function App() {
         onCreate={handleCreateTask}
         boards={boards}
         activeBoard={activeBoard}
+        boardTasks={tasks}
+        initialStatus={presetStatus}
         assignees={assignees}
         isSubmitting={isCreatingTask}
         boardSettings={boardSettings}
