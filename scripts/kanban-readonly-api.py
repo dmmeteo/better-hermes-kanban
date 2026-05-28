@@ -942,17 +942,6 @@ class Handler(BaseHTTPRequestHandler):
                 status = int(result.pop("_status", 200))
                 self.send_json(status, result)
                 return
-            self.send_json(404, {"detail": "Not found"})
-        except json.JSONDecodeError:
-            self.send_json(400, {"detail": "Invalid JSON body"})
-        except ValueError as exc:
-            self.send_json(400, {"detail": str(exc)})
-        except Exception as exc:
-            self.send_json(500, {"detail": f"BHK board API error: {exc}"})
-
-    def do_POST(self) -> None:  # noqa: N802 - stdlib callback name
-        parsed = urlparse(self.path)
-        try:
             prefix = "/api/plugins/kanban/tasks/"
             if parsed.path.startswith(prefix) and parsed.path.endswith("/links"):
                 task_id = parsed.path[len(prefix):-len("/links")]
@@ -967,7 +956,7 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as exc:
             self.send_json(400, {"detail": str(exc)})
         except Exception as exc:
-            self.send_json(500, {"detail": f"BHK link API error: {exc}"})
+            self.send_json(500, {"detail": f"BHK POST API error: {exc}"})
 
     def do_PUT(self) -> None:  # noqa: N802 - stdlib callback name
         parsed = urlparse(self.path)
