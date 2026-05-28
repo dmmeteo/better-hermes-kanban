@@ -27,6 +27,17 @@ function boardPath(boardId?: string | null) {
   return boardId ? `/boards/${encodeURIComponent(boardId)}` : '/';
 }
 
+function searchPath(query: string, filters: DataViewSearchFilters = {}) {
+  const params = new URLSearchParams();
+  const trimmed = query.trim();
+  if (trimmed) params.set('q', trimmed);
+  (['board', 'status', 'assignee', 'priority'] as const).forEach((key) => {
+    const value = filters[key]?.replace(/^!/, '');
+    if (value) params.set(key, value);
+  });
+  return `/search${params.toString() ? `?${params.toString()}` : ''}`;
+}
+
 const EXACT_TASK_ID = /^t_[0-9a-f]{8}$/i;
 
 function normalizeExactTaskId(value: string) {
@@ -246,9 +257,8 @@ function App() {
     setSelectedTaskId(task.id);
   }, [detailPresentation, navigate]);
 
-  const handleOpenSearchTask = useCallback((taskId: string, taskBoardId?: string) => {
-    const params = taskBoardId ? `?board=${encodeURIComponent(taskBoardId)}` : '';
-    navigate(`${taskPath(taskId)}${params}`);
+  const handleOpenSearchTask = useCallback((taskId: string) => {
+    navigate(taskPath(taskId));
   }, [navigate]);
 
   const handleGlobalSearch = useCallback(async (query?: string, filters: DataViewSearchFilters = searchFilters) => {
@@ -261,21 +271,22 @@ function App() {
         if (exactMatches.length === 1) {
           const match = exactMatches[0];
           toast.success('Opened exact task match');
-          navigate(`${taskPath(match.id)}?board=${encodeURIComponent(match.boardId)}`);
+          navigate(taskPath(match.id));
           return;
         }
       } catch {
         // Fall through to the shareable search page where the bridge error is shown in context.
       }
     }
-    const params = new URLSearchParams();
-    if (trimmed) params.set('q', trimmed);
-    (['board', 'status', 'assignee', 'priority'] as const).forEach((key) => {
-      const value = filters[key]?.replace(/^!/, '');
-      if (value) params.set(key, value);
-    });
-    navigate(`/tasks${params.toString() ? `?${params.toString()}` : ''}`);
+    navigate(searchPath(trimmed, filters));
   }, [navigate, searchFilters, searchQuery]);
+
+  const handleSearchFiltersChange = useCallback((nextFilters: DataViewSearchFilters) => {
+    setSearchFilters(nextFilters);
+    if (isTaskSearchPage) {
+      navigate(searchPath(searchQuery, nextFilters), { replace: true });
+    }
+  }, [isTaskSearchPage, navigate, searchQuery]);
 
   const handleCloseDetail = useCallback(() => {
     if (isTaskPage) {
@@ -478,7 +489,7 @@ function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           searchFilters={searchFilters}
-          onSearchFiltersChange={setSearchFilters}
+          onSearchFiltersChange={handleSearchFiltersChange}
           onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
           onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
