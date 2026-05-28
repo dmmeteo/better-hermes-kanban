@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Task, TaskStatus } from '@/lib/types';
-import { STATUS_LABELS } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
+import { getStatusLabel } from '@/lib/boardSettings';
 import { StatusTabs } from './StatusTabs';
 import { TaskCard } from './TaskCard';
 
@@ -8,12 +9,14 @@ interface MobileStatusBoardProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   searchQuery: string;
+  boardSettings: BoardSettings;
 }
 
 export function MobileStatusBoard({
   tasks,
   onTaskClick,
   searchQuery,
+  boardSettings,
 }: MobileStatusBoardProps) {
   const [activeStatus, setActiveStatus] = useState<TaskStatus>('triage');
 
@@ -47,12 +50,13 @@ export function MobileStatusBoard({
         activeStatus={activeStatus}
         onStatusChange={setActiveStatus}
         counts={counts}
+        boardSettings={boardSettings}
       />
 
       {/* Task count + sort */}
       <div className="flex items-center justify-between px-4 py-2">
         <span className="text-xs text-muted-foreground">
-          {STATUS_LABELS[activeStatus]} · {filteredTasks.length} tasks{searchQuery.trim() ? ' · filtered board' : ''}
+          {getStatusLabel(activeStatus, boardSettings)} · {filteredTasks.length} tasks{searchQuery.trim() ? ' · filtered board' : ''}
         </span>
         <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
           Sort: Priority
@@ -66,7 +70,7 @@ export function MobileStatusBoard({
         ))}
         {filteredTasks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <span className="text-sm">No tasks in {STATUS_LABELS[activeStatus]}</span>
+            <span className="text-sm">No tasks in {getStatusLabel(activeStatus, boardSettings)}</span>
           </div>
         )}
       </div>

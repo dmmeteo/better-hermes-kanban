@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Lock } from 'lucide-react';
 import type { Task, TaskStatus } from '@/lib/types';
-import { STATUS_COLORS, STATUS_LABELS, isStatusDropEnabled, isStatusReadOnly } from '@/lib/types';
+import { STATUS_COLORS, isStatusDropEnabled, isStatusReadOnly } from '@/lib/types';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/utils';
 
@@ -12,9 +12,10 @@ interface KanbanColumnProps {
   onTaskClick: (task: Task) => void;
   onAddTask?: (status: TaskStatus) => void;
   readOnly?: boolean;
+  statusLabel?: string;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel }: KanbanColumnProps) {
   const isReadOnlyStatus = isStatusReadOnly(status);
   const isDropDisabled = !isStatusDropEnabled(status);
   const { setNodeRef, isOver } = useDroppable({
@@ -24,7 +25,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
   });
 
   const color = STATUS_COLORS[status];
-  const label = STATUS_LABELS[status];
+  const label = statusLabel || status;
 
   return (
     <div

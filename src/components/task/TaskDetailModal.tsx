@@ -1,3 +1,4 @@
+import type { BoardSettings } from '@/lib/boardSettings';
 import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskDetail } from './TaskDetail';
@@ -17,6 +18,7 @@ interface TaskDetailModalProps {
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
+  boardSettings: BoardSettings;
 }
 
 export function TaskDetailModal({
@@ -34,6 +36,7 @@ export function TaskDetailModal({
   onLinkTask,
   isUpdating = false,
   isMobile = false,
+  boardSettings,
 }: TaskDetailModalProps) {
   if (!task) return null;
 
@@ -60,6 +63,7 @@ export function TaskDetailModal({
           onUpdateTask={onUpdateTask}
           onLinkTask={onLinkTask}
           isUpdating={isUpdating}
+          boardSettings={boardSettings}
           showCloseButton
         />
       </DialogContent>

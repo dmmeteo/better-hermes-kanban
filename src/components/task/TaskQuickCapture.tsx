@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Bot, ChevronDown } from 'lucide-react';
 import type { BotProfile, CreateTaskData, Priority, TaskStatus } from '@/lib/types';
-import { BOT_PROFILES, CREATE_TASK_STATUSES, STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
+import { getStatusOptions } from '@/lib/boardSettings';
+import { BOT_PROFILES, CREATE_TASK_STATUSES, STATUS_COLORS } from '@/lib/types';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   Dialog,
@@ -20,6 +22,7 @@ interface TaskQuickCaptureProps {
   isSubmitting?: boolean;
   boardName?: string;
   isMobile?: boolean;
+  boardSettings: BoardSettings;
 }
 
 const priorityOptions: { value: Priority; label: string; color: string }[] = [
@@ -29,13 +32,11 @@ const priorityOptions: { value: Priority; label: string; color: string }[] = [
   { value: 'p3', label: 'P3 - Low', color: '#6B7280' },
 ];
 
-const statusOptions: { value: TaskStatus; label: string; color: string }[] = CREATE_TASK_STATUSES.map((value) => ({
-  value,
-  label: STATUS_LABELS[value],
-  color: STATUS_COLORS[value],
-}));
-
-export function TaskQuickCapture({ open, onClose, onCreate, assignees = BOT_PROFILES, isSubmitting = false, boardName, isMobile = false }: TaskQuickCaptureProps) {
+export function TaskQuickCapture({ open, onClose, onCreate, assignees = BOT_PROFILES, isSubmitting = false, boardName, isMobile = false, boardSettings }: TaskQuickCaptureProps) {
+  const statusOptions: { value: TaskStatus; label: string; color: string }[] = getStatusOptions(boardSettings, CREATE_TASK_STATUSES).map((option) => ({
+    ...option,
+    color: STATUS_COLORS[option.value],
+  }));
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('p2');

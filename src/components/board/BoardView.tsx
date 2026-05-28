@@ -1,4 +1,5 @@
 import type { Task, TaskStatus } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
 import { MobileStatusBoard } from './MobileStatusBoard';
 import { DesktopKanbanBoard } from './DesktopKanbanBoard';
 
@@ -8,6 +9,7 @@ interface BoardViewProps {
   onTasksChange: (tasks: Task[]) => void;
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
+  boardSettings: BoardSettings;
 }
 
 export function BoardView({
@@ -16,6 +18,7 @@ export function BoardView({
   onTasksChange,
   onAddTask,
   searchQuery,
+  boardSettings,
 }: BoardViewProps) {
   return (
     <>
@@ -24,6 +27,7 @@ export function BoardView({
           tasks={tasks}
           onTaskClick={onTaskClick}
           searchQuery={searchQuery}
+          boardSettings={boardSettings}
         />
       </div>
       <div className="hidden md:flex h-full min-h-0 flex-col">
@@ -34,6 +38,7 @@ export function BoardView({
             onTasksChange={onTasksChange}
             onAddTask={onAddTask}
             searchQuery={searchQuery}
+            boardSettings={boardSettings}
             readOnly
           />
         </div>

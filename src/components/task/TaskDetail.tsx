@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, ChevronLeft, ChevronRight, Clock, Link2, MessageSquare, Paperclip } from 'lucide-react';
+import type { BoardSettings } from '@/lib/boardSettings';
 import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { WarningBanner } from '@/components/shared/WarningBanner';
 import { TaskActions } from './TaskActions';
@@ -38,6 +39,7 @@ interface TaskDetailProps {
   showUpdatePanel?: boolean;
   showInlineActions?: boolean;
   showDescription?: boolean;
+  boardSettings: BoardSettings;
 }
 
 export function TaskDetail({
@@ -59,6 +61,7 @@ export function TaskDetail({
   showUpdatePanel = true,
   showInlineActions = true,
   showDescription = true,
+  boardSettings,
 }: TaskDetailProps) {
   const [activeTab, setActiveTab] = useState('links');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -176,7 +179,7 @@ export function TaskDetail({
                 ))}
               </div>
 
-              {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={showPanelChrome} />}
+              {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={showPanelChrome} boardSettings={boardSettings} />}
 
               {showInlineActions && (
                 <TaskActions task={task} allTasks={allTasks} onStatusChange={onStatusChange} onBlock={onBlock} onReclaim={onReclaim} onDecompose={onDecompose} onDelete={onDelete} />
@@ -202,7 +205,7 @@ export function TaskDetail({
                 {selectedTab === 'logs' && (
                   <div className="space-y-4">
                     {readyDisabled && unfinishedParents.length > 0 && <WarningBanner message={`Ready disabled: ${unfinishedParents.length} parent task${unfinishedParents.length > 1 ? 's' : ''} not done`} />}
-                    {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={showPanelChrome} />}
+                    {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={showPanelChrome} boardSettings={boardSettings} />}
                     <TaskWorkerLogsPanel task={task} />
                     {hasPlannedAttachments && (
                       <CompactSection title="Planned attachments" count={task.plannedAttachments.length} data-testid="task-attachments-compact">
