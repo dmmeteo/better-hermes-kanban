@@ -122,6 +122,8 @@ export interface Task {
   linkedTasks: LinkedTask[];
   plannedAttachments: PlannedAttachment[];
   warningCount: number;
+  workspaceKind?: 'scratch' | 'dir' | 'worktree' | null;
+  workspacePath?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -211,6 +213,18 @@ export const STATUS_ORDER: TaskStatus[] = [
   'running',
   'blocked',
   'review',
+  'done',
+];
+
+// Subset of statuses the kanban API accepts in PATCH/POST payloads.
+// `review` is UI-only; the backend does not understand it.
+export const NATIVE_STATUS_ORDER: TaskStatus[] = [
+  'triage',
+  'todo',
+  'scheduled',
+  'ready',
+  'running',
+  'blocked',
   'done',
 ];
 

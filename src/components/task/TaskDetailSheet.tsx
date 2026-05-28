@@ -1,43 +1,38 @@
-import type { BoardSettings } from '@/lib/boardSettings';
-import type { Task } from '@/lib/types';
-import { TaskDetail } from './TaskDetail';
+import type { Board, BotProfile, Task, UpdateTaskData } from '@/lib/types';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import type { TaskStatus, UpdateTaskData } from '@/lib/types';
+import { TaskDetailBody } from './TaskDetailBody';
+import { TaskDetailSidebar } from './TaskDetailSidebar';
 
 interface TaskDetailSheetProps {
   task: Task | null;
   allTasks: Task[];
+  activeBoard?: Board;
+  assignees: BotProfile[];
   open: boolean;
   onClose: () => void;
-  onStatusChange: (status: TaskStatus) => void;
   onAddComment: (text: string) => void;
-  onBlock: () => void;
-  onReclaim: () => void;
-  onDecompose: () => void;
-  onDelete: () => void;
-  onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onUpdateTask: (patch: UpdateTaskData) => Promise<void>;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
-  isUpdating?: boolean;
+  onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
+  onSpecify: () => Promise<void>;
+  onDecompose: () => Promise<void>;
   isMobile?: boolean;
-  boardSettings: BoardSettings;
 }
 
 export function TaskDetailSheet({
   task,
   allTasks,
+  activeBoard,
+  assignees,
   open,
   onClose,
-  onStatusChange,
   onAddComment,
-  onBlock,
-  onReclaim,
-  onDecompose,
-  onDelete,
   onUpdateTask,
   onLinkTask,
-  isUpdating = false,
+  onNotify,
+  onSpecify,
+  onDecompose,
   isMobile = false,
-  boardSettings,
 }: TaskDetailSheetProps) {
   if (!task) return null;
 
@@ -45,26 +40,29 @@ export function TaskDetailSheet({
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
-        className="!w-screen !max-w-none gap-0 overflow-hidden border-l border-border bg-background p-0 md:!w-[65vw] md:!max-w-none"
+        className="!w-screen !max-w-none gap-0 overflow-y-auto border-l border-border bg-background p-4 md:!w-[65vw] md:!max-w-none md:p-5"
       >
         <SheetTitle className="sr-only">Task detail: {task.title}</SheetTitle>
         <SheetDescription className="sr-only">Read and update task {task.id}</SheetDescription>
-        <TaskDetail
-          task={task}
-          allTasks={allTasks}
-          isMobile={isMobile}
-          onBack={onClose}
-          onStatusChange={onStatusChange}
-          onAddComment={onAddComment}
-          onBlock={onBlock}
-          onReclaim={onReclaim}
-          onDecompose={onDecompose}
-          onDelete={onDelete}
-          onUpdateTask={onUpdateTask}
-          onLinkTask={onLinkTask}
-          isUpdating={isUpdating}
-          boardSettings={boardSettings}
-        />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <TaskDetailBody
+            task={task}
+            allTasks={allTasks}
+            activeBoard={activeBoard}
+            layout={isMobile ? 'mobile' : 'overlay'}
+            onUpdateTask={onUpdateTask}
+            onAddComment={onAddComment}
+            onLinkTask={onLinkTask}
+          />
+          <TaskDetailSidebar
+            task={task}
+            assignees={assignees}
+            onUpdate={onUpdateTask}
+            onNotify={onNotify}
+            onSpecify={onSpecify}
+            onDecompose={onDecompose}
+          />
+        </div>
       </SheetContent>
     </Sheet>
   );

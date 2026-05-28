@@ -1,8 +1,8 @@
 import type { Board, LinkedTask, Priority, Task, TaskActivity, TaskRun, TaskStatus, TaskWorkerLog } from './types';
+import { NATIVE_STATUS_ORDER } from './types';
 
-const NATIVE_STATUSES: TaskStatus[] = ['triage', 'todo', 'scheduled', 'ready', 'running', 'blocked', 'done'];
 const UI_ONLY_STATUSES: TaskStatus[] = ['review'];
-const ALL_STATUSES: TaskStatus[] = [...NATIVE_STATUSES, ...UI_ONLY_STATUSES];
+const ALL_STATUSES: TaskStatus[] = [...NATIVE_STATUS_ORDER, ...UI_ONLY_STATUSES];
 
 type JsonObject = Record<string, unknown>;
 
@@ -166,6 +166,12 @@ export function mapNativeTask(raw: unknown, boardId: string): Task {
     : [];
   const latestSummary = asString(item.latest_summary ?? item.latestSummary ?? item.summary ?? item.result, '') || null;
   const resolvedBoardId = asString(item.board ?? item.board_id ?? item.boardId, boardId);
+  const rawWorkspaceKind = asString(item.workspace_kind ?? item.workspaceKind, '').toLowerCase();
+  const workspaceKind: Task['workspaceKind'] =
+    rawWorkspaceKind === 'scratch' || rawWorkspaceKind === 'dir' || rawWorkspaceKind === 'worktree'
+      ? rawWorkspaceKind
+      : null;
+  const workspacePath = asString(item.workspace_path ?? item.workspacePath, '') || null;
   return {
     id,
     title: asString(item.title, id),
@@ -187,6 +193,8 @@ export function mapNativeTask(raw: unknown, boardId: string): Task {
     linkedTasks: normalizeLinks(item.links ?? item.linkedTasks),
     plannedAttachments: [],
     warningCount: asNumber(item.warning_count ?? item.warningCount ?? item.warnings, diagnostics.length),
+    workspaceKind,
+    workspacePath,
     createdAt: toIso(item.created_at ?? item.createdAt),
     updatedAt: toIso(item.updated_at ?? item.updatedAt ?? item.started_at ?? item.completed_at),
   };

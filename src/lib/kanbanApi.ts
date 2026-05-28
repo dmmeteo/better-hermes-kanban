@@ -573,6 +573,24 @@ export const kanbanApi = {
     return [updated];
   },
 
+  // TODO(notify-api): підтвердити точний контракт ендпойнту з Hermes-репо.
+  // Поки що б'ємо в /api/plugins/kanban/tasks/{id}/notify з { channel }.
+  async notifyTask(taskId: string, channel: 'telegram' | 'discord', boardId?: string): Promise<{ ok: boolean; message?: string }> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    try {
+      const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/notify${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel }),
+      });
+      const message = isObject(response) ? asString(response.message ?? response.detail, '') : '';
+      return { ok: true, message: message || undefined };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Notify failed';
+      return { ok: false, message };
+    }
+  },
+
   async getProfiles(): Promise<BotProfile[]> {
     try {
       const payload = await nativeKanbanClient.getProfiles();

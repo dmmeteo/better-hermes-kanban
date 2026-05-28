@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
-import type { Task, Board, BotProfile, CreateTaskData, TaskStatus, UpdateTaskData } from '@/lib/types';
+import type { Task, Board, BotProfile, CreateTaskData, UpdateTaskData } from '@/lib/types';
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
 import { getBoardSettings, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -80,7 +80,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [, setUpdatingTaskId] = useState<string | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [assignees, setAssignees] = useState<BotProfile[]>([]);
   const isMobile = useIsMobile();
@@ -331,15 +331,28 @@ function App() {
         toast.error('Running status is dispatcher-owned and cannot be set manually');
         return;
       }
-      if (patch.status && !window.confirm(`Apply status change to ${patch.status} for ${selectedTask.id}?`)) {
-        return;
-      }
+      const taskId = selectedTask.id;
+      const snapshot = tasks;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                ...(patch.title !== undefined ? { title: patch.title } : {}),
+                ...(patch.description !== undefined ? { description: patch.description } : {}),
+                ...(patch.status !== undefined ? { status: patch.status } : {}),
+                ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+                ...(patch.assignee !== undefined ? { assignee: patch.assignee } : {}),
+              }
+            : t,
+        ),
+      );
       try {
-        setUpdatingTaskId(selectedTask.id);
-        await kanbanApi.updateTask(selectedTask.id, patch, activeBoard.id);
+        setUpdatingTaskId(taskId);
+        await kanbanApi.updateTask(taskId, patch, activeBoard.id);
         await refetchActiveBoard(activeBoard);
-        toast.success('Task updated');
       } catch (error) {
+        setTasks(snapshot);
         const message = error instanceof Error ? error.message : 'Failed to update task';
         toast.error(message);
         throw error;
@@ -347,44 +360,28 @@ function App() {
         setUpdatingTaskId(null);
       }
     },
-    [activeBoard, refetchActiveBoard, selectedTask]
+    [activeBoard, refetchActiveBoard, selectedTask, tasks]
   );
 
-  const handleStatusChange = useCallback(
-    async (status: TaskStatus) => {
-      await updateSelectedTask({ status });
+  const handleNotify = useCallback(
+    async (channel: 'telegram' | 'discord') => {
+      if (!selectedTask || !activeBoard) return;
+      const result = await kanbanApi.notifyTask(selectedTask.id, channel, activeBoard.id);
+      if (!result.ok) {
+        throw new Error(result.message || `Failed to notify ${channel}`);
+      }
     },
-    [updateSelectedTask]
+    [activeBoard, selectedTask],
   );
 
-  const handleBlock = useCallback(async () => {
+  const handleSpecify = useCallback(async () => {
     if (!selectedTask || !activeBoard) return;
-    const reason = window.prompt(`Reason to block ${selectedTask.id}?`, 'Blocked from BHK');
-    if (reason === null) return;
     try {
       setUpdatingTaskId(selectedTask.id);
-      await kanbanApi.blockTask(selectedTask.id, activeBoard.id, reason);
+      await kanbanApi.specifyTask(selectedTask.id, activeBoard.id);
       await refetchActiveBoard(activeBoard);
-      toast.success('Task blocked');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to block task';
-      toast.error(message);
-      throw error;
-    } finally {
-      setUpdatingTaskId(null);
-    }
-  }, [activeBoard, refetchActiveBoard, selectedTask]);
-
-  const handleReclaim = useCallback(async () => {
-    if (!selectedTask || !activeBoard) return;
-    if (!window.confirm(`Reclaim ${selectedTask.id} back to ready?`)) return;
-    try {
-      setUpdatingTaskId(selectedTask.id);
-      await kanbanApi.reclaimTask(selectedTask.id, activeBoard.id);
-      await refetchActiveBoard(activeBoard);
-      toast.success('Task reclaimed');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to reclaim task';
+      const message = error instanceof Error ? error.message : 'Failed to specify task';
       toast.error(message);
       throw error;
     } finally {
@@ -394,7 +391,6 @@ function App() {
 
   const handleDecompose = useCallback(async () => {
     if (!selectedTask || !activeBoard) return;
-    if (!window.confirm(`Mark ${selectedTask.id} ready for decomposition/workflow?`)) return;
     try {
       setUpdatingTaskId(selectedTask.id);
       await kanbanApi.decomposeTask(selectedTask.id, activeBoard.id);
@@ -402,24 +398,6 @@ function App() {
       toast.success('Task action applied');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to run task action';
-      toast.error(message);
-      throw error;
-    } finally {
-      setUpdatingTaskId(null);
-    }
-  }, [activeBoard, refetchActiveBoard, selectedTask]);
-
-  const handleDelete = useCallback(async () => {
-    if (!selectedTask || !activeBoard) return;
-    if (!window.confirm(`Archive ${selectedTask.id}? This removes it from active board views.`)) return;
-    try {
-      setUpdatingTaskId(selectedTask.id);
-      await kanbanApi.deleteTask(selectedTask.id, activeBoard.id);
-      await refetchActiveBoard(activeBoard);
-      setSelectedTaskId(null);
-      toast.success('Task archived');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to archive task';
       toast.error(message);
       throw error;
     } finally {
@@ -627,18 +605,14 @@ function App() {
               taskId={selectedTask?.id || routeTaskId || ''}
               allTasks={tasks}
               activeBoard={activeBoard}
+              assignees={assignees}
               onBack={handleCloseDetail}
-              onStatusChange={handleStatusChange}
               onAddComment={handleAddComment}
-              onBlock={handleBlock}
-              onReclaim={handleReclaim}
-              onDecompose={handleDecompose}
-              onDelete={handleDelete}
               onUpdateTask={updateSelectedTask}
               onLinkTask={handleLinkTask}
-              isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
-              isMobile={isMobile}
-              boardSettings={boardSettings}
+              onNotify={handleNotify}
+              onSpecify={handleSpecify}
+              onDecompose={handleDecompose}
             />
           ) : (
             <BoardView
@@ -666,37 +640,33 @@ function App() {
         <TaskDetailSheet
           task={selectedTask}
           allTasks={tasks}
+          activeBoard={activeBoard ?? undefined}
+          assignees={assignees}
           open={!!selectedTaskId}
           onClose={handleCloseDetail}
-          onStatusChange={handleStatusChange}
           onAddComment={handleAddComment}
-          onBlock={handleBlock}
-          onReclaim={handleReclaim}
-          onDecompose={handleDecompose}
-          onDelete={handleDelete}
           onUpdateTask={updateSelectedTask}
           onLinkTask={handleLinkTask}
-          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+          onNotify={handleNotify}
+          onSpecify={handleSpecify}
+          onDecompose={handleDecompose}
           isMobile={isMobile}
-          boardSettings={boardSettings}
         />
       ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
         <TaskDetailModal
           task={selectedTask}
           allTasks={tasks}
+          activeBoard={activeBoard ?? undefined}
+          assignees={assignees}
           open={!!selectedTaskId}
           onClose={handleCloseDetail}
-          onStatusChange={handleStatusChange}
           onAddComment={handleAddComment}
-          onBlock={handleBlock}
-          onReclaim={handleReclaim}
-          onDecompose={handleDecompose}
-          onDelete={handleDelete}
           onUpdateTask={updateSelectedTask}
           onLinkTask={handleLinkTask}
-          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+          onNotify={handleNotify}
+          onSpecify={handleSpecify}
+          onDecompose={handleDecompose}
           isMobile={isMobile}
-          boardSettings={boardSettings}
         />
       ) : null}
 
