@@ -124,6 +124,8 @@ export interface Task {
   warningCount: number;
   workspaceKind?: 'scratch' | 'dir' | 'worktree' | null;
   workspacePath?: string | null;
+  createdBy?: string | null;
+  skills?: string[] | null;
   createdAt: string;
   updatedAt: string;
 }

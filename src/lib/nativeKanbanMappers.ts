@@ -172,6 +172,13 @@ export function mapNativeTask(raw: unknown, boardId: string): Task {
       ? rawWorkspaceKind
       : null;
   const workspacePath = asString(item.workspace_path ?? item.workspacePath, '') || null;
+  const createdBy = asString(item.created_by ?? item.createdBy, '') || null;
+  const rawSkills = item.skills ?? item.skill_set;
+  const skills: string[] | null = Array.isArray(rawSkills)
+    ? rawSkills.map((s) => asString(s, '')).filter(Boolean)
+    : typeof rawSkills === 'string' && rawSkills.trim()
+      ? [rawSkills.trim()]
+      : null;
   return {
     id,
     title: asString(item.title, id),
@@ -195,6 +202,8 @@ export function mapNativeTask(raw: unknown, boardId: string): Task {
     warningCount: asNumber(item.warning_count ?? item.warningCount ?? item.warnings, diagnostics.length),
     workspaceKind,
     workspacePath,
+    createdBy,
+    skills: skills && skills.length > 0 ? skills : null,
     createdAt: toIso(item.created_at ?? item.createdAt),
     updatedAt: toIso(item.updated_at ?? item.updatedAt ?? item.started_at ?? item.completed_at),
   };

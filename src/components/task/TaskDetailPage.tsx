@@ -1,7 +1,7 @@
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import type { BotProfile, Board, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { TaskDetailBody, TaskStatusControl } from './TaskDetailBody';
+import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
 import { TaskBreadcrumbs } from './TaskDetailSections';
 
@@ -65,14 +65,13 @@ export function TaskDetailPage({
         <div className="mb-3" data-testid="task-page-breadcrumbs">
           <TaskBreadcrumbs task={task} activeBoard={activeBoard} />
         </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <TaskDetailBody
               task={task}
               allTasks={allTasks}
               layout="page"
               onUpdateTask={onUpdateTask}
-              onAddComment={onAddComment}
               onLinkTask={onLinkTask}
               onUnlinkTask={onUnlinkTask}
               onSpecify={onSpecify}
@@ -80,7 +79,7 @@ export function TaskDetailPage({
             />
           </div>
 
-          <div className="min-w-0 lg:sticky lg:top-3 lg:self-start">
+          <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-3 lg:self-start">
             <div className="mb-3 hidden lg:flex lg:justify-start" data-testid="task-page-status-row">
               <TaskStatusControl
                 task={task}
@@ -96,6 +95,10 @@ export function TaskDetailPage({
               onUpdate={onUpdateTask}
               onNotify={onNotify}
             />
+          </div>
+
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+            <TaskDetailTabs task={task} onAddComment={onAddComment} />
           </div>
         </div>
       </div>

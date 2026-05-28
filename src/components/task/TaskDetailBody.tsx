@@ -119,7 +119,6 @@ interface TaskDetailBodyProps {
   allTasks: Task[];
   layout: Layout;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
-  onAddComment: (text: string) => void;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onSpecify: () => Promise<void>;
@@ -127,36 +126,17 @@ interface TaskDetailBodyProps {
   headerExtra?: ReactNode;
 }
 
-type TabKey = 'comments' | 'logs' | 'runs';
-
 export function TaskDetailBody({
   task,
   allTasks,
   layout,
   onUpdateTask,
-  onAddComment,
   onLinkTask,
   onUnlinkTask,
   onSpecify,
   onDecompose,
   headerExtra,
 }: TaskDetailBodyProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('comments');
-
-  const tabs = useMemo(
-    () =>
-      [
-        { key: 'comments', label: 'Comments', count: task.commentCount },
-        { key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount },
-        { key: 'runs', label: 'Run history', count: task.runs.length },
-      ] satisfies { key: TabKey; label: string; count: number }[],
-    [task.commentCount, task.diagnostics.length, task.runs.length, task.warningCount],
-  );
-
-  useEffect(() => {
-    if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('comments');
-  }, [tabs, activeTab]);
-
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
 
@@ -168,7 +148,7 @@ export function TaskDetailBody({
   };
 
   return (
-    <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-4', layout === 'mobile' && 'gap-3')} data-testid="task-detail-body">
+    <div className={cn('flex min-h-0 min-w-0 flex-col gap-4', layout === 'mobile' && 'gap-3')} data-testid="task-detail-body">
       <header className="flex flex-col gap-2" data-testid="task-title-row">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -221,36 +201,64 @@ export function TaskDetailBody({
       <section data-testid="task-linked-section">
         <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} onUnlinkTask={onUnlinkTask} />
       </section>
-
-      <section data-testid="task-detail-tabs-section" className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-0 overflow-x-auto border-b border-border/50" data-testid="task-detail-tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                'relative shrink-0 px-3 py-2 text-xs font-medium transition-colors',
-                activeTab === tab.key ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-              )}
-              data-testid={`task-detail-tab-${tab.key}`}
-            >
-              <span>{tab.label}</span>
-              {tab.count > 0 && (
-                <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">{tab.count}</span>
-              )}
-              {activeTab === tab.key && (
-                <div className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full" style={{ backgroundColor: '#7C5CFF' }} />
-              )}
-            </button>
-          ))}
-        </div>
-        <div className="min-h-[240px] pt-3" data-testid="task-detail-tab-panel">
-          {activeTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
-          {activeTab === 'logs' && <TaskWorkerLogsPanel task={task} />}
-          {activeTab === 'runs' && <TaskRunHistoryPanel task={task} />}
-        </div>
-      </section>
     </div>
+  );
+}
+
+type TabKey = 'comments' | 'logs' | 'runs';
+
+interface TaskDetailTabsProps {
+  task: Task;
+  onAddComment: (text: string) => void;
+  className?: string;
+}
+
+export function TaskDetailTabs({ task, onAddComment, className }: TaskDetailTabsProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>('comments');
+
+  const tabs = useMemo(
+    () =>
+      [
+        { key: 'comments', label: 'Comments', count: task.commentCount },
+        { key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount },
+        { key: 'runs', label: 'Run history', count: task.runs.length },
+      ] satisfies { key: TabKey; label: string; count: number }[],
+    [task.commentCount, task.diagnostics.length, task.runs.length, task.warningCount],
+  );
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('comments');
+  }, [tabs, activeTab]);
+
+  return (
+    <section className={cn('flex min-w-0 flex-col', className)} data-testid="task-detail-tabs-section">
+      <div className="flex items-center gap-0 overflow-x-auto border-b border-border/50" data-testid="task-detail-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'relative shrink-0 px-3 py-2 text-xs font-medium transition-colors',
+              activeTab === tab.key ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+            data-testid={`task-detail-tab-${tab.key}`}
+          >
+            <span>{tab.label}</span>
+            {tab.count > 0 && (
+              <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">{tab.count}</span>
+            )}
+            {activeTab === tab.key && (
+              <div className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full" style={{ backgroundColor: '#7C5CFF' }} />
+            )}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-[240px] pt-3" data-testid="task-detail-tab-panel">
+        {activeTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
+        {activeTab === 'logs' && <TaskWorkerLogsPanel task={task} />}
+        {activeTab === 'runs' && <TaskRunHistoryPanel task={task} />}
+      </div>
+    </section>
   );
 }

@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
+import { cn } from '@/lib/utils';
 import { TaskActivity } from './TaskActivity';
 
 type WorkspaceKind = 'scratch' | 'dir' | 'worktree';
@@ -68,6 +69,7 @@ export function TaskDetailSidebar({
   );
 
   const workspaceKind: WorkspaceKind | null = task.workspaceKind ?? null;
+  const skills = task.skills ?? null;
 
   const handleAssignee = async (next: string | null) => {
     await onUpdate({ assignee: next });
@@ -85,7 +87,10 @@ export function TaskDetailSidebar({
 
   return (
     <aside
-      className={`flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/30 p-3 ${className ?? ''}`}
+      className={cn(
+        'flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/30 p-3',
+        className,
+      )}
       data-testid="task-detail-sidebar"
     >
       <SidebarRow label="Assignee">
@@ -119,10 +124,34 @@ export function TaskDetailSidebar({
         />
       </SidebarRow>
 
-      <Separator />
+      <SidebarRow label="Created by">
+        <span className="px-2 py-1 text-sm text-foreground/90" data-testid="task-created-by">
+          {task.createdBy ?? <span className="text-muted-foreground">—</span>}
+        </span>
+      </SidebarRow>
+
+      <SidebarRow label="Skills">
+        <div className="px-2 py-1" data-testid="task-skills">
+          {skills && skills.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="rounded-md bg-secondary/70 px-1.5 py-0.5 text-[11px] text-foreground/85"
+                  title={skill}
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          )}
+        </div>
+      </SidebarRow>
 
       <SidebarRow label="Workspace">
-        <div className="flex flex-col gap-1 px-2 py-1" data-testid="task-workspace-readonly">
+        <div className="flex flex-col gap-0.5 px-2 py-1" data-testid="task-workspace-readonly">
           <span className="text-sm text-foreground/90">
             {workspaceKind ? WORKSPACE_KIND_LABELS[workspaceKind] : <span className="text-muted-foreground">—</span>}
           </span>
@@ -131,16 +160,13 @@ export function TaskDetailSidebar({
               {task.workspacePath}
             </span>
           )}
-          <span className="pt-0.5 text-[10px] text-muted-foreground/80">
-            Set at task creation; not editable here.
-          </span>
         </div>
       </SidebarRow>
 
       <Separator />
 
-      <SidebarRow label="Notify channels" icon={<Bell size={12} />}>
-        <div className="flex flex-wrap gap-2">
+      <SidebarRow label="Notify" icon={<Bell size={12} />}>
+        <div className="flex flex-wrap gap-2 px-1 py-0.5">
           <Button
             type="button"
             variant="outline"
@@ -198,12 +224,12 @@ function SidebarRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+    <div className="grid grid-cols-[90px_minmax(0,1fr)] items-start gap-3" data-testid={`sidebar-row-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+      <span className="flex items-center gap-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
         {icon}
         {label}
       </span>
-      {children}
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }

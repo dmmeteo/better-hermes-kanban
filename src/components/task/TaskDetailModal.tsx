@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import type { Board, BotProfile, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { TaskDetailBody, TaskStatusControl } from './TaskDetailBody';
+import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
 import { TaskBreadcrumbs } from './TaskDetailSections';
 
@@ -64,21 +64,20 @@ export function TaskDetailModal({
             <X size={16} />
           </Button>
         </header>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr]">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <TaskDetailBody
               task={task}
               allTasks={allTasks}
               layout={isMobile ? 'mobile' : 'overlay'}
               onUpdateTask={onUpdateTask}
-              onAddComment={onAddComment}
               onLinkTask={onLinkTask}
               onUnlinkTask={onUnlinkTask}
               onSpecify={onSpecify}
               onDecompose={onDecompose}
             />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
             <div className="mb-3 hidden lg:flex lg:justify-start" data-testid="task-modal-status-row">
               <TaskStatusControl
                 task={task}
@@ -94,6 +93,9 @@ export function TaskDetailModal({
               onUpdate={onUpdateTask}
               onNotify={onNotify}
             />
+          </div>
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+            <TaskDetailTabs task={task} onAddComment={onAddComment} />
           </div>
         </div>
       </DialogContent>
