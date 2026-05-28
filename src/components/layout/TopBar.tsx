@@ -70,49 +70,62 @@ export function TopBar({
           <Feather size={20} style={{ color: '#7C5CFF' }} />
           <span className="font-bold text-sm">Hermes</span>
         </Link>
-        {!isTaskPage && (
-          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  data-testid="mobile-board-selector-trigger"
-                  className="flex min-w-0 max-w-[180px] flex-1 items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
-                >
-                  <span className="truncate">{activeBoard.name}</span>
-                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                {boards.map((board) => (
-                  <DropdownMenuItem
-                    key={board.id}
-                    onClick={() => onBoardChange(board)}
-                    className={cn(board.id === activeBoard.id && 'bg-accent')}
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
+          {!isTaskPage && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="mobile-board-selector-trigger"
+                    className="flex min-w-0 max-w-[180px] flex-1 items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
                   >
-                    <span className="flex-1 truncate">{board.name}</span>
-                    <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+                    <span className="truncate">{activeBoard.name}</span>
+                    <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  {boards.map((board) => (
+                    <DropdownMenuItem
+                      key={board.id}
+                      onClick={() => onBoardChange(board)}
+                      className={cn(board.id === activeBoard.id && 'bg-accent')}
+                    >
+                      <span className="flex-1 truncate">{board.name}</span>
+                      <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onOpenNewBoard} data-testid="mobile-board-dropdown-new-board">
+                    <Plus size={14} className="mr-2" />
+                    New board
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onOpenNewBoard} data-testid="mobile-board-dropdown-new-board">
-                  <Plus size={14} className="mr-2" />
-                  New board
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <button
-              type="button"
-              aria-label="Open settings"
-              title="Open settings"
-              data-testid="mobile-settings-button"
-              onClick={onOpenSettings}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Settings size={17} />
-            </button>
-          </div>
-        )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <button
+                type="button"
+                aria-label="Open settings"
+                title="Open settings"
+                data-testid="mobile-settings-button"
+                onClick={onOpenSettings}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Settings size={17} />
+              </button>
+            </>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 shrink-0 gap-1.5 text-xs font-semibold"
+            style={{ backgroundColor: '#7C5CFF' }}
+            onClick={onOpenQuickCapture}
+            data-testid="mobile-create-task"
+          >
+            <Plus size={14} />
+            Create
+          </Button>
+        </div>
       </div>
 
       {/* Desktop header */}

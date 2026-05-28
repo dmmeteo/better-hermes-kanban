@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import type { Board, BotProfile, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { TaskDetailBody } from './TaskDetailBody';
+import { TaskDetailBody, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
 import { TaskBreadcrumbs } from './TaskDetailSections';
 
@@ -69,7 +69,6 @@ export function TaskDetailModal({
             <TaskDetailBody
               task={task}
               allTasks={allTasks}
-              activeBoard={activeBoard}
               layout={isMobile ? 'mobile' : 'overlay'}
               onUpdateTask={onUpdateTask}
               onAddComment={onAddComment}
@@ -80,6 +79,14 @@ export function TaskDetailModal({
             />
           </div>
           <div className="min-w-0">
+            <div className="mb-3 hidden md:flex md:justify-end" data-testid="task-modal-status-row">
+              <TaskStatusControl
+                task={task}
+                onUpdateTask={onUpdateTask}
+                onSpecify={onSpecify}
+                onDecompose={onDecompose}
+              />
+            </div>
             <TaskDetailSidebar
               task={task}
               assignees={assignees}

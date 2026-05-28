@@ -573,21 +573,19 @@ function App() {
           logoHomeHref={boardPath(activeBoard.id)}
         />
 
-      {!isTaskPage && (
-        <div className="relative z-40 shrink-0 border-b border-border/50 bg-card/80 px-4 py-2 md:hidden">
-          <DataViewSearchAndFilter
-            query={searchQuery}
-            filters={searchFilters}
-            boards={boards}
-            assignees={assignees}
-            onQueryChange={setSearchQuery}
-            onFiltersChange={setSearchFilters}
-            onSubmit={(query, filters) => handleGlobalSearch(query, filters)}
-            placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search this board…'}
-            testId="mobile-topbar-search"
-          />
-        </div>
-      )}
+      <div className="relative z-40 shrink-0 border-b border-border/50 bg-card/80 px-4 py-2 md:hidden">
+        <DataViewSearchAndFilter
+          query={searchQuery}
+          filters={searchFilters}
+          boards={boards}
+          assignees={assignees}
+          onQueryChange={setSearchQuery}
+          onFiltersChange={setSearchFilters}
+          onSubmit={(query, filters) => handleGlobalSearch(query, filters)}
+          placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search this board…'}
+          testId="mobile-topbar-search"
+        />
+      </div>
 
       {(dataSource === 'fallback' || loadError) && (
         <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">

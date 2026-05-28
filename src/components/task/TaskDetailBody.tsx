@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { GitBranch, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Board, LinkedTask, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
+import type { LinkedTask, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import {
   NATIVE_STATUS_ORDER,
   STATUS_DESCRIPTIONS,
@@ -24,10 +24,99 @@ import { TaskLinkedTasksTab } from './TaskLinkedTasksTab';
 
 type Layout = 'page' | 'overlay' | 'mobile';
 
+interface TaskStatusControlProps {
+  task: Task;
+  onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onSpecify: () => Promise<void>;
+  onDecompose: () => Promise<void>;
+  className?: string;
+  align?: 'start' | 'end' | 'center';
+}
+
+export function TaskStatusControl({
+  task,
+  onUpdateTask,
+  onSpecify,
+  onDecompose,
+  className,
+  align = 'end',
+}: TaskStatusControlProps) {
+  const statusOptions: InlineSelectOption<TaskStatus>[] = useMemo(
+    () =>
+      NATIVE_STATUS_ORDER.map((status) => ({
+        value: status,
+        key: status,
+        label: <StatusBadge status={status} />,
+        description: STATUS_DESCRIPTIONS[status],
+        disabled: !isStatusSelectable(status),
+      })),
+    [],
+  );
+
+  const statusFieldDisabled = isStatusReadOnly(task.status);
+  const showTriageActions = task.status === 'triage';
+
+  const handleStatus = async (next: TaskStatus) => {
+    await onUpdateTask({ status: next });
+  };
+
+  return (
+    <div className={cn('flex flex-wrap items-center gap-2', className)} data-testid="task-status-control">
+      {showTriageActions && (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-[11px]"
+            onClick={() =>
+              void toast.promise(onSpecify(), {
+                loading: 'Marking ready…',
+                success: 'Specified',
+                error: 'Specify failed',
+              })
+            }
+            data-testid="task-action-specify"
+          >
+            <ListChecks size={12} /> Specify
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-[11px]"
+            onClick={() =>
+              void toast.promise(onDecompose(), {
+                loading: 'Decomposing…',
+                success: 'Decompose started',
+                error: 'Decompose failed',
+              })
+            }
+            data-testid="task-action-decompose"
+          >
+            <GitBranch size={12} /> Decompose
+          </Button>
+        </>
+      )}
+      <InlineSelectField
+        value={task.status}
+        options={statusOptions}
+        onChange={handleStatus}
+        disabled={statusFieldDisabled}
+        disabledReason={statusFieldDisabled ? 'Dispatcher-owned status; cannot edit manually.' : undefined}
+        renderTrigger={(opt) => <StatusBadge status={(opt?.value as TaskStatus) ?? task.status} />}
+        ariaLabel="Edit status"
+        dataTestId="task-status-field"
+        className="px-1"
+        align={align}
+      />
+    </div>
+  );
+}
+
 interface TaskDetailBodyProps {
   task: Task;
   allTasks: Task[];
-  activeBoard?: Board;
   layout: Layout;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
   onAddComment: (text: string) => void;
@@ -43,7 +132,6 @@ type TabKey = 'links' | 'comments' | 'logs' | 'runs';
 export function TaskDetailBody({
   task,
   allTasks,
-  activeBoard: _activeBoard,
   layout,
   onUpdateTask,
   onAddComment,
@@ -66,26 +154,12 @@ export function TaskDetailBody({
     [task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount],
   );
 
-  const statusOptions: InlineSelectOption<TaskStatus>[] = useMemo(
-    () =>
-      NATIVE_STATUS_ORDER.map((status) => ({
-        value: status,
-        key: status,
-        label: <StatusBadge status={status} />,
-        description: STATUS_DESCRIPTIONS[status],
-        disabled: !isStatusSelectable(status),
-      })),
-    [],
-  );
-
   useEffect(() => {
     if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('links');
   }, [tabs, activeTab]);
 
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
-  const statusFieldDisabled = isStatusReadOnly(task.status);
-  const showTriageActions = task.status === 'triage';
 
   const handleSaveTitle = async (next: string) => {
     await onUpdateTask({ title: next.trim() });
@@ -93,71 +167,35 @@ export function TaskDetailBody({
   const handleSaveDescription = async (next: string) => {
     await onUpdateTask({ description: next });
   };
-  const handleStatus = async (next: TaskStatus) => {
-    await onUpdateTask({ status: next });
-  };
 
   return (
     <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-4', layout === 'mobile' && 'gap-3')} data-testid="task-detail-body">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3" data-testid="task-title-row">
-        <div className="min-w-0 flex-1">
-          <InlineEditField
-            value={task.title}
-            onSave={handleSaveTitle}
-            ariaLabel="Edit task title"
-            dataTestId="task-title-field"
-            inputClassName="text-base font-semibold"
-            displayClassName="text-base font-semibold leading-tight break-words"
-            validate={(v) => (v.trim() ? null : 'Title is required')}
-            placeholder="Untitled task"
-          />
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {showTriageActions && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-[11px]"
-                onClick={() => void toast.promise(onSpecify(), {
-                  loading: 'Marking ready…',
-                  success: 'Specified',
-                  error: 'Specify failed',
-                })}
-                data-testid="task-action-specify"
-              >
-                <ListChecks size={12} /> Specify
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-[11px]"
-                onClick={() => void toast.promise(onDecompose(), {
-                  loading: 'Decomposing…',
-                  success: 'Decompose started',
-                  error: 'Decompose failed',
-                })}
-                data-testid="task-action-decompose"
-              >
-                <GitBranch size={12} /> Decompose
-              </Button>
-            </>
-          )}
-          <InlineSelectField
-            value={task.status}
-            options={statusOptions}
-            onChange={handleStatus}
-            disabled={statusFieldDisabled}
-            disabledReason={statusFieldDisabled ? 'Dispatcher-owned status; cannot edit manually.' : undefined}
-            renderTrigger={(opt) => <StatusBadge status={(opt?.value as TaskStatus) ?? task.status} />}
-            ariaLabel="Edit status"
-            dataTestId="task-status-field"
-            className="px-1"
-            align="end"
-          />
+      <header className="flex flex-col gap-2" data-testid="task-title-row">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <InlineEditField
+              value={task.title}
+              onSave={handleSaveTitle}
+              ariaLabel="Edit task title"
+              dataTestId="task-title-field"
+              inputClassName="text-base font-semibold"
+              displayClassName="text-base font-semibold leading-tight break-words"
+              validate={(v) => (v.trim() ? null : 'Title is required')}
+              placeholder="Untitled task"
+            />
+          </div>
           {headerExtra}
+        </div>
+        {/* Status + triage-actions render under the title on mobile only.
+            Desktop renders the same control above the sidebar — see Page/Sheet/Modal. */}
+        <div className="md:hidden">
+          <TaskStatusControl
+            task={task}
+            onUpdateTask={onUpdateTask}
+            onSpecify={onSpecify}
+            onDecompose={onDecompose}
+            align="start"
+          />
         </div>
       </header>
 

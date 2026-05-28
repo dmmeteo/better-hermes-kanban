@@ -1,7 +1,7 @@
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import type { BotProfile, Board, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { TaskDetailBody } from './TaskDetailBody';
+import { TaskDetailBody, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
 import { TaskBreadcrumbs } from './TaskDetailSections';
 
@@ -70,7 +70,6 @@ export function TaskDetailPage({
             <TaskDetailBody
               task={task}
               allTasks={allTasks}
-              activeBoard={activeBoard}
               layout="page"
               onUpdateTask={onUpdateTask}
               onAddComment={onAddComment}
@@ -82,6 +81,14 @@ export function TaskDetailPage({
           </div>
 
           <div className="min-w-0 lg:sticky lg:top-3 lg:self-start">
+            <div className="mb-3 hidden md:flex md:justify-end" data-testid="task-page-status-row">
+              <TaskStatusControl
+                task={task}
+                onUpdateTask={onUpdateTask}
+                onSpecify={onSpecify}
+                onDecompose={onDecompose}
+              />
+            </div>
             <TaskDetailSidebar
               task={task}
               assignees={assignees}
