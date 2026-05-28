@@ -11,6 +11,8 @@ Endpoints:
 - GET /api/plugins/kanban/profiles
 - GET /api/plugins/kanban/assignees
 - GET /api/plugins/kanban/orchestration
+- GET /api/plugins/kanban/search?q=<query>&board=<slug|all>&status=<status>&assignee=<profile>&priority=<p0|p1|p2|p3>&has_warnings=<bool>&has_links=<bool>&limit=<n>&offset=<n>&sort=<relevance|updated|priority>
+- GET /api/plugins/kanban/tasks/<id>?board=<slug>
 - PUT /api/plugins/kanban/orchestration
 - PATCH /api/plugins/kanban/tasks/<id>?board=<slug>
 
@@ -41,6 +43,19 @@ PORT = 9120
 HERMES = "/home/me/.hermes/hermes-agent/venv/bin/hermes"
 ALLOWED_UPDATE_FIELDS = {"status", "assignee", "priority", "title", "body"}
 ALLOWED_STATUSES = {"triage", "todo", "scheduled", "ready", "blocked", "done"}
+ALLOWED_CREATE_FIELDS = {
+    "title",
+    "body",
+    "description",
+    "assignee",
+    "priority",
+    "status",
+    "parents",
+    "parent_ids",
+    "workspace_kind",
+    "workspace_path",
+}
+ALLOWED_WORKSPACE_KINDS = {"scratch", "dir", "worktree"}
 BOARD_UPDATE_FIELDS = {"name", "description", "icon", "color", "default_workdir"}
 BOARD_SEGMENT_RE = re.compile(r"^/api/plugins/kanban/boards/([^/]+)(?:/(switch))?$")
 SAFE_ORCHESTRATION_FIELDS = {
@@ -78,6 +93,88 @@ def task_to_dict(task: object, board: str | None) -> dict:
     if board:
         data.setdefault("board", board)
     return data
+
+
+def priority_from_payload(value: object, default: int = 50) -> int:
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        if raw in {"p0", "critical"}:
+            return 100
+        if raw in {"p1", "high"}:
+            return 90
+        if raw in {"p2", "medium"}:
+            return 50
+        if raw in {"p3", "low"}:
+            return 10
+    try:
+        priority = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("priority must be P0/P1/P2/P3 or a numeric value")
+    if priority < 0 or priority > 1000:
+        raise ValueError("priority must be between 0 and 1000")
+    return priority
+
+
+def create_task(payload: dict, slug: str | None) -> dict:
+    unknown = sorted(set(payload) - ALLOWED_CREATE_FIELDS)
+    if unknown:
+        raise ValueError(f"Unsupported create field(s): {', '.join(unknown)}")
+    board = resolve_board(slug)
+    title = str(payload.get("title") or "").strip()
+    if not title:
+        raise ValueError("title is required")
+    if len(title) > 240:
+        raise ValueError("title must be 240 characters or less")
+    body = str(payload.get("body", payload.get("description", "")) or "").strip()
+    if len(body) > 20000:
+        raise ValueError("body must be 20000 characters or less")
+    assignee = str(payload.get("assignee") or "").strip() or None
+    if assignee and not profile_exists(assignee):
+        raise ValueError(f"profile {assignee!r} does not exist")
+    status = str(payload.get("status") or "triage").strip().lower()
+    if status not in {"triage", "todo", "scheduled", "ready", "blocked"}:
+        raise ValueError("status must be one of triage, todo, scheduled, ready, blocked")
+    workspace_kind = str(payload.get("workspace_kind") or "scratch").strip().lower()
+    if workspace_kind not in ALLOWED_WORKSPACE_KINDS:
+        raise ValueError("workspace_kind must be one of scratch, dir, worktree")
+    workspace_path = str(payload.get("workspace_path") or "").strip() or None
+    if workspace_path and not Path(workspace_path).is_absolute():
+        raise ValueError("workspace_path must be absolute when provided")
+    parents_raw = payload.get("parents", payload.get("parent_ids", []))
+    if parents_raw is None:
+        parents: list[str] = []
+    elif isinstance(parents_raw, list):
+        parents = [str(parent).strip() for parent in parents_raw if str(parent).strip()]
+    else:
+        raise ValueError("parents must be a list of task ids")
+
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        task_id = kanban_db.create_task(
+            conn,
+            title=title,
+            body=body,
+            assignee=assignee,
+            created_by="bhk",
+            workspace_kind=workspace_kind,
+            workspace_path=workspace_path,
+            priority=priority_from_payload(payload.get("priority"), 50),
+            parents=parents,
+            triage=status == "triage",
+            initial_status="blocked" if status == "blocked" else "running",
+            board=board,
+        )
+        if status == "scheduled":
+            kanban_db.schedule_task(conn, task_id, reason="Scheduled from BHK guarded create")
+        elif status in {"todo", "ready"}:
+            set_status_direct(conn, task_id, status)
+        task = kanban_db.get_task(conn, task_id)
+        return {"task": task_to_dict(task, board)}
+    finally:
+        conn.close()
 
 
 def update_task(task_id: str, payload: dict, slug: str | None) -> dict:
@@ -316,6 +413,416 @@ def board_payload(slug: str | None) -> dict:
     }
 
 
+def parse_bool(value: str | None) -> bool | None:
+    if value is None or value == "":
+        return None
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def limit_from_query(value: str | None, default: int = 50, maximum: int = 100) -> int:
+    try:
+        limit = int(value or default)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(maximum, limit))
+
+
+def offset_from_query(value: str | None) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def priority_matches(task_priority: object, wanted: str | None) -> bool:
+    if not wanted:
+        return True
+    try:
+        normalized = priority_from_payload(task_priority, 50)
+    except ValueError:
+        normalized = 50
+    label = wanted.strip().lower()
+    if label == "p0":
+        return normalized >= 100
+    if label == "p1":
+        return 50 <= normalized < 100
+    if label == "p2":
+        return 11 <= normalized < 50
+    if label == "p3":
+        return normalized <= 10
+    try:
+        return normalized == int(label)
+    except ValueError:
+        return False
+
+
+def truncate_text(value: object, max_chars: int = 260) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip() + "…"
+
+
+def snippet_for(text: object, query: str, max_chars: int = 260) -> str:
+    source = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not source:
+        return ""
+    if not query:
+        return truncate_text(source, max_chars)
+    pos = source.lower().find(query.lower())
+    if pos < 0:
+        return truncate_text(source, max_chars)
+    half = max_chars // 2
+    start = max(0, pos - half)
+    end = min(len(source), start + max_chars)
+    start = max(0, end - max_chars)
+    prefix = "…" if start else ""
+    suffix = "…" if end < len(source) else ""
+    return prefix + source[start:end].strip() + suffix
+
+
+def latest_run_summary(conn, task_id: str) -> tuple[str, int | None]:
+    row = conn.execute(
+        "SELECT summary, error, outcome, ended_at, started_at FROM task_runs WHERE task_id = ? ORDER BY COALESCE(ended_at, started_at, 0) DESC, id DESC LIMIT 1",
+        (task_id,),
+    ).fetchone()
+    if not row:
+        return "", None
+    text = row["summary"] or row["error"] or row["outcome"] or ""
+    return str(text or ""), row["ended_at"] or row["started_at"]
+
+
+def task_comments(conn, task_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, author, body, created_at FROM task_comments WHERE task_id = ? ORDER BY created_at DESC LIMIT 50",
+        (task_id,),
+    ).fetchall()
+    return [
+        {
+            "id": str(row["id"]),
+            "author": row["author"] or "user",
+            "body": row["body"] or "",
+            "text": row["body"] or "",
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def task_runs(conn, task_id: str) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT id, status, outcome, summary, error, started_at, ended_at
+        FROM task_runs
+        WHERE task_id = ?
+        ORDER BY started_at DESC, id DESC
+        LIMIT 20
+        """,
+        (task_id,),
+    ).fetchall()
+    return [
+        {
+            "id": str(row["id"]),
+            "status": row["status"] or row["outcome"] or "started",
+            "outcome": row["outcome"],
+            "summary": row["summary"],
+            "error": row["error"],
+            "started_at": row["started_at"],
+            "ended_at": row["ended_at"],
+        }
+        for row in rows
+    ]
+
+
+def activity_type(kind: str) -> str:
+    raw = (kind or "").lower()
+    if "comment" in raw:
+        return "comment"
+    if "assign" in raw:
+        return "assignment"
+    if "block" in raw:
+        return "block"
+    if "reclaim" in raw:
+        return "reclaim"
+    if "specify" in raw:
+        return "specify"
+    if "decompose" in raw:
+        return "decompose"
+    if "status" in raw or "complete" in raw or "ready" in raw or "schedule" in raw:
+        return "status_change"
+    return "run"
+
+
+def task_activity(conn, task_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, kind, payload, created_at FROM task_events WHERE task_id = ? ORDER BY created_at DESC, id DESC LIMIT 50",
+        (task_id,),
+    ).fetchall()
+    activity: list[dict] = []
+    for row in rows:
+        payload = row["payload"]
+        description = row["kind"] or "Activity"
+        metadata = None
+        if payload:
+            try:
+                metadata = json.loads(payload)
+                if isinstance(metadata, dict):
+                    detail = metadata.get("reason") or metadata.get("status") or metadata.get("assignee") or metadata.get("summary")
+                    if detail:
+                        description = f"{description}: {detail}"
+                else:
+                    metadata = {"value": metadata}
+            except json.JSONDecodeError:
+                metadata = {"value": payload}
+                description = f"{description}: {payload}"
+        activity.append({
+            "id": str(row["id"]),
+            "type": activity_type(row["kind"]),
+            "description": description.replace("_", " "),
+            "created_at": row["created_at"],
+            "payload": metadata,
+        })
+    return activity
+
+
+def task_counts(conn, task_id: str) -> tuple[int, int, int]:
+    comment_count = conn.execute("SELECT COUNT(*) AS count FROM task_comments WHERE task_id = ?", (task_id,)).fetchone()["count"]
+    link_count = conn.execute("SELECT COUNT(*) AS count FROM task_links WHERE parent_id = ? OR child_id = ?", (task_id, task_id)).fetchone()["count"]
+    warning_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM task_events WHERE task_id = ? AND (kind LIKE '%warn%' OR payload LIKE '%warning%' OR payload LIKE '%review-required%')",
+        (task_id,),
+    ).fetchone()["count"]
+    return int(comment_count or 0), int(link_count or 0), int(warning_count or 0)
+
+
+def linked_tasks(conn, task_id: str, board: str) -> list[dict]:
+    """Return compact parent/child task records for the BHK detail UI."""
+    rows = conn.execute(
+        """
+        SELECT
+            links.parent_id,
+            links.child_id,
+            tasks.id AS task_id,
+            tasks.title,
+            tasks.status,
+            tasks.priority,
+            tasks.assignee
+        FROM task_links AS links
+        JOIN tasks
+            ON tasks.id = CASE
+                WHEN lower(links.parent_id) = lower(?) THEN links.child_id
+                ELSE links.parent_id
+            END
+        WHERE lower(links.parent_id) = lower(?) OR lower(links.child_id) = lower(?)
+        ORDER BY
+            CASE WHEN lower(links.parent_id) = lower(?) THEN 1 ELSE 0 END,
+            tasks.created_at ASC,
+            tasks.id ASC
+        """,
+        (task_id, task_id, task_id, task_id),
+    ).fetchall()
+    links: list[dict] = []
+    for index, row in enumerate(rows):
+        relation = "child" if str(row["parent_id"]).lower() == task_id.lower() else "parent"
+        related_task_id = str(row["task_id"])
+        links.append({
+            "id": f"link-{index}-{row['parent_id']}-{row['child_id']}",
+            "task_id": related_task_id,
+            "taskId": related_task_id,
+            "title": row["title"] or related_task_id,
+            "status": row["status"] or "todo",
+            "priority": row["priority"],
+            "assignee": row["assignee"],
+            "relation": relation,
+            "board": board,
+            "board_id": board,
+        })
+    return links
+
+
+def board_choices(slug: str | None) -> list[dict]:
+    if slug and slug.lower() not in {"all", "*"}:
+        board = resolve_board(slug)
+        meta = kanban_db.read_board_metadata(board or kanban_db.DEFAULT_BOARD)
+        return [meta]
+    return kanban_db.list_boards(include_archived=False)
+
+
+def task_detail_payload(task_id: str, slug: str | None = None) -> dict:
+    exact = search_tasks({"q": [task_id], "board": [slug]} if slug else {"q": [task_id]}, exact_task_id=task_id, limit_override=1)
+    if not exact["results"]:
+        return {"_status": 404, "detail": f"task {task_id} not found"}
+    return {"task": exact["results"][0]["task"]}
+
+
+def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, limit_override: int | None = None) -> dict:
+    query = (qs.get("q") or [""])[0].strip()
+    board_filter = (qs.get("board") or [None])[0]
+    status_filter = (qs.get("status") or [""])[0].strip().lower()
+    assignee_filter = (qs.get("assignee") or [""])[0].strip().lower()
+    priority_filter = (qs.get("priority") or [""])[0].strip().lower()
+    has_warnings = parse_bool((qs.get("has_warnings") or [None])[0])
+    has_links = parse_bool((qs.get("has_links") or [None])[0])
+    sort = ((qs.get("sort") or [""])[0] or ("relevance" if query else "updated")).strip().lower()
+    limit = limit_override or limit_from_query((qs.get("limit") or [None])[0])
+    offset = offset_from_query((qs.get("offset") or qs.get("cursor") or [None])[0])
+    exact_re = re.compile(r"^t_[0-9a-f]{8}$", re.IGNORECASE)
+    exact_id = exact_task_id or (query if exact_re.match(query) else None)
+    now = int(time.time())
+    results: list[dict] = []
+    seen_sources: set[tuple[str, str]] = set()
+
+    for board_meta in board_choices(board_filter):
+        board = board_meta.get("slug") or board_meta.get("id") or kanban_db.DEFAULT_BOARD
+        db_identity = str(board_meta.get("db_path") or board)
+        try:
+            kanban_db.init_db(board=board)
+            conn = kanban_db.connect(board=board)
+        except Exception:
+            continue
+        try:
+            if exact_id:
+                rows = conn.execute("SELECT * FROM tasks WHERE lower(id) = lower(?)", (exact_id,)).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM tasks").fetchall()
+            for row in rows:
+                task_id = row["id"]
+                source_key = (db_identity, task_id)
+                if source_key in seen_sources:
+                    continue
+                seen_sources.add(source_key)
+                comments = task_comments(conn, task_id)
+                runs = task_runs(conn, task_id) if exact_id else []
+                events = task_activity(conn, task_id) if exact_id else []
+                latest_summary, summary_updated_at = latest_run_summary(conn, task_id)
+                comment_count, link_count, warning_count = task_counts(conn, task_id)
+                links = linked_tasks(conn, task_id, board) if exact_id or link_count else []
+                if status_filter and row["status"].lower() != status_filter:
+                    continue
+                if assignee_filter and (row["assignee"] or "").lower() != assignee_filter:
+                    continue
+                if not priority_matches(row["priority"], priority_filter):
+                    continue
+                if has_warnings is not None and (warning_count > 0) != has_warnings:
+                    continue
+                if has_links is not None and (link_count > 0) != has_links:
+                    continue
+
+                searchable_comments = " ".join(str(comment["body"] or "") for comment in comments)
+                fields = {
+                    "id": task_id,
+                    "title": row["title"] or "",
+                    "body": row["body"] or "",
+                    "summary": latest_summary,
+                    "comments": searchable_comments,
+                    "assignee": row["assignee"] or "",
+                    "status": row["status"] or "",
+                    "board": f"{board} {board_meta.get('name') or ''} {board_meta.get('description') or ''}",
+                }
+                if query:
+                    haystack = " ".join(fields.values()).lower()
+                    if query.lower() not in haystack:
+                        continue
+                score = 0
+                match_field = "title"
+                if query:
+                    q = query.lower()
+                    if task_id.lower() == q:
+                        score += 1000
+                        match_field = "id"
+                    elif q in task_id.lower():
+                        score += 600
+                        match_field = "id"
+                    elif q in fields["title"].lower():
+                        score += 300
+                        match_field = "title"
+                    elif q in fields["body"].lower():
+                        score += 120
+                        match_field = "body"
+                    elif q in fields["summary"].lower():
+                        score += 100
+                        match_field = "summary"
+                    elif q in fields["comments"].lower():
+                        score += 80
+                        match_field = "comment"
+                    elif q in fields["assignee"].lower() or q in fields["status"].lower() or q in fields["board"].lower():
+                        score += 50
+                        match_field = "metadata"
+                updated_at = row["completed_at"] or row["started_at"] or summary_updated_at or row["created_at"]
+                if match_field == "comment":
+                    matching_comment = next((comment for comment in comments if query.lower() in str(comment["body"] or "").lower()), comments[0] if comments else None)
+                    snippet = f"comment by {matching_comment['author']}: {snippet_for(matching_comment['body'], query)}" if matching_comment else ""
+                elif match_field == "summary":
+                    snippet = snippet_for(latest_summary, query)
+                elif match_field == "body":
+                    snippet = snippet_for(row["body"], query)
+                elif match_field == "metadata":
+                    snippet = truncate_text(f"{row['status']} · {row['assignee'] or 'unassigned'} · {board_meta.get('name') or board}")
+                else:
+                    snippet = snippet_for(row["body"] or latest_summary or row["title"], query)
+                task = task_to_dict(dict(row), board)
+                task.update({
+                    "board": board,
+                    "board_id": board,
+                    "description": row["body"] or "",
+                    "latest_summary": latest_summary or None,
+                    "summary_updated_at": summary_updated_at,
+                    "comment_count": comment_count,
+                    "comments": comments,
+                    "activity": events,
+                    "events": events,
+                    "runs": runs,
+                    "link_count": link_count,
+                    "links": links,
+                    "linkedTasks": links,
+                    "warning_count": warning_count,
+                    "updated_at": updated_at,
+                })
+                results.append({
+                    "id": task_id,
+                    "title": row["title"],
+                    "body": truncate_text(row["body"], 320),
+                    "snippet": snippet,
+                    "matchField": match_field,
+                    "exact": bool(exact_id and task_id.lower() == exact_id.lower()),
+                    "status": row["status"],
+                    "priority": row["priority"],
+                    "assignee": row["assignee"],
+                    "boardId": board,
+                    "boardName": board_meta.get("name") or board,
+                    "commentCount": comment_count,
+                    "linkCount": link_count,
+                    "warningCount": warning_count,
+                    "latestSummary": latest_summary or None,
+                    "createdAt": row["created_at"],
+                    "updatedAt": updated_at,
+                    "source": "sqlite",
+                    "indexedAt": now,
+                    "score": score,
+                    "task": task,
+                })
+        finally:
+            conn.close()
+    if sort == "priority":
+        results.sort(key=lambda r: (int(r.get("priority") or 0), int(r.get("updatedAt") or 0)), reverse=True)
+    elif sort in {"updated", "newest"}:
+        results.sort(key=lambda r: int(r.get("updatedAt") or 0), reverse=True)
+    else:
+        results.sort(key=lambda r: (int(r.get("score") or 0), int(r.get("updatedAt") or 0)), reverse=True)
+    total = len(results)
+    page = results[offset : offset + limit]
+    for item in page:
+        item.pop("score", None)
+    next_offset = offset + limit if offset + limit < total else None
+    return {
+        "results": page,
+        "total": total,
+        "nextCursor": str(next_offset) if next_offset is not None else None,
+        "source": "sqlite",
+        "indexedAt": now,
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BHKReadonlyKanban/1.0"
 
@@ -346,6 +853,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/plugins/kanban/boards":
                 self.send_json(201, create_board(self.read_json_body()))
+                return
+            if parsed.path == "/api/plugins/kanban/tasks":
+                qs = parse_qs(parsed.query)
+                result = create_task(self.read_json_body(), (qs.get("board") or [None])[0])
+                status = int(result.pop("_status", 201))
+                self.send_json(status, result)
                 return
             match = BOARD_SEGMENT_RE.match(parsed.path)
             if match and match.group(2) == "switch":
@@ -441,6 +954,16 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/plugins/kanban/orchestration":
                 self.send_json(200, orchestration_payload())
+                return
+            if parsed.path == "/api/plugins/kanban/search":
+                self.send_json(200, search_tasks(parse_qs(parsed.query)))
+                return
+            prefix = "/api/plugins/kanban/tasks/"
+            if parsed.path.startswith(prefix):
+                qs = parse_qs(parsed.query)
+                result = task_detail_payload(parsed.path[len(prefix):], (qs.get("board") or [None])[0])
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
                 return
             self.send_json(404, {"detail": "Not found"})
         except subprocess.CalledProcessError as exc:

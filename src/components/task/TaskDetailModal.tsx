@@ -1,9 +1,8 @@
-import type { Task } from '@/lib/types';
+import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskDetail } from './TaskDetail';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import type { TaskStatus, UpdateTaskData } from '@/lib/types';
 
-interface TaskDetailSheetProps {
+interface TaskDetailModalProps {
   task: Task | null;
   allTasks: Task[];
   open: boolean;
@@ -19,7 +18,7 @@ interface TaskDetailSheetProps {
   isMobile?: boolean;
 }
 
-export function TaskDetailSheet({
+export function TaskDetailModal({
   task,
   allTasks,
   open,
@@ -33,17 +32,18 @@ export function TaskDetailSheet({
   onUpdateTask,
   isUpdating = false,
   isMobile = false,
-}: TaskDetailSheetProps) {
+}: TaskDetailModalProps) {
   if (!task) return null;
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent
-        side="right"
-        className="!w-screen !max-w-none gap-0 overflow-hidden border-l border-border bg-background p-0 md:!w-[65vw] md:!max-w-none"
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent
+        data-testid="task-detail-modal"
+        aria-describedby={undefined}
+        showCloseButton={false}
+        className="flex h-[min(86dvh,880px)] max-w-none flex-col gap-0 overflow-hidden border-border/70 bg-background p-0 shadow-2xl sm:max-w-none md:w-[min(92vw,1120px)] md:rounded-2xl md:border md:shadow-[0_24px_90px_rgba(0,0,0,0.55)] max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0"
       >
-        <SheetTitle className="sr-only">Task detail: {task.title}</SheetTitle>
-        <SheetDescription className="sr-only">Read and update task {task.id}</SheetDescription>
+        <DialogTitle className="sr-only">Task detail: {task.title}</DialogTitle>
         <TaskDetail
           task={task}
           allTasks={allTasks}
@@ -57,8 +57,9 @@ export function TaskDetailSheet({
           onDelete={onDelete}
           onUpdateTask={onUpdateTask}
           isUpdating={isUpdating}
+          showCloseButton
         />
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

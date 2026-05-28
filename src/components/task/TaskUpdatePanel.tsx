@@ -1,34 +1,39 @@
 import { useEffect, useState } from 'react';
 import type { Priority, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
-import { PRIORITY_LABELS, STATUS_LABELS } from '@/lib/types';
+import { PRIORITY_LABELS, SELECTABLE_TASK_STATUSES, STATUS_LABELS, isStatusReadOnly } from '@/lib/types';
 
-const STATUS_OPTIONS: TaskStatus[] = ['triage', 'todo', 'scheduled', 'ready', 'blocked', 'done'];
+const STATUS_OPTIONS: TaskStatus[] = SELECTABLE_TASK_STATUSES;
 const PRIORITY_OPTIONS: Priority[] = ['p0', 'p1', 'p2', 'p3'];
+
+function getInitialStatus(status: TaskStatus): TaskStatus {
+  return isStatusReadOnly(status) ? 'ready' : status;
+}
 
 interface TaskUpdatePanelProps {
   task: Task;
   isSaving?: boolean;
   onUpdate: (patch: UpdateTaskData) => Promise<void> | void;
+  showTitleField?: boolean;
 }
 
-export function TaskUpdatePanel({ task, isSaving = false, onUpdate }: TaskUpdatePanelProps) {
+export function TaskUpdatePanel({ task, isSaving = false, onUpdate, showTitleField = true }: TaskUpdatePanelProps) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [assignee, setAssignee] = useState(task.assignee || '');
   const [priority, setPriority] = useState<Priority>(task.priority);
-  const [status, setStatus] = useState<TaskStatus>(task.status === 'running' || task.status === 'review' ? 'ready' : task.status);
+  const [status, setStatus] = useState<TaskStatus>(getInitialStatus(task.status));
 
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.description);
     setAssignee(task.assignee || '');
     setPriority(task.priority);
-    setStatus(task.status === 'running' || task.status === 'review' ? 'ready' : task.status);
+    setStatus(getInitialStatus(task.status));
   }, [task]);
 
   const updateDetails = () => {
     const patch: UpdateTaskData = {};
-    if (title.trim() !== task.title) patch.title = title.trim();
+    if (showTitleField && title.trim() !== task.title) patch.title = title.trim();
     if (description !== task.description) patch.description = description;
     if ((assignee.trim() || null) !== task.assignee) patch.assignee = assignee.trim() || null;
     if (priority !== task.priority) patch.priority = priority;
@@ -39,7 +44,7 @@ export function TaskUpdatePanel({ task, isSaving = false, onUpdate }: TaskUpdate
     if (status !== task.status) onUpdate({ status });
   };
 
-  const detailsChanged = title.trim() !== task.title || description !== task.description || (assignee.trim() || null) !== task.assignee || priority !== task.priority;
+  const detailsChanged = (showTitleField && title.trim() !== task.title) || description !== task.description || (assignee.trim() || null) !== task.assignee || priority !== task.priority;
   const statusDisabledReason = task.status === 'running'
     ? 'Running tasks are claimed by workers; BHK cannot manually set running or move an active claim.'
     : task.status === 'done'
@@ -55,14 +60,16 @@ export function TaskUpdatePanel({ task, isSaving = false, onUpdate }: TaskUpdate
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Title</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-        />
-      </div>
+      {showTitleField && (
+        <div className="space-y-2">
+          <label className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <label className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Body</label>
@@ -98,7 +105,7 @@ export function TaskUpdatePanel({ task, isSaving = false, onUpdate }: TaskUpdate
 
       <button
         onClick={updateDetails}
-        disabled={!detailsChanged || !title.trim() || isSaving}
+        disabled={!detailsChanged || (showTitleField && !title.trim()) || isSaving}
         className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
       >
         Save fields

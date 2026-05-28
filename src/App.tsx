@@ -1,18 +1,50 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
-import type { Task, Board, TaskStatus, UpdateTaskData } from '@/lib/types';
+import type { Task, Board, BotProfile, CreateTaskData, TaskStatus, UpdateTaskData } from '@/lib/types';
+import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
-import { TopBar } from '@/components/layout/TopBar';
+import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
+import { TaskDetailModal } from '@/components/task/TaskDetailModal';
+import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel } from '@/components/settings/BoardsSettingsPanel';
+import { TaskSearchPage } from '@/components/search/TaskSearchPage';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
+function taskPath(taskId: string) {
+  return `/tasks/${encodeURIComponent(taskId)}`;
+}
+
+function boardPath(boardId?: string | null) {
+  return boardId ? `/boards/${encodeURIComponent(boardId)}` : '/';
+}
+
+function mergeTaskUpdate(existing: Task, updated: Task): Task {
+  return {
+    ...existing,
+    ...updated,
+    comments: updated.comments.length > 0 ? updated.comments : existing.comments,
+    commentCount: updated.comments.length > 0 ? updated.commentCount : Math.max(existing.commentCount, updated.commentCount),
+    activity: updated.activity.length > 0 ? updated.activity : existing.activity,
+    runs: updated.runs.length > 0 ? updated.runs : existing.runs,
+    linkedTasks: updated.linkedTasks.length > 0 ? updated.linkedTasks : existing.linkedTasks,
+    linkCount: updated.linkedTasks.length > 0 ? updated.linkCount : Math.max(existing.linkCount, updated.linkCount),
+    diagnostics: updated.diagnostics.length > 0 ? updated.diagnostics : existing.diagnostics,
+    warningCount: updated.diagnostics.length > 0 ? updated.warningCount : Math.max(existing.warningCount, updated.warningCount),
+    latestSummary: updated.latestSummary ?? existing.latestSummary,
+    summaryUpdatedAt: updated.summaryUpdatedAt ?? existing.summaryUpdatedAt,
+  };
+}
+
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
@@ -20,14 +52,36 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isBoardSettingsOpen, setIsBoardSettingsOpen] = useState(false);
+  const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
+    const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
+    return saved === 'modal' || saved === 'page' ? saved : 'drawer';
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [assignees, setAssignees] = useState<BotProfile[]>([]);
   const isMobile = useIsMobile();
+
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const legacyBoardIdFromUrl = searchParams.get('board') || undefined;
+  const boardIdFromPath = useMemo(() => {
+    const match = location.pathname.match(/^\/boards\/([^/]+)\/?$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  }, [location.pathname]);
+  const boardIdFromUrl = boardIdFromPath || legacyBoardIdFromUrl;
+  const routeTaskId = useMemo(() => {
+    const match = location.pathname.match(/^\/tasks\/([^/]+)\/?$/);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  }, [location.pathname]);
+  const isTaskPage = !!routeTaskId;
+  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/';
+  const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
     try {
+      setIsLoading(true);
       const boardsResult = await kanbanApi.getBoards();
       const preferredBoard =
         (preferredBoardId ? boardsResult.boards.find((board) => board.id === preferredBoardId) : null) ||
@@ -40,6 +94,12 @@ function App() {
       setActiveBoard(boardData.board);
       setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
       setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+      try {
+        const assigneeResult = await kanbanApi.getAssignees(preferredBoard?.id);
+        setAssignees(assigneeResult);
+      } catch {
+        setAssignees([]);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load board data';
       setLoadError(message);
@@ -49,28 +109,157 @@ function App() {
     }
   }, []);
 
-  // Load initial data
+  const loadTaskPageData = useCallback(async (taskId: string) => {
+    try {
+      setIsLoading(true);
+      const [boardsResult, directTask] = await Promise.all([
+        kanbanApi.getBoards(),
+        kanbanApi.getTask(taskId),
+      ]);
+      const taskBoardId = directTask?.boardId || boardIdFromUrl;
+      const boardData = await kanbanApi.getBoard(taskBoardId);
+      const mergedTasks = directTask
+        ? boardData.tasks.some((task) => task.id === directTask.id)
+          ? boardData.tasks.map((task) => (task.id === directTask.id ? mergeTaskUpdate(task, directTask) : task))
+          : [directTask, ...boardData.tasks]
+        : boardData.tasks;
+      setTasks(mergedTasks);
+      setBoards(boardsResult.boards);
+      setActiveBoard(boardData.board);
+      setSelectedTaskId(taskId);
+      setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
+      setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+      try {
+        setAssignees(await kanbanApi.getAssignees(taskBoardId));
+      } catch {
+        setAssignees([]);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Task ${taskId} not found`;
+      setLoadError(message);
+      toast.error(message);
+      await loadBoardData(boardIdFromUrl);
+      setSelectedTaskId(taskId);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [boardIdFromUrl, loadBoardData]);
+
+  // Load route data
   useEffect(() => {
-    loadBoardData();
-  }, [loadBoardData]);
+    if (isTaskSearchPage) {
+      loadBoardData(boardIdFromUrl);
+      return;
+    }
+    if (legacyBoardIdFromUrl && !routeTaskId && !boardIdFromPath) {
+      navigate(boardPath(legacyBoardIdFromUrl), { replace: true });
+      return;
+    }
+    if (routeTaskId) {
+      loadTaskPageData(routeTaskId);
+      return;
+    }
+    loadBoardData(boardIdFromUrl);
+  }, [boardIdFromPath, boardIdFromUrl, isTaskSearchPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
+
+  useEffect(() => {
+    window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
+  }, [detailPresentation]);
+
+  useEffect(() => {
+    if (routeTaskId) {
+      setSelectedTaskId(routeTaskId);
+    } else if (detailPresentation === 'page') {
+      setSelectedTaskId(null);
+    }
+  }, [detailPresentation, routeTaskId]);
 
   const selectedTask = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) || null,
     [tasks, selectedTaskId]
   );
 
+  useEffect(() => {
+    if (!selectedTaskId || isTaskPage) return;
+    let cancelled = false;
+    kanbanApi.getTask(selectedTaskId)
+      .then((detailTask) => {
+        if (cancelled || !detailTask) return;
+        setTasks((current) => current.map((task) => (task.id === detailTask.id ? mergeTaskUpdate(task, detailTask) : task)));
+      })
+      .catch(() => {
+        // Board cards can still open from list data; detail hydration is best-effort for overlay tabs.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isTaskPage, selectedTaskId]);
+
+  useEffect(() => {
+    const appSuffix = 'BHK';
+    if (selectedTask) {
+      document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
+      return;
+    }
+    if (isTaskSearchPage) {
+      document.title = `🪽 Task finder — ${appSuffix}`;
+      return;
+    }
+    if (routeTaskId) {
+      document.title = `🪽 ${routeTaskId} — ${appSuffix}`;
+      return;
+    }
+    if (activeBoard) {
+      const board = boards.find((item) => item.id === activeBoard.id) || activeBoard;
+      const count = board.taskCount === 1 ? '1 task' : `${board.taskCount} tasks`;
+      document.title = `🪽 ${board.name || board.id} · ${count} — ${appSuffix}`;
+      return;
+    }
+    document.title = `🪽 ${appSuffix}`;
+  }, [activeBoard, boards, isTaskSearchPage, routeTaskId, selectedTask]);
+
   const handleTaskClick = useCallback((task: Task) => {
+    if (detailPresentation === 'page') {
+      navigate(taskPath(task.id));
+      return;
+    }
     setSelectedTaskId(task.id);
-  }, []);
+  }, [detailPresentation, navigate]);
+
+  const handleOpenSearchTask = useCallback((taskId: string, taskBoardId?: string) => {
+    const params = taskBoardId ? `?board=${encodeURIComponent(taskBoardId)}` : '';
+    navigate(`${taskPath(taskId)}${params}`);
+  }, [navigate]);
+
+  const handleGlobalSearch = useCallback((query?: string) => {
+    const trimmed = (query ?? searchQuery).trim();
+    navigate(`/tasks${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''}`);
+  }, [navigate, searchQuery]);
 
   const handleCloseDetail = useCallback(() => {
+    if (isTaskPage) {
+      navigate(boardPath(activeBoard?.id));
+      return;
+    }
     setSelectedTaskId(null);
-  }, []);
+  }, [activeBoard, isTaskPage, navigate]);
+
+  const handleDetailPresentationChange = useCallback((presentation: TaskDetailPresentation) => {
+    setDetailPresentation(presentation);
+    if (presentation === 'page' && selectedTask) {
+      navigate(taskPath(selectedTask.id));
+      return;
+    }
+    if (isTaskPage && routeTaskId && presentation !== 'page') {
+      navigate(boardPath(activeBoard?.id));
+      setSelectedTaskId(routeTaskId);
+    }
+  }, [activeBoard, isTaskPage, navigate, routeTaskId, selectedTask]);
 
   const updateSelectedTask = useCallback(
     async (patch: UpdateTaskData) => {
       if (!selectedTask || !activeBoard) return;
-      if (patch.status === 'running') {
+      if (patch.status && !isStatusSelectable(patch.status)) {
         toast.error('Running status is dispatcher-owned and cannot be set manually');
         return;
       }
@@ -80,11 +269,12 @@ function App() {
       try {
         setUpdatingTaskId(selectedTask.id);
         const updated = await kanbanApi.updateTask(selectedTask.id, patch, activeBoard.id);
-        setTasks((current) => current.map((task) => (task.id === updated.id ? { ...task, ...updated } : task)));
+        setTasks((current) => current.map((task) => (task.id === updated.id ? mergeTaskUpdate(task, updated) : task)));
         toast.success('Task updated');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update task';
         toast.error(message);
+        throw error;
       } finally {
         setUpdatingTaskId(null);
       }
@@ -116,10 +306,34 @@ function App() {
   }, []);
 
   const handleCreateTask = useCallback(
-    async () => {
-      toast.info('Read-only mode: task creation is disabled in this MVP');
+    async (data: CreateTaskData) => {
+      if (!activeBoard) return;
+      if (!isStatusCreateSelectable(data.status)) {
+        toast.error('Choose a safe starting status: triage, todo, scheduled, ready, or blocked');
+        return;
+      }
+      if (data.workspacePath && !data.workspacePath.startsWith('/')) {
+        toast.error('Workspace path must be absolute');
+        return;
+      }
+      if (!window.confirm(`Create this task on board ${activeBoard.name || activeBoard.id}?`)) {
+        return;
+      }
+      try {
+        setIsCreatingTask(true);
+        const created = await kanbanApi.createTask(data, activeBoard.id);
+        setTasks((current) => [created, ...current]);
+        setIsQuickCaptureOpen(false);
+        toast.success(`Task ${created.id} created`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create task';
+        toast.error(message);
+        throw error;
+      } finally {
+        setIsCreatingTask(false);
+      }
     },
-    []
+    [activeBoard]
   );
 
   const handleAddComment = useCallback(
@@ -138,14 +352,20 @@ function App() {
         setActiveBoard(data.board);
         setDataSource(data.source);
         setLoadError(data.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+        navigate(boardPath(board.id));
         setSelectedTaskId(null);
+        try {
+          setAssignees(await kanbanApi.getAssignees(board.id));
+        } catch {
+          setAssignees([]);
+        }
       } catch {
         toast.error('Failed to switch board');
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [navigate]
   );
 
   if (isLoading) {
@@ -187,8 +407,14 @@ function App() {
         onBoardChange={handleBoardChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onOpenQuickCapture={() => toast.info('Read-only mode: task creation is disabled in this MVP')}
+        onSearchSubmit={handleGlobalSearch}
+        onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
         onOpenSettings={() => setIsBoardSettingsOpen(true)}
+        detailPresentation={activeDetailPresentation}
+        onDetailPresentationChange={handleDetailPresentationChange}
+        isTaskPage={isTaskPage}
+        isTaskSearchPage={isTaskSearchPage}
+        onNavigateToBoard={handleCloseDetail}
       />
 
       {(dataSource === 'fallback' || loadError) && (
@@ -200,55 +426,99 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          <BoardView
-            tasks={tasks}
-            boards={boards}
-            activeBoard={activeBoard}
-            onBoardChange={handleBoardChange}
-            onTaskClick={handleTaskClick}
-            onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
-            onAddTask={() => {
-              toast.info('Read-only mode: task creation is disabled in this MVP');
-            }}
-            searchQuery={searchQuery}
-          />
+          {isTaskSearchPage ? (
+            <TaskSearchPage
+              boards={boards}
+              activeBoard={activeBoard}
+              assignees={assignees}
+              onOpenTask={handleOpenSearchTask}
+            />
+          ) : activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
+            <TaskDetailPage
+              task={selectedTask}
+              taskId={selectedTask?.id || routeTaskId || ''}
+              allTasks={tasks}
+              activeBoard={activeBoard}
+              onBack={handleCloseDetail}
+              onStatusChange={handleStatusChange}
+              onAddComment={handleAddComment}
+              onBlock={handleBlock}
+              onReclaim={handleReclaim}
+              onDecompose={handleDecompose}
+              onDelete={handleDelete}
+              onUpdateTask={updateSelectedTask}
+              isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+              isMobile={isMobile}
+            />
+          ) : (
+            <BoardView
+              tasks={tasks}
+              boards={boards}
+              activeBoard={activeBoard}
+              onBoardChange={handleBoardChange}
+              onTaskClick={handleTaskClick}
+              onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
+              onAddTask={() => setIsQuickCaptureOpen(true)}
+              searchQuery={searchQuery}
+            />
+          )}
         </div>
       </main>
 
       {/* Desktop Footer Bar */}
-      <DesktopFooterBar tasks={tasks} />
+      {!isTaskPage && !isTaskSearchPage && <DesktopFooterBar tasks={tasks} />}
 
       {/* Mobile Bottom Nav */}
-      <MobileBottomNav
-        activeTab="boards"
-        onTabChange={(tab) => {
-          if (tab === 'boards') {
-            handleCloseDetail();
-          } else if (tab === 'more') {
-            setIsBoardSettingsOpen(true);
-          } else {
-            toast.info(`${tab} coming soon`);
-          }
-        }}
-        onOpenQuickCapture={() => toast.info('Read-only mode: task creation is disabled in this MVP')}
-      />
+      {!isTaskPage && !isTaskSearchPage && (
+        <MobileBottomNav
+          activeTab="boards"
+          onTabChange={(tab) => {
+            if (tab === 'boards') {
+              handleCloseDetail();
+            } else if (tab === 'more') {
+              setIsBoardSettingsOpen(true);
+            } else {
+              toast.info(`${tab} coming soon`);
+            }
+          }}
+          onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+        />
+      )}
 
-      {/* Task Detail Drawer: half-screen on desktop, full-screen on mobile */}
-      <TaskDetailSheet
-        task={selectedTask}
-        allTasks={tasks}
-        open={!!selectedTaskId}
-        onClose={handleCloseDetail}
-        onStatusChange={handleStatusChange}
-        onAddComment={handleAddComment}
-        onBlock={handleBlock}
-        onReclaim={handleReclaim}
-        onDecompose={handleDecompose}
-        onDelete={handleDelete}
-        onUpdateTask={updateSelectedTask}
-        isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
-        isMobile={isMobile}
-      />
+      {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
+      {!isTaskPage && !isTaskSearchPage && detailPresentation === 'drawer' ? (
+        <TaskDetailSheet
+          task={selectedTask}
+          allTasks={tasks}
+          open={!!selectedTaskId}
+          onClose={handleCloseDetail}
+          onStatusChange={handleStatusChange}
+          onAddComment={handleAddComment}
+          onBlock={handleBlock}
+          onReclaim={handleReclaim}
+          onDecompose={handleDecompose}
+          onDelete={handleDelete}
+          onUpdateTask={updateSelectedTask}
+          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+          isMobile={isMobile}
+        />
+      ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
+        <TaskDetailModal
+          task={selectedTask}
+          allTasks={tasks}
+          open={!!selectedTaskId}
+          onClose={handleCloseDetail}
+          onStatusChange={handleStatusChange}
+          onAddComment={handleAddComment}
+          onBlock={handleBlock}
+          onReclaim={handleReclaim}
+          onDecompose={handleDecompose}
+          onDelete={handleDelete}
+          onUpdateTask={updateSelectedTask}
+          isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
+          isMobile={isMobile}
+        />
+      ) : null}
 
       {/* Quick Capture */}
       <div className="md:hidden">
@@ -256,6 +526,9 @@ function App() {
           open={isQuickCaptureOpen}
           onClose={() => setIsQuickCaptureOpen(false)}
           onCreate={handleCreateTask}
+          assignees={assignees}
+          isSubmitting={isCreatingTask}
+          boardName={activeBoard.name || activeBoard.id}
           isMobile
         />
       </div>
@@ -264,6 +537,9 @@ function App() {
           open={isQuickCaptureOpen}
           onClose={() => setIsQuickCaptureOpen(false)}
           onCreate={handleCreateTask}
+          assignees={assignees}
+          isSubmitting={isCreatingTask}
+          boardName={activeBoard.name || activeBoard.id}
         />
       </div>
 

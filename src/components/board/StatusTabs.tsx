@@ -1,5 +1,5 @@
 import type { TaskStatus } from '@/lib/types';
-import { STATUS_ORDER, STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
+import { STATUS_ORDER, STATUS_COLORS, STATUS_LABELS, isStatusReadOnly } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Lock } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export function StatusTabs({ activeStatus, onStatusChange, counts }: StatusTabsP
         const count = counts[status] || 0;
         const isActive = activeStatus === status;
         const color = STATUS_COLORS[status];
-        const isRunning = status === 'running';
+        const isReadOnlyStatus = isStatusReadOnly(status);
 
         return (
           <button
@@ -35,7 +35,7 @@ export function StatusTabs({ activeStatus, onStatusChange, counts }: StatusTabsP
                 : {}
             }
           >
-            {isRunning && <Lock size={10} />}
+            {isReadOnlyStatus && <Lock size={10} />}
             {STATUS_LABELS[status]}
             {count > 0 && (
               <span

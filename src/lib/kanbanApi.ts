@@ -11,6 +11,10 @@ import type {
   LinkedTask,
   TaskRun,
   UpdateTaskData,
+  CreateTaskData,
+  TaskSearchParams,
+  TaskSearchResponse,
+  TaskSearchResult,
 } from './types';
 import { mockTasks, boards as mockBoards, BOT_PROFILES } from '@/data/mockTasks';
 
@@ -129,9 +133,20 @@ function normalizeActivity(raw: unknown): TaskActivity[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item, index) => {
     const event = isObject(item) ? item : {};
+    const rawType = asString(event.type ?? event.kind, 'run').replace(/-/g, '_');
+    const type = (
+      rawType === 'status_change' ||
+      rawType === 'assignment' ||
+      rawType === 'comment' ||
+      rawType === 'run' ||
+      rawType === 'block' ||
+      rawType === 'reclaim' ||
+      rawType === 'specify' ||
+      rawType === 'decompose'
+    ) ? rawType : 'run';
     return {
       id: asString(event.id ?? event.event_id, `a-${index}`),
-      type: 'run',
+      type,
       description: asString(event.description ?? event.kind ?? event.message ?? event.payload, 'Activity'),
       createdAt: toIso(event.created_at ?? event.createdAt ?? event.timestamp),
       metadata: isObject(event.payload) ? event.payload : undefined,
@@ -143,12 +158,13 @@ function normalizeRuns(raw: unknown): TaskRun[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item, index) => {
     const run = isObject(item) ? item : {};
-    const status = asString(run.status ?? run.outcome, 'started');
+    const status = asString(run.status ?? run.outcome, 'started').toLowerCase();
+    const ended = run.ended_at ?? run.completedAt;
     return {
       id: asString(run.id ?? run.run_id, `run-${index}`),
-      status: status === 'completed' || status === 'done' ? 'completed' : status === 'failed' || status === 'crashed' ? 'failed' : 'started',
+      status: status === 'completed' || status === 'done' || status === 'succeeded' || (ended && status !== 'failed' && status !== 'crashed' && status !== 'error') ? 'completed' : status === 'failed' || status === 'crashed' || status === 'error' ? 'failed' : 'started',
       startedAt: toIso(run.started_at ?? run.startedAt),
-      completedAt: run.ended_at || run.completedAt ? toIso(run.ended_at ?? run.completedAt) : undefined,
+      completedAt: ended ? toIso(ended) : undefined,
       output: asString(run.summary ?? run.result ?? run.error, ''),
     };
   });
@@ -263,6 +279,35 @@ function normalizeTask(raw: unknown, boardId: string): Task {
   };
 }
 
+function normalizeSearchResult(raw: unknown, index = 0): TaskSearchResult {
+  const item = isObject(raw) ? raw : {};
+  const boardId = asString(item.boardId ?? item.board_id ?? item.board ?? 'current', 'current');
+  const task = item.task ? normalizeTask(item.task, boardId) : undefined;
+  const id = asString(item.id ?? item.task_id ?? item.taskId ?? task?.id, `result-${index}`);
+  return {
+    id,
+    title: asString(item.title ?? task?.title, id),
+    body: asString(item.body ?? item.description ?? task?.description, ''),
+    snippet: asString(item.snippet ?? item.excerpt ?? item.body ?? task?.latestSummary ?? task?.description, ''),
+    matchField: asString(item.matchField ?? item.match_field, 'title') as TaskSearchResult['matchField'],
+    exact: Boolean(item.exact ?? item.isExact),
+    status: normalizeStatus(item.status ?? task?.status),
+    priority: normalizePriority(item.priority ?? task?.priority),
+    assignee: asString(item.assignee ?? task?.assignee, '') || null,
+    boardId,
+    boardName: asString(item.boardName ?? item.board_name ?? item.board_title, boardId),
+    commentCount: asNumber(item.commentCount ?? item.comment_count ?? task?.commentCount, 0),
+    linkCount: asNumber(item.linkCount ?? item.link_count ?? task?.linkCount, 0),
+    warningCount: asNumber(item.warningCount ?? item.warning_count ?? task?.warningCount, 0),
+    latestSummary: asString(item.latestSummary ?? item.latest_summary ?? task?.latestSummary, '') || null,
+    createdAt: toIso(item.createdAt ?? item.created_at ?? task?.createdAt),
+    updatedAt: toIso(item.updatedAt ?? item.updated_at ?? task?.updatedAt),
+    source: asString(item.source, 'live'),
+    indexedAt: toIso(item.indexedAt ?? item.indexed_at),
+    task,
+  };
+}
+
 function flattenTasksFromBoard(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (!isObject(payload)) return [];
@@ -352,10 +397,36 @@ export const kanbanApi = {
     }
   },
 
-  async getTask(taskId: string): Promise<Task | null> {
-    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}`);
+  async getTask(taskId: string, boardId?: string): Promise<Task | null> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query}`);
     const rawTask = isObject(payload) && payload.task ? payload.task : payload;
-    return normalizeTask(rawTask, 'current');
+    return normalizeTask(rawTask, boardId || 'current');
+  },
+
+  async searchTasks(params: TaskSearchParams = {}): Promise<TaskSearchResponse> {
+    const search = new URLSearchParams();
+    if (params.q) search.set('q', params.q);
+    if (params.board) search.set('board', params.board);
+    if (params.status) search.set('status', params.status);
+    if (params.assignee) search.set('assignee', params.assignee);
+    if (params.priority) search.set('priority', params.priority);
+    if (params.hasWarnings !== undefined) search.set('has_warnings', String(params.hasWarnings));
+    if (params.hasLinks !== undefined) search.set('has_links', String(params.hasLinks));
+    if (params.limit !== undefined) search.set('limit', String(params.limit));
+    if (params.cursor) search.set('cursor', params.cursor);
+    if (params.offset !== undefined) search.set('offset', String(params.offset));
+    if (params.sort) search.set('sort', params.sort);
+    const payload = await requestJson<unknown>(`/search${search.toString() ? `?${search.toString()}` : ''}`);
+    const item = isObject(payload) ? payload : {};
+    const rawResults = Array.isArray(item.results) ? item.results : [];
+    return {
+      results: rawResults.map(normalizeSearchResult),
+      total: asNumber(item.total, rawResults.length),
+      nextCursor: asString(item.nextCursor ?? item.next_cursor, '') || null,
+      source: asString(item.source, 'live'),
+      indexedAt: toIso(item.indexedAt ?? item.indexed_at),
+    };
   },
 
   async createBoard(input: { slug: string; name?: string; description?: string; icon?: string; color?: string; defaultWorkdir?: string }): Promise<Board> {
@@ -403,8 +474,24 @@ export const kanbanApi = {
     return normalizeBoard(isObject(response) && response.board ? response.board : response, 0);
   },
 
-  async createTask(): Promise<Task> {
-    throw new KanbanApiError('Read-only mode: task creation is disabled in this MVP');
+  async createTask(data: CreateTaskData, boardId?: string): Promise<Task> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const response = await requestJson<unknown>(`/tasks${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: data.title,
+        body: data.description ?? '',
+        priority: priorityToNative(data.priority),
+        assignee: data.assignee || '',
+        status: data.status,
+        parent_ids: data.parentIds ?? [],
+        workspace_kind: data.workspaceKind ?? 'scratch',
+        workspace_path: data.workspacePath?.trim() || undefined,
+      }),
+    });
+    const rawTask = isObject(response) && response.task ? response.task : response;
+    return normalizeTask(rawTask, boardId || 'current');
   },
 
   async updateTask(taskId: string, data: UpdateTaskData, boardId?: string): Promise<Task> {
@@ -466,9 +553,10 @@ export const kanbanApi = {
     }
   },
 
-  async getAssignees(): Promise<BotProfile[]> {
+  async getAssignees(boardId?: string): Promise<BotProfile[]> {
     try {
-      const payload = await requestJson<unknown>('/assignees');
+      const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+      const payload = await requestJson<unknown>(`/assignees${query}`);
       const rawAssignees = Array.isArray(payload)
         ? payload
         : isObject(payload) && Array.isArray(payload.assignees)

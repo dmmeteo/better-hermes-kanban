@@ -142,6 +142,53 @@ export interface CreateTaskData {
   assignee?: string | null;
   status: TaskStatus;
   parentIds?: string[];
+  workspaceKind?: 'scratch' | 'dir' | 'worktree';
+  workspacePath?: string;
+}
+
+export interface TaskSearchParams {
+  q?: string;
+  board?: string;
+  status?: TaskStatus | string;
+  assignee?: string;
+  priority?: Priority | string;
+  hasWarnings?: boolean;
+  hasLinks?: boolean;
+  limit?: number;
+  cursor?: string;
+  offset?: number;
+  sort?: 'relevance' | 'updated' | 'newest' | 'priority';
+}
+
+export interface TaskSearchResult {
+  id: string;
+  title: string;
+  body: string;
+  snippet: string;
+  matchField: 'id' | 'title' | 'body' | 'summary' | 'comment' | 'metadata';
+  exact: boolean;
+  status: TaskStatus;
+  priority: Priority;
+  assignee: string | null;
+  boardId: string;
+  boardName: string;
+  commentCount: number;
+  linkCount: number;
+  warningCount: number;
+  latestSummary: string | null;
+  createdAt: string;
+  updatedAt: string;
+  source: string;
+  indexedAt: string;
+  task?: Task;
+}
+
+export interface TaskSearchResponse {
+  results: TaskSearchResult[];
+  total: number;
+  nextCursor: string | null;
+  source: string;
+  indexedAt: string;
 }
 
 export const STATUS_ORDER: TaskStatus[] = [
@@ -176,6 +223,55 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   review: '#F59E0B',
   done: '#22C55E',
 };
+
+export const STATUS_DESCRIPTIONS: Record<TaskStatus, string> = {
+  triage: 'Needs grooming before execution.',
+  todo: 'Concrete work that is not ready to dispatch yet.',
+  scheduled: 'Parked for later; hidden from near-term execution.',
+  ready: 'All prerequisites are met and the dispatcher can claim it.',
+  running: 'Dispatcher-owned active worker claim; visible but read-only.',
+  blocked: 'Needs human input or an external unblock before continuing.',
+  review: 'Implementation is waiting for review before it can be marked done.',
+  done: 'Terminal completed work.',
+};
+
+export type StatusRule = {
+  selectable: boolean;
+  createSelectable: boolean;
+  dropEnabled: boolean;
+  readOnly: boolean;
+};
+
+export const STATUS_RULES: Record<TaskStatus, StatusRule> = {
+  triage: { selectable: true, createSelectable: true, dropEnabled: true, readOnly: false },
+  todo: { selectable: true, createSelectable: true, dropEnabled: true, readOnly: false },
+  scheduled: { selectable: true, createSelectable: true, dropEnabled: true, readOnly: false },
+  ready: { selectable: true, createSelectable: true, dropEnabled: true, readOnly: false },
+  running: { selectable: false, createSelectable: false, dropEnabled: false, readOnly: true },
+  blocked: { selectable: true, createSelectable: true, dropEnabled: true, readOnly: false },
+  review: { selectable: true, createSelectable: false, dropEnabled: true, readOnly: false },
+  done: { selectable: true, createSelectable: false, dropEnabled: true, readOnly: false },
+};
+
+export const SELECTABLE_TASK_STATUSES = STATUS_ORDER.filter((status) => STATUS_RULES[status].selectable);
+export const CREATE_TASK_STATUSES = STATUS_ORDER.filter((status) => STATUS_RULES[status].createSelectable);
+export const DROPPABLE_TASK_STATUSES = STATUS_ORDER.filter((status) => STATUS_RULES[status].dropEnabled);
+
+export function isStatusSelectable(status: TaskStatus): boolean {
+  return STATUS_RULES[status].selectable;
+}
+
+export function isStatusCreateSelectable(status: TaskStatus): boolean {
+  return STATUS_RULES[status].createSelectable;
+}
+
+export function isStatusDropEnabled(status: TaskStatus): boolean {
+  return STATUS_RULES[status].dropEnabled;
+}
+
+export function isStatusReadOnly(status: TaskStatus): boolean {
+  return STATUS_RULES[status].readOnly;
+}
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
   p0: 'P0 - Critical',

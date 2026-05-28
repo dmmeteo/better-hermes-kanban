@@ -1,6 +1,6 @@
 import { MessageSquare, Link2, AlertTriangle, Lock, GripVertical } from 'lucide-react';
 import type { Task } from '@/lib/types';
-import { STATUS_COLORS } from '@/lib/types';
+import { STATUS_COLORS, isStatusReadOnly } from '@/lib/types';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
   } = useSortable({
     id: task.id,
     data: { task },
-    disabled: task.status === 'running',
+    disabled: isStatusReadOnly(task.status),
   });
 
   const style = {
@@ -34,7 +34,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
   };
 
   const statusColor = STATUS_COLORS[task.status];
-  const isRunning = task.status === 'running';
+  const isReadOnlyStatus = isStatusReadOnly(task.status);
 
   return (
     <div
@@ -52,7 +52,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
         'hover:border-border hover:-translate-y-0.5 hover:shadow-lg',
         isDragging && 'opacity-40',
         isOverlay && 'opacity-85 rotate-[2deg] shadow-2xl cursor-grabbing',
-        isRunning && 'running-card cursor-default',
+        isReadOnlyStatus && 'running-card cursor-default',
         'task-slide-in'
       )}
     >
@@ -66,7 +66,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
       <div className="flex items-center justify-between pl-1">
         <div className="flex items-center gap-2">
           <PriorityBadge priority={task.priority} />
-          {isRunning && (
+          {isReadOnlyStatus && (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-sky-400">
               <Lock size={10} />
               running
@@ -74,6 +74,12 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
           )}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
+          <span
+            className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/35 select-text"
+            title={`Task ID: ${task.id}`}
+          >
+            {task.id}
+          </span>
           {task.commentCount > 0 && (
             <span className="inline-flex items-center gap-1 text-[11px]">
               <MessageSquare size={12} />

@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Lock } from 'lucide-react';
 import type { Task, TaskStatus } from '@/lib/types';
-import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types';
+import { STATUS_COLORS, STATUS_LABELS, isStatusDropEnabled, isStatusReadOnly } from '@/lib/types';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/utils';
 
@@ -15,10 +15,11 @@ interface KanbanColumnProps {
 }
 
 export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false }: KanbanColumnProps) {
-  const isRunning = status === 'running';
+  const isReadOnlyStatus = isStatusReadOnly(status);
+  const isDropDisabled = !isStatusDropEnabled(status);
   const { setNodeRef, isOver } = useDroppable({
     id: status,
-    disabled: isRunning || readOnly,
+    disabled: isDropDisabled || readOnly,
     data: { status },
   });
 
@@ -31,11 +32,11 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         'flex-shrink-0 w-[300px] h-full min-h-0 flex flex-col rounded-xl border',
         'bg-card/50 backdrop-blur-sm',
         'transition-colors duration-200',
-        isOver && !isRunning && 'border-dashed',
-        isOver && isRunning && 'border-red-500/50',
+        isOver && !isDropDisabled && 'border-dashed',
+        isOver && isDropDisabled && 'border-red-500/50',
         !isOver && 'border-border/50'
       )}
-      style={isOver && !isRunning ? { borderColor: `${color}60` } : {}}
+      style={isOver && !isDropDisabled ? { borderColor: `${color}60` } : {}}
     >
       {/* Column Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
@@ -53,14 +54,14 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
           <span className="text-[11px] text-muted-foreground font-medium">
             {tasks.length}
           </span>
-          {(isRunning || readOnly) && (
+          {(isReadOnlyStatus || readOnly) && (
             <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
               <Lock size={10} />
               read-only
             </span>
           )}
         </div>
-        {!isRunning && !readOnly && (
+        {!isReadOnlyStatus && !readOnly && (
           <button
             onClick={() => onAddTask?.(status)}
             className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
@@ -75,11 +76,11 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         ref={setNodeRef}
         className={cn(
           'flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2',
-          isRunning && 'relative'
+          isDropDisabled && 'relative'
         )}
       >
-        {/* Running overlay */}
-        {isRunning && (
+        {/* Dispatcher-owned status overlay */}
+        {isDropDisabled && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-xl bg-red-500/5 pointer-events-none">
             <Lock size={20} className="text-red-400/60 mb-1" />
             <span className="text-[11px] text-red-400/60 font-medium">Drop disabled</span>
@@ -103,7 +104,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         </SortableContext>
 
         {/* Empty state */}
-        {tasks.length === 0 && !isRunning && !readOnly && (
+        {tasks.length === 0 && !isReadOnlyStatus && !readOnly && (
           <button
             onClick={() => onAddTask?.(status)}
             className="w-full py-6 rounded-lg border border-dashed border-border/50 text-muted-foreground text-xs hover:border-border hover:bg-accent/50 transition-colors"

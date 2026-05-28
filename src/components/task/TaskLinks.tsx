@@ -53,13 +53,19 @@ export function TaskLinks({ linkedTasks }: TaskLinksProps) {
 }
 
 function LinkItem({ link }: { link: LinkedTask }) {
+  const href = `/tasks/${encodeURIComponent(link.taskId)}`;
+
   return (
-    <div className="flex items-center justify-between p-2 rounded-md bg-card border border-border/50 hover:bg-accent/50 transition-colors">
+    <a
+      href={href}
+      className="flex items-center justify-between p-2 rounded-md bg-card border border-border/50 hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`Open linked task ${link.taskId}`}
+    >
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-[10px] text-muted-foreground font-mono shrink-0">{link.taskId}</span>
         <span className="text-xs truncate">{link.title}</span>
       </div>
       <StatusBadge status={link.status} size="sm" />
-    </div>
+    </a>
   );
 }

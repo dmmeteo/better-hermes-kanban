@@ -1,4 +1,4 @@
-import { LayoutGrid, ClipboardList, Plus, Search, MoreHorizontal } from 'lucide-react';
+import { LayoutGrid, Plus, Search, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MobileBottomNavProps {
@@ -9,7 +9,6 @@ interface MobileBottomNavProps {
 
 const navItems = [
   { id: 'boards', label: 'Boards', icon: LayoutGrid },
-  { id: 'mytasks', label: 'My tasks', icon: ClipboardList },
   { id: 'search', label: 'Search', icon: Search },
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
