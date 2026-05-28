@@ -492,7 +492,7 @@ function App() {
         />
 
       {!isTaskPage && (
-        <div className="shrink-0 border-b border-border/50 bg-card/80 px-4 py-2 md:hidden">
+        <div className="relative z-40 shrink-0 border-b border-border/50 bg-card/80 px-4 py-2 md:hidden">
           <DataViewSearchAndFilter
             query={searchQuery}
             filters={searchFilters}

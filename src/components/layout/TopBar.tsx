@@ -59,7 +59,7 @@ export function TopBar({
   logoHomeHref,
 }: TopBarProps) {
   return (
-    <header className="shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
+    <header className="relative z-50 shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
       {/* Mobile header */}
       <div className="md:hidden flex items-center gap-2 h-12 px-4">
         <Link

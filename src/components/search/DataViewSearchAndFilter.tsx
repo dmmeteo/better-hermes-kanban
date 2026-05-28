@@ -181,7 +181,7 @@ export function DataViewSearchAndFilter({
   const panelId = `${testId}-panel`;
 
   return (
-    <div ref={rootRef} className={cn('relative min-w-0', className)} data-testid={testId}>
+    <div ref={rootRef} className={cn('relative min-w-0', isOpen && 'z-[100]', className)} data-testid={testId}>
       <div
         className={cn(
           'group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-secondary/95 px-2 text-xs shadow-[0_12px_36px_rgba(0,0,0,0.18)] transition-colors focus-within:border-[#7C5CFF]/70 focus-within:ring-2 focus-within:ring-[#7C5CFF]/20',
@@ -239,7 +239,11 @@ export function DataViewSearchAndFilter({
       </div>
 
       {isOpen && (
-        <div id={panelId} className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border/80 bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur" data-testid={`${testId}-picker`}>
+        <div
+          id={panelId}
+          className="pointer-events-auto absolute left-0 right-0 top-full z-[100] mt-2 isolate overflow-hidden rounded-2xl border border-border/80 bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur"
+          data-testid={`${testId}-picker`}
+        >
           {!activeField ? (
             <div className="p-2" data-testid={`${testId}-field-picker`}>
               <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Choose filter field</div>
