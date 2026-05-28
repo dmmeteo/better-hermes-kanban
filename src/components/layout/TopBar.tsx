@@ -1,4 +1,4 @@
-import { Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import type { Board, BotProfile } from '@/lib/types';
@@ -34,7 +34,6 @@ interface TopBarProps {
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
   isTaskPage?: boolean;
   isTaskSearchPage?: boolean;
-  onNavigateToBoard?: () => void;
   logoHomeHref: string;
 }
 
@@ -55,7 +54,6 @@ export function TopBar({
   onDetailPresentationChange,
   isTaskPage = false,
   isTaskSearchPage = false,
-  onNavigateToBoard,
   logoHomeHref,
 }: TopBarProps) {
   return (
@@ -149,44 +147,32 @@ export function TopBar({
         />
 
         <div className="flex shrink-0 items-center gap-3">
-          {isTaskPage ? (
-            <button
-              className="flex max-w-[260px] items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
-              onClick={onNavigateToBoard}
-              data-testid="task-page-board-link"
-            >
-              <ArrowLeft size={14} className="text-muted-foreground" />
-              <span className="text-muted-foreground">Board</span>
-              <span className="truncate">{activeBoard.name}</span>
-            </button>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent" data-testid="board-selector-trigger">
-                  <span className="text-muted-foreground">Board</span>
-                  <span className="truncate">{activeBoard.name}</span>
-                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                {boards.map((board) => (
-                  <DropdownMenuItem
-                    key={board.id}
-                    onClick={() => onBoardChange(board)}
-                    className={cn(board.id === activeBoard.id && 'bg-accent')}
-                  >
-                    <span className="flex-1 truncate">{board.name}</span>
-                    <span className="text-muted-foreground text-xs">{board.taskCount}</span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onOpenNewBoard} data-testid="board-dropdown-new-board">
-                  <Plus size={14} className="mr-2" />
-                  New board
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent" data-testid="board-selector-trigger">
+                <span className="text-muted-foreground">Board</span>
+                <span className="truncate">{activeBoard.name}</span>
+                <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              {boards.map((board) => (
+                <DropdownMenuItem
+                  key={board.id}
+                  onClick={() => onBoardChange(board)}
+                  className={cn(board.id === activeBoard.id && 'bg-accent')}
+                >
+                  <span className="flex-1 truncate">{board.name}</span>
+                  <span className="text-muted-foreground text-xs">{board.taskCount}</span>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onOpenNewBoard} data-testid="board-dropdown-new-board">
+                <Plus size={14} className="mr-2" />
+                New board
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {!isTaskPage && (
             <DropdownMenu>

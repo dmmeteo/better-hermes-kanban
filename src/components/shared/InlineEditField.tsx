@@ -50,8 +50,15 @@ export function InlineEditField({
 
   useEffect(() => {
     if (editing && inputRef.current) {
-      inputRef.current.focus();
-      if ('select' in inputRef.current) inputRef.current.select();
+      const el = inputRef.current;
+      el.focus();
+      // Place caret at end instead of selecting the whole content.
+      const len = el.value.length;
+      try {
+        el.setSelectionRange(len, len);
+      } catch {
+        // Some input types do not support setSelectionRange; ignore.
+      }
     }
   }, [editing]);
 
@@ -150,12 +157,12 @@ export function InlineEditField({
   };
 
   return (
-    <div className={cn('flex w-full flex-col gap-2', className)}>
+    <div className={cn('flex w-full flex-col gap-1.5', className)}>
       {as === 'textarea' ? (
         <Textarea
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          rows={textareaRows}
-          className={cn('w-full', inputClassName)}
+          rows={textareaRows ?? 1}
+          className={cn('w-full resize-none', inputClassName)}
           {...sharedFieldProps}
         />
       ) : (
@@ -166,25 +173,31 @@ export function InlineEditField({
         />
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-1">
         <Button
           type="button"
           variant="ghost"
-          size="sm"
+          size="icon"
+          className="h-7 w-7"
           onClick={cancel}
           disabled={saving}
+          aria-label="Cancel"
+          title="Cancel (Esc)"
           data-testid={dataTestId ? `${dataTestId}-cancel` : undefined}
         >
-          <X size={14} /> Cancel
+          <X size={14} />
         </Button>
         <Button
           type="button"
-          size="sm"
+          size="icon"
+          className="h-7 w-7"
           onClick={() => void commit()}
           disabled={saving}
+          aria-label={saving ? 'Saving' : 'Save'}
+          title="Save (⌘+Enter)"
           data-testid={dataTestId ? `${dataTestId}-save` : undefined}
         >
-          <Check size={14} /> {saving ? 'Saving…' : 'Save'}
+          <Check size={14} />
         </Button>
       </div>
     </div>

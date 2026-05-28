@@ -558,7 +558,6 @@ function App() {
           onDetailPresentationChange={handleDetailPresentationChange}
           isTaskPage={isTaskPage}
           isTaskSearchPage={isTaskSearchPage}
-          onNavigateToBoard={handleCloseDetail}
           logoHomeHref={boardPath(activeBoard.id)}
         />
 
