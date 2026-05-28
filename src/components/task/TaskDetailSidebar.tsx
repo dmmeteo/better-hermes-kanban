@@ -18,6 +18,7 @@ interface TaskDetailSidebarProps {
   assignees: BotProfile[];
   onUpdate: (patch: UpdateTaskData) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
+  subscribedChannels?: { telegram: boolean; discord: boolean };
   className?: string;
 }
 
@@ -34,8 +35,10 @@ export function TaskDetailSidebar({
   assignees,
   onUpdate,
   onNotify,
+  subscribedChannels,
   className,
 }: TaskDetailSidebarProps) {
+  const subscribed = subscribedChannels ?? { telegram: false, discord: false };
   const [eventsOpen, setEventsOpen] = useState(false);
 
   const assigneeOptions: InlineSelectOption<string | null>[] = useMemo(() => {
@@ -78,9 +81,10 @@ export function TaskDetailSidebar({
     await onUpdate({ priority: next });
   };
   const handleNotify = async (channel: 'telegram' | 'discord') => {
+    const isSubscribed = subscribed[channel];
     await toast.promise(onNotify(channel), {
-      loading: `Sending ${channel} notification…`,
-      success: `Notified ${channel}`,
+      loading: isSubscribed ? `Re-sending ${channel}…` : `Subscribing to ${channel}…`,
+      success: isSubscribed ? `Re-sent ${channel}` : `Subscribed to ${channel}`,
       error: `Failed to notify ${channel}`,
     });
   };
@@ -169,8 +173,9 @@ export function TaskDetailSidebar({
         <div className="flex flex-wrap gap-2 px-1 py-0.5">
           <Button
             type="button"
-            variant="outline"
+            variant={subscribed.telegram ? 'default' : 'outline'}
             size="sm"
+            aria-pressed={subscribed.telegram}
             onClick={() => void handleNotify('telegram')}
             data-testid="task-notify-telegram"
           >
@@ -178,8 +183,9 @@ export function TaskDetailSidebar({
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant={subscribed.discord ? 'default' : 'outline'}
             size="sm"
+            aria-pressed={subscribed.discord}
             onClick={() => void handleNotify('discord')}
             data-testid="task-notify-discord"
           >

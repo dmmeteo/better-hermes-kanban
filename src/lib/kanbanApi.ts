@@ -500,16 +500,11 @@ export const kanbanApi = {
     return normalizeTask(rawTask, boardId || 'current');
   },
 
-  // TODO(unlink-api): backend currently returns 404 for every variant tried
-  // (DELETE /tasks/{id}/links/{linkId}, DELETE /links/{linkId}, PATCH parents=[],
-  // POST .../actions {action:'unlink'}, etc.). Wired the front-end at the most
-  // RESTful guess; surface graceful errors until backend ships the route.
-  async unlinkTask(taskId: string, linkId: string, boardId?: string): Promise<{ ok: boolean; message?: string }> {
-    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+  async unlinkTask(parentId: string, childId: string, boardId?: string): Promise<{ ok: boolean; message?: string }> {
+    const params = new URLSearchParams({ parent_id: parentId, child_id: childId });
+    if (boardId) params.set('board', boardId);
     try {
-      await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/links/${encodeURIComponent(linkId)}${query}`, {
-        method: 'DELETE',
-      });
+      await requestJson<unknown>(`/links?${params.toString()}`, { method: 'DELETE' });
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to unlink';
@@ -590,21 +585,35 @@ export const kanbanApi = {
     return [updated];
   },
 
-  // TODO(notify-api): підтвердити точний контракт ендпойнту з Hermes-репо.
-  // Поки що б'ємо в /api/plugins/kanban/tasks/{id}/notify з { channel }.
   async notifyTask(taskId: string, channel: 'telegram' | 'discord', boardId?: string): Promise<{ ok: boolean; message?: string }> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     try {
-      const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/notify${query}`, {
+      await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/home-subscribe/${encodeURIComponent(channel)}${query}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel }),
+        headers: { 'Content-Length': '0' },
       });
-      const message = isObject(response) ? asString(response.message ?? response.detail, '') : '';
-      return { ok: true, message: message || undefined };
+      return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Notify failed';
       return { ok: false, message };
+    }
+  },
+
+  async getHomeChannels(taskId: string, boardId?: string): Promise<{ telegram: boolean; discord: boolean }> {
+    const params = new URLSearchParams({ task_id: taskId });
+    if (boardId) params.set('board', boardId);
+    try {
+      const raw = await requestJson<unknown>(`/home-channels?${params.toString()}`);
+      if (isObject(raw) && Array.isArray(raw.channels)) {
+        const set = new Set(raw.channels.map((c) => String(c).toLowerCase()));
+        return { telegram: set.has('telegram'), discord: set.has('discord') };
+      }
+      if (isObject(raw)) {
+        return { telegram: Boolean(raw.telegram), discord: Boolean(raw.discord) };
+      }
+      return { telegram: false, discord: false };
+    } catch {
+      return { telegram: false, discord: false };
     }
   },
 

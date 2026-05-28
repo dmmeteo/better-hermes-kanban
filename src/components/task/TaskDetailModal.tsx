@@ -18,6 +18,7 @@ interface TaskDetailModalProps {
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
+  subscribedChannels?: { telegram: boolean; discord: boolean };
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
   isMobile?: boolean;
@@ -35,6 +36,7 @@ export function TaskDetailModal({
   onLinkTask,
   onUnlinkTask,
   onNotify,
+  subscribedChannels,
   onSpecify,
   onDecompose,
   isMobile = false,
@@ -92,6 +94,7 @@ export function TaskDetailModal({
               assignees={assignees}
               onUpdate={onUpdateTask}
               onNotify={onNotify}
+              subscribedChannels={subscribedChannels}
             />
           </div>
           <div className="min-w-0 lg:col-start-1 lg:row-start-2">

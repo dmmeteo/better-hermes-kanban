@@ -83,6 +83,7 @@ function App() {
   const [, setUpdatingTaskId] = useState<string | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [assignees, setAssignees] = useState<BotProfile[]>([]);
+  const [homeChannels, setHomeChannels] = useState<{ telegram: boolean; discord: boolean }>({ telegram: false, discord: false });
   const isMobile = useIsMobile();
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -235,6 +236,20 @@ function App() {
   }, [isTaskPage, selectedTaskId]);
 
   useEffect(() => {
+    if (!selectedTaskId || !activeBoard) {
+      setHomeChannels({ telegram: false, discord: false });
+      return;
+    }
+    let cancelled = false;
+    kanbanApi.getHomeChannels(selectedTaskId, activeBoard.id).then((state) => {
+      if (!cancelled) setHomeChannels(state);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTaskId, activeBoard]);
+
+  useEffect(() => {
     const appSuffix = 'BHK';
     if (selectedTask) {
       document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
@@ -370,6 +385,8 @@ function App() {
       if (!result.ok) {
         throw new Error(result.message || `Failed to notify ${channel}`);
       }
+      const next = await kanbanApi.getHomeChannels(selectedTask.id, activeBoard.id);
+      setHomeChannels(next);
     },
     [activeBoard, selectedTask],
   );
@@ -467,9 +484,11 @@ function App() {
   const handleUnlinkTask = useCallback(
     async (link: LinkedTask) => {
       if (!selectedTask || !activeBoard) return;
-      const result = await kanbanApi.unlinkTask(selectedTask.id, link.id, activeBoard.id);
+      const parentId = link.relation === 'parent' ? link.taskId : selectedTask.id;
+      const childId = link.relation === 'parent' ? selectedTask.id : link.taskId;
+      const result = await kanbanApi.unlinkTask(parentId, childId, activeBoard.id);
       if (!result.ok) {
-        throw new Error(result.message || 'Backend does not support unlink yet');
+        throw new Error(result.message || 'Failed to unlink');
       }
       await refetchActiveBoard(activeBoard);
     },
@@ -621,6 +640,7 @@ function App() {
               onLinkTask={handleLinkTask}
               onUnlinkTask={handleUnlinkTask}
               onNotify={handleNotify}
+              subscribedChannels={homeChannels}
               onSpecify={handleSpecify}
               onDecompose={handleDecompose}
             />
@@ -659,6 +679,7 @@ function App() {
           onLinkTask={handleLinkTask}
           onUnlinkTask={handleUnlinkTask}
           onNotify={handleNotify}
+          subscribedChannels={homeChannels}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}
           isMobile={isMobile}
@@ -676,6 +697,7 @@ function App() {
           onLinkTask={handleLinkTask}
           onUnlinkTask={handleUnlinkTask}
           onNotify={handleNotify}
+          subscribedChannels={homeChannels}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}
           isMobile={isMobile}

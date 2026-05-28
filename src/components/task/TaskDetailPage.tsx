@@ -17,6 +17,7 @@ interface TaskDetailPageProps {
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
+  subscribedChannels?: { telegram: boolean; discord: boolean };
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
 }
@@ -33,6 +34,7 @@ export function TaskDetailPage({
   onLinkTask,
   onUnlinkTask,
   onNotify,
+  subscribedChannels,
   onSpecify,
   onDecompose,
 }: TaskDetailPageProps) {
@@ -94,6 +96,7 @@ export function TaskDetailPage({
               assignees={assignees}
               onUpdate={onUpdateTask}
               onNotify={onNotify}
+              subscribedChannels={subscribedChannels}
             />
           </div>
 
