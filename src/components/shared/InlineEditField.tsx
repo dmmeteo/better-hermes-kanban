@@ -62,6 +62,15 @@ export function InlineEditField({
     }
   }, [editing]);
 
+  // Auto-grow textareas to fit content so there is no inner scrollbar.
+  useEffect(() => {
+    if (!editing || as !== 'textarea') return;
+    const el = inputRef.current;
+    if (!(el instanceof HTMLTextAreaElement)) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [editing, as, draft]);
+
   const beginEdit = () => {
     if (disabled || saving) return;
     setDraft(value);
@@ -157,12 +166,12 @@ export function InlineEditField({
   };
 
   return (
-    <div className={cn('flex w-full flex-col gap-1.5', className)}>
+    <div className={cn('flex w-full flex-col gap-2', className)}>
       {as === 'textarea' ? (
         <Textarea
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           rows={textareaRows ?? 1}
-          className={cn('w-full resize-none', inputClassName)}
+          className={cn('w-full resize-none overflow-hidden', inputClassName)}
           {...sharedFieldProps}
         />
       ) : (
@@ -173,31 +182,29 @@ export function InlineEditField({
         />
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex items-center justify-end gap-1">
+      <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-7 w-7"
+          size="sm"
+          className="h-8 gap-1.5"
           onClick={cancel}
           disabled={saving}
-          aria-label="Cancel"
           title="Cancel (Esc)"
           data-testid={dataTestId ? `${dataTestId}-cancel` : undefined}
         >
-          <X size={14} />
+          <X size={14} /> Cancel
         </Button>
         <Button
           type="button"
-          size="icon"
-          className="h-7 w-7"
+          size="sm"
+          className="h-8 gap-1.5"
           onClick={() => void commit()}
           disabled={saving}
-          aria-label={saving ? 'Saving' : 'Save'}
           title="Save (⌘+Enter)"
           data-testid={dataTestId ? `${dataTestId}-save` : undefined}
         >
-          <Check size={14} />
+          <Check size={14} /> {saving ? 'Saving…' : 'Save'}
         </Button>
       </div>
     </div>
