@@ -10,8 +10,10 @@ export default defineConfig(({ mode }) => {
   const pass = env.HERMES_BASIC_PASS || ''
   const sessionCookie = env.HERMES_SESSION_COOKIE || ''
   const sessionToken = env.HERMES_SESSION_TOKEN || ''
-  const useSessionAuth = sessionCookie && sessionToken
-  const basicAuth = !useSessionAuth && user && pass
+  const useSessionAuth = Boolean(sessionCookie && sessionToken)
+  // her.dmmeteo.dev needs Basic AND cookie/token together; the dashboard's
+  // front gate is Basic, the application-level auth is the session pair.
+  const basicAuth = user && pass
     ? 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64')
     : ''
 
@@ -27,13 +29,14 @@ export default defineConfig(({ mode }) => {
           secure: true,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
+              if (basicAuth) {
+                proxyReq.setHeader('Authorization', basicAuth)
+              }
               if (useSessionAuth) {
                 proxyReq.setHeader('Cookie', `hermes_session=${sessionCookie}`)
                 proxyReq.setHeader('x-hermes-session-token', sessionToken)
                 proxyReq.setHeader('Origin', target)
                 proxyReq.setHeader('Referer', `${target}/kanban`)
-              } else if (basicAuth) {
-                proxyReq.setHeader('Authorization', basicAuth)
               }
             })
           },

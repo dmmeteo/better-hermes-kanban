@@ -604,14 +604,23 @@ export const kanbanApi = {
     if (boardId) params.set('board', boardId);
     try {
       const raw = await requestJson<unknown>(`/home-channels?${params.toString()}`);
-      if (isObject(raw) && Array.isArray(raw.channels)) {
+      const state = { telegram: false, discord: false };
+      if (isObject(raw) && Array.isArray(raw.home_channels)) {
+        for (const entry of raw.home_channels) {
+          if (!isObject(entry)) continue;
+          const platform = asString(entry.platform).toLowerCase();
+          if (platform !== 'telegram' && platform !== 'discord') continue;
+          state[platform] = Boolean(entry.subscribed);
+        }
+      } else if (isObject(raw) && Array.isArray(raw.channels)) {
         const set = new Set(raw.channels.map((c) => String(c).toLowerCase()));
-        return { telegram: set.has('telegram'), discord: set.has('discord') };
+        state.telegram = set.has('telegram');
+        state.discord = set.has('discord');
+      } else if (isObject(raw)) {
+        state.telegram = Boolean(raw.telegram);
+        state.discord = Boolean(raw.discord);
       }
-      if (isObject(raw)) {
-        return { telegram: Boolean(raw.telegram), discord: Boolean(raw.discord) };
-      }
-      return { telegram: false, discord: false };
+      return state;
     } catch {
       return { telegram: false, discord: false };
     }
