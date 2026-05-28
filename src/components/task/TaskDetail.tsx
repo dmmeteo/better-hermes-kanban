@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ChevronLeft, ChevronRight, Clock, Link2, MessageSquare, Paperclip } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, Clock, Link2, Paperclip } from 'lucide-react';
 import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { WarningBanner } from '@/components/shared/WarningBanner';
 import { TaskActions } from './TaskActions';
@@ -13,6 +13,7 @@ import {
   TaskCommentsPanel,
   TaskDescriptionMarkdown,
   TaskDetailHeader,
+  TaskEventsPanel,
   TaskMetaPanel,
   TaskRunHistoryPanel,
   TaskWorkerLogsPanel,
@@ -60,9 +61,9 @@ export function TaskDetail({
   showInlineActions = true,
   showDescription = true,
 }: TaskDetailProps) {
-  const [activeTab, setActiveTab] = useState('');
+  const [activeTab, setActiveTab] = useState('comments');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    comments: false,
+    comments: true,
     activity: false,
     runs: false,
     links: false,
@@ -82,9 +83,9 @@ export function TaskDetail({
 
   const mobileSections = [
     { key: 'links', label: 'Linked tasks', icon: Link2, count: task.linkedTasks.length },
-    { key: 'comments', label: 'Comments', icon: MessageSquare, count: task.commentCount },
     { key: 'logs', label: 'Worker log', icon: Activity, count: task.diagnostics.length + task.warningCount },
     { key: 'runs', label: 'Run history', icon: Clock, count: task.runs.length },
+    { key: 'activity', label: 'Current activity', icon: Activity, count: task.activity.length },
     { key: 'attachments', label: 'Attachments (planned)', icon: Paperclip, count: task.plannedAttachments.length },
   ];
   const visibleMobileSections = mobileSections.filter((section) => {
@@ -153,7 +154,8 @@ export function TaskDetail({
                 <WarningBanner message={`Ready disabled: ${unfinishedParents.length} parent task${unfinishedParents.length > 1 ? 's' : ''} not done`} />
               )}
 
-              <div className="space-y-1">
+              <div className="space-y-1" data-testid="task-mobile-sections">
+                <TaskCommentsPanel task={task} onAddComment={onAddComment} />
                 {visibleMobileSections.map((section) => (
                   <div key={section.key}>
                     <button onClick={() => toggleSection(section.key)} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/50">
@@ -172,6 +174,7 @@ export function TaskDetail({
                         {section.key === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
                         {section.key === 'logs' && <TaskWorkerLogsPanel task={task} />}
                         {section.key === 'runs' && <TaskRunHistoryPanel task={task} />}
+                        {section.key === 'activity' && <TaskEventsPanel task={task} />}
                         {section.key === 'attachments' && <TaskAttachmentsPlanned attachments={task.plannedAttachments} />}
                       </div>
                     )}

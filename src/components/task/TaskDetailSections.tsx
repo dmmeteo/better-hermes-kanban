@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, ExternalLink, MoreHorizontal, RefreshCcw, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, ExternalLink, MoreHorizontal, RefreshCcw, X } from 'lucide-react';
 import type { Board, Task } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { BotAvatar } from '@/components/shared/BotAvatar';
@@ -34,22 +34,46 @@ export function TaskBreadcrumbs({
   idTestId = 'task-detail-id-link',
 }: TaskBreadcrumbsProps) {
   const taskHref = `/tasks/${encodeURIComponent(task.id)}`;
+  const parentTask = task.linkedTasks.find((linkedTask) => linkedTask.relation === 'parent');
+  const boardLabel = activeBoard?.name || activeBoard?.id || backLabel;
+  const boardHref = activeBoard ? `/?board=${encodeURIComponent(activeBoard.id)}` : '/';
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground', className)}>
+    <nav className={cn('flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground', className)} aria-label="Task breadcrumbs">
       {onBack && (
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="-ml-2 h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
           onClick={onBack}
           data-testid="task-page-back"
         >
           <ArrowLeft size={14} />
-          {backLabel}
+          Back
         </Button>
       )}
-      {onBack && <span className="text-border">/</span>}
+      {onBack && <ChevronRight size={12} className="text-border" />}
+      <a
+        href={boardHref}
+        className="max-w-[12rem] truncate rounded px-1.5 py-0.5 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        data-testid="task-breadcrumb-board"
+      >
+        {boardLabel}
+      </a>
+      {parentTask && (
+        <>
+          <ChevronRight size={12} className="text-border" />
+          <a
+            href={`/tasks/${encodeURIComponent(parentTask.taskId)}`}
+            className="max-w-[14rem] truncate rounded px-1.5 py-0.5 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title={parentTask.title}
+            data-testid="task-breadcrumb-parent"
+          >
+            {parentTask.taskId}
+          </a>
+        </>
+      )}
+      <ChevronRight size={12} className="text-border" />
       <a
         href={taskHref}
         target={newTab ? '_blank' : undefined}
@@ -60,8 +84,7 @@ export function TaskBreadcrumbs({
       >
         {task.id}
       </a>
-      {activeBoard && <span>on {activeBoard.name || activeBoard.id}</span>}
-    </div>
+    </nav>
   );
 }
 
@@ -94,7 +117,7 @@ export function TaskDetailHeader({
 }: TaskDetailHeaderProps) {
   return (
     <div className={cn(compact ? 'space-y-3' : 'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between', className)} data-testid="task-detail-header">
-      <div className="min-w-0 flex-1 space-y-3">
+      <div className="min-w-0 flex-1 space-y-2">
         <TaskBreadcrumbs
           task={task}
           activeBoard={activeBoard}
@@ -102,7 +125,7 @@ export function TaskDetailHeader({
           newTab={!activeBoard}
           idTestId={activeBoard ? 'task-page-id-link' : 'task-detail-id-link'}
         />
-        {titleSlot ?? <h1 className={cn('font-bold leading-tight tracking-[-0.02em]', compact ? 'text-lg' : 'max-w-4xl text-2xl md:text-3xl')}>{task.title}</h1>}
+        {titleSlot ?? <h1 className={cn('font-bold leading-tight tracking-[-0.02em]', compact ? 'text-lg' : 'max-w-3xl text-xl md:text-2xl')}>{task.title}</h1>}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
         <StatusBadge status={task.status} />
@@ -223,7 +246,15 @@ export function TaskRunHistoryPanel({ task }: { task: Task }) {
 }
 
 export function TaskEventsPanel({ task }: { task: Task }) {
-  return <TaskActivity activity={task.activity} />;
+  return (
+    <section className="rounded-2xl border border-border/60 bg-background/35 p-3" data-testid="task-events-panel">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Current activity</p>
+        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">{task.activity.length}</span>
+      </div>
+      <TaskActivity activity={task.activity} />
+    </section>
+  );
 }
 
 export function TaskMetaPanel({ task, activeBoard }: { task: Task; activeBoard?: Board }) {
