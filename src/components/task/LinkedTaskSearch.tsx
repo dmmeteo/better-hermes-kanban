@@ -1,41 +1,70 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
-import type { TaskSearchResult } from '@/lib/types';
+import type { TaskStatus } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-export interface LinkedTaskSearchProps {
-  /** Restrict the search to a single board. */
+/** Minimal shape both Task and TaskSearchResult satisfy. */
+export interface LinkedTaskCandidate {
+  id: string;
+  title: string;
+  status: TaskStatus;
   boardId?: string;
+}
+
+export interface LinkedTaskSearchProps {
+  /** Restrict the server search to a single board. */
+  boardId?: string;
+  /**
+   * When provided, the component filters this list client-side (no network) —
+   * used where the server `/search` endpoint is unavailable but the board's
+   * tasks are already loaded. When omitted, it falls back to server search.
+   */
+  localTasks?: LinkedTaskCandidate[];
   /** Called when a (non-disabled) result is picked. May be async. */
-  onSelect: (result: TaskSearchResult) => void | Promise<void>;
+  onSelect: (result: LinkedTaskCandidate) => void | Promise<void>;
   /** Return a reason string to disable a result, or null to allow it. */
-  isDisabled?: (result: TaskSearchResult) => string | null;
+  isDisabled?: (result: LinkedTaskCandidate) => string | null;
   placeholder?: string;
   /** Suffix for data-testid hooks so multiple instances stay distinguishable. */
   testIdSuffix?: string;
 }
 
 /**
- * Presentational task search used both by the task-detail linked-tasks tab and
- * the create-task modal. It knows how to search and render results; what to do
- * with a picked result is up to the caller via `onSelect`.
+ * Presentational task search used by the task-detail linked-tasks tab (server
+ * search) and the create-task modal (client-side over loaded board tasks). It
+ * knows how to find and render results; what to do with a picked result is up
+ * to the caller via `onSelect`.
  */
 export function LinkedTaskSearch({
   boardId,
+  localTasks,
   onSelect,
   isDisabled,
   placeholder = 'Search task id, title, or body…',
   testIdSuffix = '',
 }: LinkedTaskSearchProps) {
+  const isLocal = !!localTasks;
   const suffix = testIdSuffix ? `-${testIdSuffix}` : '';
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<TaskSearchResult[]>([]);
+  const [serverResults, setServerResults] = useState<LinkedTaskCandidate[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const localResults = useMemo(() => {
+    if (!isLocal) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return (localTasks ?? [])
+      .filter((task) => task.id.toLowerCase().includes(q) || task.title.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [isLocal, localTasks, query]);
+
+  const results = isLocal ? localResults : serverResults;
+  const showEmpty = isLocal && query.trim().length > 0 && localResults.length === 0;
 
   const runSearch = async () => {
     const trimmed = query.trim();
@@ -52,7 +81,7 @@ export function LinkedTaskSearch({
         limit: 8,
         sort: 'relevance',
       });
-      setResults(response.results);
+      setServerResults(response.results);
       if (response.results.length === 0) setMessage('No matching tasks found by id, title, or body.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Search failed');
@@ -61,7 +90,7 @@ export function LinkedTaskSearch({
     }
   };
 
-  const pick = async (result: TaskSearchResult) => {
+  const pick = async (result: LinkedTaskCandidate) => {
     const reason = isDisabled?.(result);
     if (reason) {
       setMessage(reason);
@@ -72,7 +101,7 @@ export function LinkedTaskSearch({
     try {
       await onSelect(result);
       setQuery('');
-      setResults([]);
+      setServerResults([]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to select task');
     } finally {
@@ -85,9 +114,12 @@ export function LinkedTaskSearch({
       <div className="flex gap-2">
         <Input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (message) setMessage(null);
+          }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' && !isLocal) {
               event.preventDefault();
               void runSearch();
             }
@@ -95,20 +127,22 @@ export function LinkedTaskSearch({
           placeholder={placeholder}
           data-testid={`linked-task-search-input${suffix}`}
         />
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={runSearch}
-          disabled={isSearching}
-          data-testid={`linked-task-search-submit${suffix}`}
-        >
-          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-        </Button>
+        {!isLocal && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={runSearch}
+            disabled={isSearching}
+            data-testid={`linked-task-search-submit${suffix}`}
+          >
+            {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+          </Button>
+        )}
       </div>
-      {message && (
+      {(message || showEmpty) && (
         <p className="text-xs text-muted-foreground" data-testid="linked-task-search-message">
-          {message}
+          {message ?? 'No matching tasks on this board.'}
         </p>
       )}
       {results.length > 0 && (
@@ -116,7 +150,7 @@ export function LinkedTaskSearch({
           {results.map((result) => {
             const reason = isDisabled?.(result);
             return (
-              <li key={`${result.boardId}-${result.id}`}>
+              <li key={`${result.boardId ?? ''}-${result.id}`}>
                 <button
                   type="button"
                   onClick={() => pick(result)}
