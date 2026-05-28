@@ -113,10 +113,12 @@ function App() {
       } catch {
         setAssignees([]);
       }
+      return boardData.board;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load board data';
       setLoadError(message);
       toast.error(message);
+      return undefined;
     } finally {
       setIsLoading(false);
     }
@@ -165,8 +167,14 @@ function App() {
       setSettingsMode('settings');
       setIsNewBoardOpen(false);
       setIsSettingsOpen(true);
-      navigate(boardPath(boardIdFromUrl), { replace: true });
-      return;
+      let cancelled = false;
+      loadBoardData(boardIdFromUrl).then((resolvedBoard) => {
+        if (cancelled || !resolvedBoard) return;
+        navigate(boardPath(resolvedBoard.id), { replace: true });
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     if (isTaskSearchPage) {
       loadBoardData(boardIdFromUrl);
@@ -610,7 +618,7 @@ function App() {
         boards={boards}
         activeBoard={activeBoard}
         onBoardChange={handleBoardChange}
-        onBoardsRefresh={loadBoardData}
+        onBoardsRefresh={async (preferredBoardId) => { await loadBoardData(preferredBoardId); }}
         assignees={assignees}
       />
 
