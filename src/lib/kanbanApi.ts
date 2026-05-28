@@ -544,7 +544,7 @@ export const kanbanApi = {
 
   async getProfiles(): Promise<BotProfile[]> {
     try {
-      const payload = await requestJson<unknown>('/profiles');
+      const payload = await nativeKanbanClient.getProfiles();
       const rawProfiles = Array.isArray(payload)
         ? payload
         : isObject(payload) && Array.isArray(payload.profiles)
@@ -561,8 +561,7 @@ export const kanbanApi = {
 
   async getAssignees(boardId?: string): Promise<BotProfile[]> {
     try {
-      const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
-      const payload = await requestJson<unknown>(`/assignees${query}`);
+      const payload = await nativeKanbanClient.getAssignees(boardId);
       const rawAssignees = Array.isArray(payload)
         ? payload
         : isObject(payload) && Array.isArray(payload.assignees)
@@ -577,20 +576,16 @@ export const kanbanApi = {
   },
 
   async getOrchestration(): Promise<KanbanOrchestrationSettings> {
-    const payload = await requestJson<unknown>('/orchestration');
+    const payload = await nativeKanbanClient.getOrchestration();
     return normalizeOrchestration(payload);
   },
 
   async updateOrchestration(input: KanbanOrchestrationUpdate): Promise<KanbanOrchestrationSettings> {
-    const response = await requestJson<unknown>('/orchestration', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orchestrator_profile: input.orchestratorProfile,
-        default_assignee: input.defaultAssignee,
-        auto_decompose: input.autoDecompose,
-        auto_promote_children: input.autoPromoteChildren,
-      }),
+    const response = await nativeKanbanClient.updateOrchestration({
+      orchestrator_profile: input.orchestratorProfile,
+      default_assignee: input.defaultAssignee,
+      auto_decompose: input.autoDecompose,
+      auto_promote_children: input.autoPromoteChildren,
     });
     return normalizeOrchestration(response);
   },
