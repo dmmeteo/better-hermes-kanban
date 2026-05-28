@@ -7,11 +7,13 @@ interface StatusBadgeProps {
   showLabel?: boolean;
   size?: 'sm' | 'md';
   className?: string;
+  /** Board-specific display label; falls back to the canonical STATUS_LABELS name. */
+  label?: string;
 }
 
-export function StatusBadge({ status, showLabel = true, size = 'sm', className }: StatusBadgeProps) {
+export function StatusBadge({ status, showLabel = true, size = 'sm', className, label }: StatusBadgeProps) {
   const color = STATUS_COLORS[status];
-  const label = STATUS_LABELS[status];
+  const displayLabel = label ?? STATUS_LABELS[status];
 
   return (
     <span
@@ -34,7 +36,7 @@ export function StatusBadge({ status, showLabel = true, size = 'sm', className }
           backgroundColor: color,
         }}
       />
-      {showLabel && label}
+      {showLabel && displayLabel}
     </span>
   );
 }

@@ -1,5 +1,6 @@
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import type { BotProfile, Board, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
 import { Button } from '@/components/ui/button';
 import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
@@ -21,6 +22,7 @@ interface TaskDetailPageProps {
   subscribedChannels?: { telegram: boolean; discord: boolean };
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
+  boardSettings?: BoardSettings;
 }
 
 export function TaskDetailPage({
@@ -38,6 +40,7 @@ export function TaskDetailPage({
   subscribedChannels,
   onSpecify,
   onDecompose,
+  boardSettings,
 }: TaskDetailPageProps) {
   if (!task) {
     return (
@@ -81,6 +84,7 @@ export function TaskDetailPage({
               onDecompose={onDecompose}
               onToggleNotify={onToggleNotify}
               subscribedChannels={subscribedChannels}
+              boardSettings={boardSettings}
             />
           </div>
 
@@ -92,6 +96,7 @@ export function TaskDetailPage({
                 onSpecify={onSpecify}
                 onDecompose={onDecompose}
                 align="start"
+                boardSettings={boardSettings}
               />
               <TaskNotifyMenu
                 subscribed={subscribedChannels ?? { telegram: false, discord: false }}

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import type { Board, BotProfile, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
@@ -23,6 +24,7 @@ interface TaskDetailModalProps {
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
   isMobile?: boolean;
+  boardSettings?: BoardSettings;
 }
 
 export function TaskDetailModal({
@@ -41,6 +43,7 @@ export function TaskDetailModal({
   onSpecify,
   onDecompose,
   isMobile = false,
+  boardSettings,
 }: TaskDetailModalProps) {
   if (!task) return null;
 
@@ -80,6 +83,7 @@ export function TaskDetailModal({
               onDecompose={onDecompose}
               onToggleNotify={onToggleNotify}
               subscribedChannels={subscribedChannels}
+              boardSettings={boardSettings}
             />
           </div>
           <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -90,6 +94,7 @@ export function TaskDetailModal({
                 onSpecify={onSpecify}
                 onDecompose={onDecompose}
                 align="start"
+                boardSettings={boardSettings}
               />
               <TaskNotifyMenu
                 subscribed={subscribedChannels ?? { telegram: false, discord: false }}

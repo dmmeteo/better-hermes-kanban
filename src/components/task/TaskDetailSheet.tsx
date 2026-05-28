@@ -1,4 +1,5 @@
 import type { Board, BotProfile, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { TaskDetailBody, TaskDetailTabs, TaskStatusControl } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
@@ -21,6 +22,7 @@ interface TaskDetailSheetProps {
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
   isMobile?: boolean;
+  boardSettings?: BoardSettings;
 }
 
 export function TaskDetailSheet({
@@ -39,6 +41,7 @@ export function TaskDetailSheet({
   onSpecify,
   onDecompose,
   isMobile = false,
+  boardSettings,
 }: TaskDetailSheetProps) {
   if (!task) return null;
 
@@ -66,6 +69,7 @@ export function TaskDetailSheet({
               onDecompose={onDecompose}
               onToggleNotify={onToggleNotify}
               subscribedChannels={subscribedChannels}
+              boardSettings={boardSettings}
             />
           </div>
           <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -76,6 +80,7 @@ export function TaskDetailSheet({
                 onSpecify={onSpecify}
                 onDecompose={onDecompose}
                 align="start"
+                boardSettings={boardSettings}
               />
               <TaskNotifyMenu
                 subscribed={subscribedChannels ?? { telegram: false, discord: false }}

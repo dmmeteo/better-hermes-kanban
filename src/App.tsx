@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
-import type { Task, Board, BotProfile, CreateTaskData, LinkedTask, UpdateTaskData } from '@/lib/types';
+import type { Task, Board, BotProfile, CreateTaskData, LinkedTask, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
 import { getBoardSettings, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -341,6 +341,12 @@ function App() {
     }
   }, [activeBoard, isTaskPage, navigate, routeTaskId, selectedTask]);
 
+  const handleRenameStatus = useCallback((status: TaskStatus, label: string) => {
+    setBoardSettings((prev) =>
+      saveBoardSettings(activeBoard?.id, { statusLabels: { ...prev.statusLabels, [status]: label } }),
+    );
+  }, [activeBoard]);
+
   const refetchActiveBoard = useCallback(async (board: Board) => {
     const data = await kanbanApi.getBoard(board.id);
     setTasks(data.tasks);
@@ -661,6 +667,7 @@ function App() {
               subscribedChannels={homeChannels}
               onSpecify={handleSpecify}
               onDecompose={handleDecompose}
+              boardSettings={boardSettings}
             />
           ) : (
             <BoardView
@@ -670,6 +677,7 @@ function App() {
               onAddTask={() => setIsQuickCaptureOpen(true)}
               searchQuery={searchQuery}
               boardSettings={boardSettings}
+              onRenameStatus={handleRenameStatus}
             />
           )}
         </div>
@@ -700,6 +708,7 @@ function App() {
           subscribedChannels={homeChannels}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}
+          boardSettings={boardSettings}
           isMobile={isMobile}
         />
       ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
@@ -718,6 +727,7 @@ function App() {
           subscribedChannels={homeChannels}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}
+          boardSettings={boardSettings}
           isMobile={isMobile}
         />
       ) : null}

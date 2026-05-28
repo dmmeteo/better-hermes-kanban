@@ -10,6 +10,7 @@ interface BoardViewProps {
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
   boardSettings: BoardSettings;
+  onRenameStatus?: (status: TaskStatus, label: string) => void;
 }
 
 export function BoardView({
@@ -19,6 +20,7 @@ export function BoardView({
   onAddTask,
   searchQuery,
   boardSettings,
+  onRenameStatus,
 }: BoardViewProps) {
   return (
     <>
@@ -39,6 +41,7 @@ export function BoardView({
             onAddTask={onAddTask}
             searchQuery={searchQuery}
             boardSettings={boardSettings}
+            onRenameStatus={onRenameStatus}
             readOnly
           />
         </div>

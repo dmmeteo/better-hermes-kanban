@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Lock } from 'lucide-react';
@@ -13,9 +14,10 @@ interface KanbanColumnProps {
   onAddTask?: (status: TaskStatus) => void;
   readOnly?: boolean;
   statusLabel?: string;
+  onRenameStatus?: (status: TaskStatus, label: string) => void;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus }: KanbanColumnProps) {
   const isReadOnlyStatus = isStatusReadOnly(status);
   const isDropDisabled = !isStatusDropEnabled(status);
   const { setNodeRef, isOver } = useDroppable({
@@ -46,12 +48,12 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
             className="w-2 h-2 rounded-full"
             style={{ backgroundColor: color }}
           />
-          <span
-            className="text-[11px] font-bold uppercase tracking-wider"
-            style={{ color }}
-          >
-            {label}
-          </span>
+          <ColumnTitle
+            status={status}
+            label={label}
+            color={color}
+            onRename={onRenameStatus}
+          />
           <span className="text-[11px] text-muted-foreground font-medium">
             {tasks.length}
           </span>
@@ -115,5 +117,100 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         )}
       </div>
     </div>
+  );
+}
+
+interface ColumnTitleProps {
+  status: TaskStatus;
+  label: string;
+  color: string;
+  onRename?: (status: TaskStatus, label: string) => void;
+}
+
+/**
+ * Trello-style inline-editable column title. Click to edit, Enter/blur commits,
+ * Escape cancels. Renaming is a display-only alias (independent of drag read-only),
+ * so it stays available even while the board is read-only for drag/drop.
+ */
+function ColumnTitle({ status, label, color, onRename }: ColumnTitleProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const cancelingRef = useRef(false);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      const el = inputRef.current;
+      el.focus();
+      const len = el.value.length;
+      try {
+        el.setSelectionRange(len, len);
+      } catch {
+        // ignore inputs that don't support selection range
+      }
+    }
+  }, [editing]);
+
+  const titleClass = 'text-[11px] font-bold uppercase tracking-wider';
+
+  if (!onRename) {
+    return <span className={titleClass} style={{ color }}>{label}</span>;
+  }
+
+  const beginEdit = () => {
+    setDraft(label);
+    cancelingRef.current = false;
+    setEditing(true);
+  };
+
+  const finish = () => {
+    if (cancelingRef.current) {
+      cancelingRef.current = false;
+      setEditing(false);
+      return;
+    }
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== label) onRename(status, trimmed);
+    setEditing(false);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      inputRef.current?.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelingRef.current = true;
+      inputRef.current?.blur();
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={finish}
+        onKeyDown={onKeyDown}
+        aria-label={`Rename ${label} column`}
+        data-testid={`column-title-input-${status}`}
+        className={cn(titleClass, 'w-[140px] rounded bg-background/80 px-1 py-0.5 outline-none ring-1 ring-border focus:ring-2')}
+        style={{ color }}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={beginEdit}
+      title="Rename column"
+      data-testid={`column-title-${status}`}
+      className={cn(titleClass, 'rounded px-1 py-0.5 -mx-1 text-left transition-colors hover:bg-accent/50 cursor-text')}
+      style={{ color }}
+    >
+      {label}
+    </button>
   );
 }

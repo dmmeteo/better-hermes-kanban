@@ -14,6 +14,8 @@ import { WarningBanner } from '@/components/shared/WarningBanner';
 import { InlineEditField } from '@/components/shared/InlineEditField';
 import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
 import { Button } from '@/components/ui/button';
+import type { BoardSettings } from '@/lib/boardSettings';
+import { getStatusLabel } from '@/lib/boardSettings';
 import { getUnfinishedParents, isReadyDisabled, cn } from '@/lib/utils';
 import {
   TaskCommentsPanel,
@@ -32,6 +34,7 @@ interface TaskStatusControlProps {
   onDecompose: () => Promise<void>;
   className?: string;
   align?: 'start' | 'end' | 'center';
+  boardSettings?: BoardSettings;
 }
 
 export function TaskStatusControl({
@@ -41,17 +44,18 @@ export function TaskStatusControl({
   onDecompose,
   className,
   align = 'end',
+  boardSettings,
 }: TaskStatusControlProps) {
   const statusOptions: InlineSelectOption<TaskStatus>[] = useMemo(
     () =>
       NATIVE_STATUS_ORDER.map((status) => ({
         value: status,
         key: status,
-        label: <StatusBadge status={status} />,
+        label: <StatusBadge status={status} label={getStatusLabel(status, boardSettings)} />,
         description: STATUS_DESCRIPTIONS[status],
         disabled: !isStatusSelectable(status),
       })),
-    [],
+    [boardSettings],
   );
 
   const statusFieldDisabled = isStatusReadOnly(task.status);
@@ -105,7 +109,10 @@ export function TaskStatusControl({
         onChange={handleStatus}
         disabled={statusFieldDisabled}
         disabledReason={statusFieldDisabled ? 'Dispatcher-owned status; cannot edit manually.' : undefined}
-        renderTrigger={(opt) => <StatusBadge status={(opt?.value as TaskStatus) ?? task.status} />}
+        renderTrigger={(opt) => {
+          const s = (opt?.value as TaskStatus) ?? task.status;
+          return <StatusBadge status={s} label={getStatusLabel(s, boardSettings)} />;
+        }}
         ariaLabel="Edit status"
         dataTestId="task-status-field"
         className="px-1"
@@ -127,6 +134,7 @@ interface TaskDetailBodyProps {
   onToggleNotify?: (channel: 'telegram' | 'discord', subscribed: boolean) => Promise<void>;
   subscribedChannels?: { telegram: boolean; discord: boolean };
   headerExtra?: ReactNode;
+  boardSettings?: BoardSettings;
 }
 
 export function TaskDetailBody({
@@ -141,6 +149,7 @@ export function TaskDetailBody({
   onToggleNotify,
   subscribedChannels,
   headerExtra,
+  boardSettings,
 }: TaskDetailBodyProps) {
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
@@ -179,6 +188,7 @@ export function TaskDetailBody({
             onSpecify={onSpecify}
             onDecompose={onDecompose}
             align="start"
+            boardSettings={boardSettings}
           />
           {onToggleNotify && (
             <TaskNotifyMenu

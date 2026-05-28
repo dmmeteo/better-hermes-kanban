@@ -27,6 +27,7 @@ interface DesktopKanbanBoardProps {
   searchQuery: string;
   readOnly?: boolean;
   boardSettings: BoardSettings;
+  onRenameStatus?: (status: TaskStatus, label: string) => void;
 }
 
 export function DesktopKanbanBoard({
@@ -37,6 +38,7 @@ export function DesktopKanbanBoard({
   searchQuery,
   readOnly = false,
   boardSettings,
+  onRenameStatus,
 }: DesktopKanbanBoardProps) {
   const orderedStatuses = useMemo(() => getOrderedStatuses(boardSettings), [boardSettings]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -176,6 +178,7 @@ export function DesktopKanbanBoard({
             onAddTask={onAddTask}
             readOnly={readOnly}
             statusLabel={getStatusLabel(status, boardSettings)}
+            onRenameStatus={onRenameStatus}
           />
         ))}
       </div>
