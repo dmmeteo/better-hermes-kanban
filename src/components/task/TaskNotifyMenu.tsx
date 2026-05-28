@@ -12,18 +12,17 @@ import {
 
 interface TaskNotifyMenuProps {
   subscribed: { telegram: boolean; discord: boolean };
-  onToggle: (channel: 'telegram' | 'discord') => Promise<void>;
+  onToggle: (channel: 'telegram' | 'discord', subscribed: boolean) => Promise<void>;
 }
 
 export function TaskNotifyMenu({ subscribed, onToggle }: TaskNotifyMenuProps) {
   const hasActive = subscribed.telegram || subscribed.discord;
 
-  const handleSelect = (channel: 'telegram' | 'discord') => {
-    const isSubscribed = subscribed[channel];
-    void toast.promise(onToggle(channel), {
-      loading: isSubscribed ? `Re-sending ${channel}…` : `Subscribing to ${channel}…`,
-      success: isSubscribed ? `Re-sent ${channel}` : `Subscribed to ${channel}`,
-      error: `Failed to notify ${channel}`,
+  const handleSelect = (channel: 'telegram' | 'discord', next: boolean) => {
+    void toast.promise(onToggle(channel, next), {
+      loading: next ? `Subscribing to ${channel}…` : `Unsubscribing from ${channel}…`,
+      success: next ? `Subscribed to ${channel}` : `Unsubscribed from ${channel}`,
+      error: `Failed to ${next ? 'subscribe to' : 'unsubscribe from'} ${channel}`,
     });
   };
 
@@ -54,7 +53,7 @@ export function TaskNotifyMenu({ subscribed, onToggle }: TaskNotifyMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={subscribed.telegram}
-          onCheckedChange={() => handleSelect('telegram')}
+          onCheckedChange={(next) => handleSelect('telegram', Boolean(next))}
           onSelect={(e) => e.preventDefault()}
           data-testid="task-notify-telegram"
         >
@@ -62,7 +61,7 @@ export function TaskNotifyMenu({ subscribed, onToggle }: TaskNotifyMenuProps) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={subscribed.discord}
-          onCheckedChange={() => handleSelect('discord')}
+          onCheckedChange={(next) => handleSelect('discord', Boolean(next))}
           onSelect={(e) => e.preventDefault()}
           data-testid="task-notify-discord"
         >

@@ -214,10 +214,20 @@ function App() {
     }
   }, [detailPresentation, routeTaskId]);
 
-  const selectedTask = useMemo(
-    () => tasks.find((t) => t.id === selectedTaskId) || null,
-    [tasks, selectedTaskId]
-  );
+  const selectedTask = useMemo(() => {
+    const task = tasks.find((t) => t.id === selectedTaskId) || null;
+    if (!task) return null;
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    return {
+      ...task,
+      linkedTasks: task.linkedTasks.map((link) => {
+        const found = byId.get(link.taskId);
+        return found
+          ? { ...link, title: found.title, status: found.status, boardId: found.boardId }
+          : link;
+      }),
+    };
+  }, [tasks, selectedTaskId]);
 
   useEffect(() => {
     if (!selectedTaskId || isTaskPage) return;
@@ -378,12 +388,14 @@ function App() {
     [activeBoard, refetchActiveBoard, selectedTask, tasks]
   );
 
-  const handleNotify = useCallback(
-    async (channel: 'telegram' | 'discord') => {
+  const handleToggleNotify = useCallback(
+    async (channel: 'telegram' | 'discord', subscribed: boolean) => {
       if (!selectedTask || !activeBoard) return;
-      const result = await kanbanApi.notifyTask(selectedTask.id, channel, activeBoard.id);
+      const result = subscribed
+        ? await kanbanApi.subscribeTask(selectedTask.id, channel, activeBoard.id)
+        : await kanbanApi.unsubscribeTask(selectedTask.id, channel, activeBoard.id);
       if (!result.ok) {
-        throw new Error(result.message || `Failed to notify ${channel}`);
+        throw new Error(result.message || `Failed to ${subscribed ? 'subscribe to' : 'unsubscribe from'} ${channel}`);
       }
       const next = await kanbanApi.getHomeChannels(selectedTask.id, activeBoard.id);
       setHomeChannels(next);
@@ -639,7 +651,7 @@ function App() {
               onUpdateTask={updateSelectedTask}
               onLinkTask={handleLinkTask}
               onUnlinkTask={handleUnlinkTask}
-              onNotify={handleNotify}
+              onToggleNotify={handleToggleNotify}
               subscribedChannels={homeChannels}
               onSpecify={handleSpecify}
               onDecompose={handleDecompose}
@@ -678,7 +690,7 @@ function App() {
           onUpdateTask={updateSelectedTask}
           onLinkTask={handleLinkTask}
           onUnlinkTask={handleUnlinkTask}
-          onNotify={handleNotify}
+          onToggleNotify={handleToggleNotify}
           subscribedChannels={homeChannels}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}
@@ -696,7 +708,7 @@ function App() {
           onUpdateTask={updateSelectedTask}
           onLinkTask={handleLinkTask}
           onUnlinkTask={handleUnlinkTask}
-          onNotify={handleNotify}
+          onToggleNotify={handleToggleNotify}
           subscribedChannels={homeChannels}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}

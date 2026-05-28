@@ -113,18 +113,21 @@ function normalizeRuns(raw: unknown): TaskRun[] {
 }
 
 function normalizeLinks(raw: unknown): LinkedTask[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item, index): LinkedTask => {
-    const link = isObject(item) ? item : {};
-    return {
-      id: asString(link.id, `link-${index}`),
-      taskId: asString(link.task_id ?? link.taskId ?? link.id, ''),
-      title: asString(link.title, 'Linked task'),
-      status: normalizeStatus(link.status),
-      relation: asString(link.relation) === 'child' ? 'child' : 'parent',
-      boardId: asString(link.board ?? link.board_id ?? link.boardId, ''),
-    };
-  }).filter((link) => link.taskId);
+  if (!isObject(raw)) return [];
+  const parents = Array.isArray(raw.parents) ? raw.parents.filter((x): x is string => typeof x === 'string') : [];
+  const children = Array.isArray(raw.children) ? raw.children.filter((x): x is string => typeof x === 'string') : [];
+  const make = (taskId: string, relation: 'parent' | 'child'): LinkedTask => ({
+    id: `link-${relation}-${taskId}`,
+    taskId,
+    title: taskId,
+    status: normalizeStatus(null),
+    relation,
+    boardId: '',
+  });
+  return [
+    ...parents.map((id) => make(id, 'parent')),
+    ...children.map((id) => make(id, 'child')),
+  ].filter((link) => link.taskId);
 }
 
 function normalizeWorkerLog(raw: unknown, taskId: string, boardId: string): TaskWorkerLog | null {

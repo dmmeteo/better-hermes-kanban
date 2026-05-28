@@ -124,7 +124,7 @@ interface TaskDetailBodyProps {
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
-  onNotify?: (channel: 'telegram' | 'discord') => Promise<void>;
+  onToggleNotify?: (channel: 'telegram' | 'discord', subscribed: boolean) => Promise<void>;
   subscribedChannels?: { telegram: boolean; discord: boolean };
   headerExtra?: ReactNode;
 }
@@ -138,7 +138,7 @@ export function TaskDetailBody({
   onUnlinkTask,
   onSpecify,
   onDecompose,
-  onNotify,
+  onToggleNotify,
   subscribedChannels,
   headerExtra,
 }: TaskDetailBodyProps) {
@@ -180,10 +180,10 @@ export function TaskDetailBody({
             onDecompose={onDecompose}
             align="start"
           />
-          {onNotify && (
+          {onToggleNotify && (
             <TaskNotifyMenu
               subscribed={subscribedChannels ?? { telegram: false, discord: false }}
-              onToggle={onNotify}
+              onToggle={onToggleNotify}
             />
           )}
         </div>

@@ -173,21 +173,25 @@ function normalizeRuns(raw: unknown): TaskRun[] {
   });
 }
 
-function normalizeLinks(raw: unknown): LinkedTask[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item, index): LinkedTask => {
-    const link = isObject(item) ? item : {};
-    const status = normalizeStatus(link.status);
-    const relation: 'parent' | 'child' = asString(link.relation) === 'child' ? 'child' : 'parent';
+function normalizeLinks(raw: unknown, byId?: Map<string, Task>): LinkedTask[] {
+  if (!isObject(raw)) return [];
+  const parents = Array.isArray(raw.parents) ? raw.parents.filter((x): x is string => typeof x === 'string') : [];
+  const children = Array.isArray(raw.children) ? raw.children.filter((x): x is string => typeof x === 'string') : [];
+  const make = (taskId: string, relation: 'parent' | 'child'): LinkedTask => {
+    const t = byId?.get(taskId);
     return {
-      id: asString(link.id, `link-${index}`),
-      taskId: asString(link.task_id ?? link.taskId ?? link.id, ''),
-      title: asString(link.title, 'Linked task'),
-      status,
+      id: `link-${relation}-${taskId}`,
+      taskId,
+      title: t?.title ?? taskId,
+      status: t?.status ?? normalizeStatus(null),
       relation,
-      boardId: asString(link.board ?? link.board_id ?? link.boardId, ''),
+      boardId: t?.boardId ?? '',
     };
-  }).filter((link) => link.taskId);
+  };
+  return [
+    ...parents.map((id) => make(id, 'parent')),
+    ...children.map((id) => make(id, 'child')),
+  ].filter((link) => link.taskId);
 }
 
 function normalizeWorkerLog(raw: unknown, taskId: string, boardId: string): TaskWorkerLog | null {
@@ -243,7 +247,14 @@ function normalizeOrchestration(raw: unknown): KanbanOrchestrationSettings {
   };
 }
 
-function normalizeTask(raw: unknown, boardId: string): Task {
+function taskFromEnvelope(payload: unknown, boardId: string, byId?: Map<string, Task>): Task {
+  const env = isObject(payload) ? payload : {};
+  const rawTask = isObject(env.task) ? env.task : env;
+  const rawLinks = isObject(env.links) ? env.links : undefined;
+  return normalizeTask(rawTask, boardId, rawLinks, byId);
+}
+
+function normalizeTask(raw: unknown, boardId: string, links?: unknown, byId?: Map<string, Task>): Task {
   const item = isObject(raw) ? raw : {};
   const id = asString(item.id ?? item.task_id ?? item.taskId, `task-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const body = asString(item.body ?? item.description ?? item.summary ?? item.result, '');
@@ -285,7 +296,12 @@ function normalizeTask(raw: unknown, boardId: string): Task {
     boardId: asString(item.board ?? item.board_id ?? item.boardId, boardId),
     parentIds: asStringArray(item.parents ?? item.parent_ids ?? item.parentIds),
     commentCount: asNumber(item.comment_count ?? item.commentCount, comments.length),
-    linkCount: asNumber(item.link_count ?? item.linkCount, asStringArray(item.parents ?? item.parent_ids).length),
+    linkCount: asNumber(
+      item.link_count ?? item.linkCount,
+      isObject(links)
+        ? asStringArray((links as Record<string, unknown>).parents).length + asStringArray((links as Record<string, unknown>).children).length
+        : asStringArray(item.parents ?? item.parent_ids).length,
+    ),
     latestSummary,
     summaryUpdatedAt: item.summary_updated_at || item.summaryUpdatedAt ? toIso(item.summary_updated_at ?? item.summaryUpdatedAt) : null,
     diagnostics,
@@ -293,7 +309,7 @@ function normalizeTask(raw: unknown, boardId: string): Task {
     activity: normalizeActivity(item.events ?? item.activity),
     runs: normalizeRuns(item.runs),
     workerLog: normalizeWorkerLog(item.worker_log ?? item.workerLog ?? item.logs, id, asString(item.board ?? item.board_id ?? item.boardId, boardId)),
-    linkedTasks: normalizeLinks(item.links ?? item.linkedTasks),
+    linkedTasks: normalizeLinks(links ?? item.links ?? item.linkedTasks, byId),
     plannedAttachments: [],
     warningCount: asNumber(item.warning_count ?? item.warningCount ?? item.warnings, diagnostics.length),
     createdAt: toIso(item.created_at ?? item.createdAt),
@@ -383,11 +399,10 @@ export const kanbanApi = {
     }
   },
 
-  async getTask(taskId: string, boardId?: string): Promise<Task | null> {
+  async getTask(taskId: string, boardId?: string, byId?: Map<string, Task>): Promise<Task | null> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query}`);
-    const rawTask = isObject(payload) && payload.task ? payload.task : payload;
-    return normalizeTask(rawTask, boardId || 'current');
+    return taskFromEnvelope(payload, boardId || 'current', byId);
   },
 
   async getTaskWorkerLog(taskId: string, boardId?: string): Promise<TaskWorkerLog | null> {
@@ -585,7 +600,7 @@ export const kanbanApi = {
     return [updated];
   },
 
-  async notifyTask(taskId: string, channel: 'telegram' | 'discord', boardId?: string): Promise<{ ok: boolean; message?: string }> {
+  async subscribeTask(taskId: string, channel: 'telegram' | 'discord', boardId?: string): Promise<{ ok: boolean; message?: string }> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     try {
       await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/home-subscribe/${encodeURIComponent(channel)}${query}`, {
@@ -594,7 +609,20 @@ export const kanbanApi = {
       });
       return { ok: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Notify failed';
+      const message = error instanceof Error ? error.message : 'Subscribe failed';
+      return { ok: false, message };
+    }
+  },
+
+  async unsubscribeTask(taskId: string, channel: 'telegram' | 'discord', boardId?: string): Promise<{ ok: boolean; message?: string }> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    try {
+      await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/home-subscribe/${encodeURIComponent(channel)}${query}`, {
+        method: 'DELETE',
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unsubscribe failed';
       return { ok: false, message };
     }
   },

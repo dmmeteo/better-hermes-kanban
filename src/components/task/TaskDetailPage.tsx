@@ -17,7 +17,7 @@ interface TaskDetailPageProps {
   onUpdateTask: (patch: UpdateTaskData) => Promise<void>;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   onUnlinkTask: (link: LinkedTask) => Promise<void>;
-  onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
+  onToggleNotify: (channel: 'telegram' | 'discord', subscribed: boolean) => Promise<void>;
   subscribedChannels?: { telegram: boolean; discord: boolean };
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
@@ -34,7 +34,7 @@ export function TaskDetailPage({
   onUpdateTask,
   onLinkTask,
   onUnlinkTask,
-  onNotify,
+  onToggleNotify,
   subscribedChannels,
   onSpecify,
   onDecompose,
@@ -79,7 +79,7 @@ export function TaskDetailPage({
               onUnlinkTask={onUnlinkTask}
               onSpecify={onSpecify}
               onDecompose={onDecompose}
-              onNotify={onNotify}
+              onToggleNotify={onToggleNotify}
               subscribedChannels={subscribedChannels}
             />
           </div>
@@ -95,7 +95,7 @@ export function TaskDetailPage({
               />
               <TaskNotifyMenu
                 subscribed={subscribedChannels ?? { telegram: false, discord: false }}
-                onToggle={onNotify}
+                onToggle={onToggleNotify}
               />
             </div>
             <TaskDetailSidebar
