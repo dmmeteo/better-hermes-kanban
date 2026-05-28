@@ -185,7 +185,7 @@ export function DataViewSearchAndFilter({
       <div
         className={cn(
           'group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-secondary/95 px-2 text-xs shadow-[0_12px_36px_rgba(0,0,0,0.18)] transition-colors focus-within:border-[#7C5CFF]/70 focus-within:ring-2 focus-within:ring-[#7C5CFF]/20',
-          density === 'page' ? 'min-h-12 rounded-2xl bg-background/70 px-3' : 'min-h-9'
+          density === 'page' ? 'min-h-12 rounded-2xl bg-background/70 px-3' : 'min-h-8'
         )}
       >
         <Search size={density === 'page' ? 17 : 14} className="shrink-0 text-muted-foreground" />
@@ -214,7 +214,7 @@ export function DataViewSearchAndFilter({
             }}
             onKeyDown={handleKeyDown}
             placeholder={activeTokens.length ? 'Add text…' : placeholder}
-            className="h-7 min-w-[110px] flex-[1_0_120px] bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground md:min-w-[150px]"
+            className="h-6 min-w-[110px] flex-[1_0_120px] bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground md:min-w-[150px]"
             aria-label="Search and filter tasks"
             aria-expanded={isOpen}
             aria-controls={panelId}
