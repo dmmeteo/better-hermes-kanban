@@ -138,12 +138,7 @@ export function TopBar({
           className="flex shrink-0 items-center gap-2.5 rounded-xl transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Feather size={24} style={{ color: '#7C5CFF' }} />
-          <div className="flex flex-col">
-            <span className="font-bold text-sm leading-tight">Hermes</span>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground leading-tight">
-              Kanban Control Room
-            </span>
-          </div>
+          <span className="font-bold text-sm leading-tight">Hermes</span>
         </Link>
 
         <DataViewSearchAndFilter
