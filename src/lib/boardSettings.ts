@@ -20,6 +20,27 @@ type StoredSettingsMap = Record<string, StoredBoardSettings | undefined>;
 export const BOARD_SETTINGS_STORAGE_KEY = 'bhk.boardSettings.v2';
 const LEGACY_BOARD_SETTINGS_STORAGE_KEY = 'bhk.boardSettings.v1';
 export const LEGACY_DETAIL_PRESENTATION_KEY = 'bhk.taskDetailPresentation';
+const SELECTED_BOARD_KEY = 'bhk.kanban.selectedBoard';
+
+export function getSelectedBoardSlug(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(SELECTED_BOARD_KEY);
+    return value && value.trim() ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setSelectedBoardSlug(slug: string | null | undefined): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (slug) window.localStorage.setItem(SELECTED_BOARD_KEY, slug);
+    else window.localStorage.removeItem(SELECTED_BOARD_KEY);
+  } catch {
+    // private mode / disabled storage — silently ignore
+  }
+}
 
 const PRESENTATIONS: TaskDetailPresentation[] = ['drawer', 'modal', 'page'];
 

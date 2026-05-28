@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
 import type { Task, Board, BotProfile, CreateTaskData, LinkedTask, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
-import { getBoardSettings, getStatusLabel, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
+import { getBoardSettings, getSelectedBoardSlug, getStatusLabel, migrateLegacyDetailPresentation, saveBoardSettings, setSelectedBoardSlug, type BoardSettings } from '@/lib/boardSettings';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
@@ -107,15 +107,17 @@ function App() {
     try {
       setIsLoading(true);
       const boardsResult = await kanbanApi.getBoards();
+      const stickyBoardId = getSelectedBoardSlug();
       const preferredBoard =
         (preferredBoardId ? boardsResult.boards.find((board) => board.id === preferredBoardId) : null) ||
-        boardsResult.boards.find((board) => board.id === 'better-hermes-kanban') ||
+        (stickyBoardId ? boardsResult.boards.find((board) => board.id === stickyBoardId) : null) ||
         boardsResult.boards.find((board) => board.isDefault) ||
         boardsResult.boards[0];
       const boardData = await kanbanApi.getBoard(preferredBoard?.id);
       setTasks(boardData.tasks);
       setBoards(boardsResult.boards);
       setActiveBoard(boardData.board);
+      if (boardData.board?.id) setSelectedBoardSlug(boardData.board.id);
       setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
       setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
       try {
@@ -138,16 +140,19 @@ function App() {
   const loadTaskPageData = useCallback(async (taskId: string) => {
     try {
       setIsLoading(true);
-      // Hermes scopes /tasks/{id} to a board — and the dispatcher's
-      // current board often isn't the task's home, so we need to find
-      // the right one. Try the URL board first, then current/default,
-      // then every other non-archived board until the task resolves.
+      // Hermes scopes /tasks/{id} to a board — and the dashboard's
+      // current board is held in localStorage (mirroring her), not on
+      // the server. Try URL board → LS stickyBoard → server default →
+      // server current → every other non-archived board. The first hit
+      // wins; we then sticky-save its id for future deep links.
       const boardsResult = await kanbanApi.getBoards();
+      const stickyBoardId = getSelectedBoardSlug();
       const ordered: string[] = [];
-      const push = (id?: string) => { if (id && !ordered.includes(id)) ordered.push(id); };
+      const push = (id?: string | null) => { if (id && !ordered.includes(id)) ordered.push(id); };
       push(boardIdFromUrl);
-      push(boardsResult.boards.find((b) => b.isCurrent)?.id);
+      push(stickyBoardId);
       push(boardsResult.boards.find((b) => b.isDefault)?.id);
+      push(boardsResult.boards.find((b) => b.isCurrent)?.id);
       for (const b of boardsResult.boards) if (!b.archived) push(b.id);
       let directTask = null;
       let lastError: unknown = null;
@@ -173,6 +178,7 @@ function App() {
       setTasks(mergedTasks);
       setBoards(boardsResult.boards);
       setActiveBoard(boardData.board);
+      if (boardData.board?.id) setSelectedBoardSlug(boardData.board.id);
       setSelectedTaskId(taskId);
       setDataSource(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'fallback' : 'live');
       setLoadError(boardData.source === 'fallback' || boardsResult.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
@@ -607,6 +613,7 @@ function App() {
         const data = await kanbanApi.getBoard(board.id);
         setTasks(data.tasks);
         setActiveBoard(data.board);
+        if (data.board?.id) setSelectedBoardSlug(data.board.id);
         setDataSource(data.source);
         setLoadError(data.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
         navigate(boardPath(board.id));

@@ -44,10 +44,48 @@ Auth:
 | `DELETE` | `/tasks/{task_id}/home-subscribe/{platform}` | **Unsubscribe** (empty body) — same path as subscribe, different verb. |
 | `GET` | `/stats` | Aggregate stats for a board. |
 | `GET` | `/assignees` | List of assignable profiles. |
-| `GET` | `/tasks/{task_id}/log` | Worker stdout/stderr tail. |
+| `GET` | `/tasks/{task_id}/log` | Worker stdout/stderr tail. Query: `tail` (max chars to return). |
+| `POST` | `/dispatch` | Kick the dispatcher to re-evaluate the board (used by orchestration UIs). |
+| `GET` | `/boards` | List boards. Response: `{boards: [{slug, name, …, is_current, counts, total}], current}`. `is_current` reflects the **CLI / gateway** pointer, not the dashboard pointer — see "Board selection" below. |
+| `POST` | `/boards` | Create board. Body: `CreateBoardBody`. |
+| `PATCH` | `/boards/{slug}` | Rename / update board metadata. |
+| `DELETE` | `/boards/{slug}` | Delete (or archive) a board. |
+| `POST` | `/boards/{slug}/switch` | Set the server-side current-board pointer (parity for `/kanban boards switch` and CLI). Dashboards normally do NOT call this — they keep selection in localStorage. |
+| `GET` | `/profiles` | List installed orchestrator profiles with descriptions. |
+| `PATCH` | `/profiles/{name}` | Edit a profile's user-authored description. |
+| `POST` | `/profiles/{name}/describe-auto` | Auto-generate a description for a profile. |
+| `POST` | `/tasks/{task_id}/decompose` | Start decomposition for a triage task. |
+| `GET` | `/orchestration` | Get current orchestration mode + settings. |
+| `PUT` | `/orchestration` | Update orchestration mode + settings. |
 
 Query param `board` is supported (and usually required) by every task-scoped
 route; an omitted `board` falls through to the "current" board on the server.
+
+### Board selection (UI convention)
+
+Kanban data is partitioned per board — each board has its own SQLite DB
+(`db_path: ~/.hermes/kanban/boards/<slug>/kanban.db`). IDs are **not** unique
+across boards, so every task-scoped request must carry a matching
+`?board=<slug>`; the wrong slug yields 404.
+
+`POST /boards/{slug}/switch` and `is_current` from `/boards` reflect the
+**CLI / gateway-slash-command** pointer, not the dashboard's. Mirroring her,
+the BHK dashboard keeps its selected board in localStorage:
+
+- key: `bhk.kanban.selectedBoard` (string slug, e.g. `better-hermes-kanban`).
+- helpers: `getSelectedBoardSlug()` / `setSelectedBoardSlug(slug)` in
+  `src/lib/boardSettings.ts`.
+- written by `loadBoardData`, `loadTaskPageData`, and `handleBoardChange`
+  (App.tsx) on every successful board resolution.
+- read first when resolving the board for a deep link (`/tasks/{id}` without
+  a `/boards/X/...` segment).
+
+### Server-side search: doesn't exist
+
+`/board` accepts only field-based filters (`tenant`, `include_archived`,
+`workflow_template_id`, `current_step_key`). There is no full-text-search
+endpoint. Text search must be a client-side filter over the current board's
+`/board` payload (the canonical her dashboard does the same).
 
 ## Frontend wiring
 
