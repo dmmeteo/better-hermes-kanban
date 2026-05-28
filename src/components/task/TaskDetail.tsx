@@ -13,6 +13,7 @@ import {
   TaskCommentsPanel,
   TaskDescriptionMarkdown,
   TaskDetailHeader,
+  TaskEventsPanel,
   TaskMetaPanel,
   TaskRunHistoryPanel,
   TaskWorkerLogsPanel,
@@ -75,10 +76,9 @@ export function TaskDetail({
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
   const showPanelChrome = chrome === 'panel';
-  const hasDiagnostics = task.diagnostics.length > 0 || task.warningCount > 0;
+  const showOverlayLayout = showPanelChrome && !isMobile;
   const hasPlannedAttachments = task.plannedAttachments.length > 0;
 
-  const hasLinkedTasks = task.linkedTasks.length > 0;
 
   const mobileSections = [
     { key: 'links', label: 'Linked tasks', icon: Link2, count: task.linkedTasks.length },
@@ -88,21 +88,18 @@ export function TaskDetail({
     { key: 'attachments', label: 'Attachments (planned)', icon: Paperclip, count: task.plannedAttachments.length },
   ];
   const visibleMobileSections = mobileSections.filter((section) => {
-    if (section.key === 'links') return hasLinkedTasks;
-    if (section.key === 'logs') return hasDiagnostics;
     if (section.key === 'attachments') return hasPlannedAttachments;
     return true;
   });
 
   const desktopTabs = useMemo(
     () => [
-      ...(hasLinkedTasks ? [{ key: 'links', label: 'Linked tasks', count: task.linkedTasks.length }] : []),
+      { key: 'links', label: 'Linked tasks', count: task.linkedTasks.length },
       { key: 'comments', label: 'Comments', count: task.commentCount },
-      ...(hasDiagnostics ? [{ key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount }] : []),
-      ...(task.runs.length > 0 ? [{ key: 'runs', label: 'Run history', count: task.runs.length }] : []),
-      ...(!hasLinkedTasks ? [{ key: 'links', label: 'Link tasks', count: 0 }] : []),
+      { key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount },
+      { key: 'runs', label: 'Run history', count: task.runs.length },
     ],
-    [hasDiagnostics, hasLinkedTasks, task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount]
+    [task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount]
   );
   const selectedTab = desktopTabs.some((tab) => tab.key === activeTab) ? activeTab : desktopTabs[0]?.key;
 
@@ -144,8 +141,54 @@ export function TaskDetail({
             </div>
           )}
 
-          {showPanelChrome && <TaskMetaPanel task={task} />}
+          {showPanelChrome && !showOverlayLayout && <TaskMetaPanel task={task} />}
           <LatestSummaryPanel task={task} />
+
+          {showOverlayLayout && (
+            <div className="grid min-h-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]" data-testid="task-detail-overlay-layout">
+              <div className="min-w-0 space-y-4">
+                {readyDisabled && unfinishedParents.length > 0 && (
+                  <WarningBanner message={`Ready disabled: ${unfinishedParents.length} parent task${unfinishedParents.length > 1 ? 's' : ''} not done`} />
+                )}
+
+                <div className="flex items-center gap-0 overflow-x-auto border-b border-border/50" data-testid="task-detail-tabs">
+                  {desktopTabs.map((tab) => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn('relative shrink-0 px-3 py-2 text-xs font-medium transition-colors', activeTab === tab.key ? 'text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                      <span>{tab.label}</span>
+                      {typeof tab.count === 'number' && tab.count > 0 && <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">{tab.count}</span>}
+                      {activeTab === tab.key && <div className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full" style={{ backgroundColor: '#7C5CFF' }} />}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="min-h-[280px] pt-1" data-testid="task-detail-tab-panel">
+                  {selectedTab === 'links' && <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} />}
+                  {selectedTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
+                  {selectedTab === 'logs' && <TaskWorkerLogsPanel task={task} />}
+                  {selectedTab === 'runs' && <TaskRunHistoryPanel task={task} />}
+                </div>
+              </div>
+
+              <aside className="space-y-3 xl:sticky xl:top-0" data-testid="task-detail-overlay-aside">
+                {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={false} />}
+                {showInlineActions && (
+                  <div className="rounded-2xl border border-border/60 bg-background/35 p-3 [&_button]:!rounded-md [&_button]:!px-2.5 [&_button]:!py-2 [&_button]:!text-[11px] [&_svg]:!h-3.5 [&_svg]:!w-3.5" data-testid="task-detail-overlay-actions">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Actions</p>
+                    <TaskActions task={task} allTasks={allTasks} onStatusChange={onStatusChange} onBlock={onBlock} onReclaim={onReclaim} onDecompose={onDecompose} onDelete={onDelete} />
+                  </div>
+                )}
+                <TaskMetaPanel task={task} />
+                <CompactSection title="Events" count={task.activity.length} data-testid="task-events-compact">
+                  <TaskEventsPanel task={task} />
+                </CompactSection>
+                {hasPlannedAttachments && (
+                  <CompactSection title="Planned attachments" count={task.plannedAttachments.length} data-testid="task-attachments-compact">
+                    <TaskAttachmentsPlanned attachments={task.plannedAttachments} />
+                  </CompactSection>
+                )}
+              </aside>
+            </div>
+          )}
 
           {isMobile && (
             <>
@@ -187,7 +230,7 @@ export function TaskDetail({
             </>
           )}
 
-          {!isMobile && (
+          {!isMobile && !showOverlayLayout && (
             <>
               <div className="flex items-center gap-0 border-b border-border/50">
                 {desktopTabs.map((tab) => (
@@ -221,7 +264,7 @@ export function TaskDetail({
         </div>
       </div>
 
-      {!isMobile && showInlineActions && (
+      {!isMobile && !showOverlayLayout && showInlineActions && (
         <div className="shrink-0 border-t border-border/50 p-2 [&_button]:!rounded-md [&_button]:!px-2.5 [&_button]:!py-2 [&_button]:!text-[11px] [&_svg]:!h-3.5 [&_svg]:!w-3.5">
           <TaskActions task={task} allTasks={allTasks} onStatusChange={onStatusChange} onBlock={onBlock} onReclaim={onReclaim} onDecompose={onDecompose} onDelete={onDelete} />
         </div>
