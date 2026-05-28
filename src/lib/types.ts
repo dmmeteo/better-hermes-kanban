@@ -158,6 +158,7 @@ export interface CreateTaskData {
   assignee?: string | null;
   status: TaskStatus;
   parentIds?: string[];
+  skills?: string[];
   workspaceKind?: 'scratch' | 'dir' | 'worktree';
   workspacePath?: string;
 }

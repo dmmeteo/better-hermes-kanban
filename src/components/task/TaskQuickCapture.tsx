@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ChevronDown, Loader2, Search, X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 import type {
   Board,
   BotProfile,
@@ -12,20 +12,12 @@ import type { BoardSettings } from '@/lib/boardSettings';
 import { getStatusOptions } from '@/lib/boardSettings';
 import { BOT_PROFILES, CREATE_TASK_STATUSES, PRIORITY_LABELS } from '@/lib/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { BotAvatar } from '@/components/shared/BotAvatar';
-import { kanbanApi } from '@/lib/kanbanApi';
-import { cn } from '@/lib/utils';
+import { LinkedTaskSearch } from './LinkedTaskSearch';
 import { toast } from 'sonner';
 
 const PRIORITIES: Priority[] = ['p0', 'p1', 'p2', 'p3'];
@@ -76,11 +68,23 @@ function CreateTaskForm({
   const [status, setStatus] = useState<TaskStatus>('triage');
   const [workspaceKind, setWorkspaceKind] = useState<CreateTaskData['workspaceKind']>('scratch');
   const [workspacePath, setWorkspacePath] = useState('');
+  const [skillsInput, setSkillsInput] = useState('');
   const [parent, setParent] = useState<TaskSearchResult | null>(null);
 
   const selectedBoard = useMemo(
     () => boards.find((board) => board.id === selectedBoardId) ?? activeBoard,
     [boards, selectedBoardId, activeBoard],
+  );
+
+  const boardOptions: InlineSelectOption<string>[] = useMemo(
+    () =>
+      boards.map((board) => ({
+        value: board.id,
+        key: board.id,
+        label: board.name || board.id,
+        description: board.taskCount != null ? `${board.taskCount}` : undefined,
+      })),
+    [boards],
   );
 
   const statusOptions: InlineSelectOption<TaskStatus>[] = useMemo(
@@ -132,6 +136,10 @@ function CreateTaskForm({
       toast.error('Workspace path must be absolute');
       return;
     }
+    const skills = skillsInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     await onCreate(
       {
         title: title.trim(),
@@ -140,6 +148,7 @@ function CreateTaskForm({
         assignee,
         status,
         parentIds: parent ? [parent.id] : [],
+        skills: skills.length ? skills : undefined,
         workspaceKind,
         workspacePath: workspacePath.trim() || undefined,
       },
@@ -149,37 +158,9 @@ function CreateTaskForm({
 
   return (
     <>
-      {/* Header: board selector instead of breadcrumbs */}
+      {/* Header */}
       <header className="flex items-center justify-between gap-3" data-testid="create-task-header">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Create on
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
-                data-testid="create-task-board-selector"
-              >
-                <span className="truncate">{selectedBoard.name || selectedBoard.id}</span>
-                <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-64">
-              {boards.map((board) => (
-                <DropdownMenuItem
-                  key={board.id}
-                  onSelect={() => setSelectedBoardId(board.id)}
-                  className={cn(board.id === selectedBoardId && 'bg-accent')}
-                >
-                  <span className="flex-1 truncate">{board.name || board.id}</span>
-                  <span className="text-xs text-muted-foreground">{board.taskCount}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <h2 className="text-sm font-semibold">Create task</h2>
         <Button
           type="button"
           variant="ghost"
@@ -195,6 +176,37 @@ function CreateTaskForm({
 
       {/* Single-column body */}
       <div className="flex flex-col gap-4">
+        {/* Board */}
+        <FieldRow label="Board">
+          <InlineSelectField
+            value={selectedBoardId}
+            options={boardOptions}
+            onChange={(next) => {
+              setSelectedBoardId(next);
+              setParent(null); // parent is board-scoped
+            }}
+            renderTrigger={() => (
+              <span className="text-sm">{selectedBoard.name || selectedBoard.id}</span>
+            )}
+            ariaLabel="Select board"
+            dataTestId="create-task-board"
+            className="border border-border bg-card"
+          />
+        </FieldRow>
+
+        {/* Status */}
+        <FieldRow label="Status">
+          <InlineSelectField
+            value={status}
+            options={statusOptions}
+            onChange={(next) => setStatus(next)}
+            renderTrigger={() => <StatusBadge status={status} />}
+            ariaLabel="Select status"
+            dataTestId="create-task-status"
+            className="border border-border bg-card"
+          />
+        </FieldRow>
+
         {/* Title */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Title</label>
@@ -225,12 +237,35 @@ function CreateTaskForm({
         {/* Parent */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Parent (optional)</label>
-          <ParentTaskPicker
-            boardId={selectedBoardId}
-            parent={parent}
-            onSelect={setParent}
-            onClear={() => setParent(null)}
-          />
+          {parent ? (
+            <div
+              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
+              data-testid="create-task-parent-selected"
+            >
+              <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                {parent.id}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm">{parent.title}</span>
+              <StatusBadge status={parent.status} size="sm" showLabel={false} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={() => setParent(null)}
+                aria-label="Remove parent"
+                data-testid="create-task-parent-clear"
+              >
+                <X size={14} />
+              </Button>
+            </div>
+          ) : (
+            <LinkedTaskSearch
+              boardId={selectedBoardId}
+              testIdSuffix="parent"
+              onSelect={(result) => setParent(result)}
+            />
+          )}
         </div>
 
         {/* Assignee */}
@@ -272,18 +307,18 @@ function CreateTaskForm({
           />
         </FieldRow>
 
-        {/* Status */}
-        <FieldRow label="Status">
-          <InlineSelectField
-            value={status}
-            options={statusOptions}
-            onChange={(next) => setStatus(next)}
-            renderTrigger={() => <StatusBadge status={status} />}
-            ariaLabel="Select status"
-            dataTestId="create-task-status"
-            className="border border-border bg-card"
+        {/* Skills */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Skills (optional, comma-separated)</label>
+          <input
+            type="text"
+            value={skillsInput}
+            onChange={(e) => setSkillsInput(e.target.value)}
+            placeholder="translation, github-code-review…"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm transition-all placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+            data-testid="create-task-skills"
           />
-        </FieldRow>
+        </div>
 
         {/* Workspace + Path */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px_1fr]">
@@ -334,139 +369,11 @@ function CreateTaskForm({
   );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <div className="rounded-lg">{children}</div>
-    </div>
-  );
-}
-
-function ParentTaskPicker({
-  boardId,
-  parent,
-  onSelect,
-  onClear,
-}: {
-  boardId: string;
-  parent: TaskSearchResult | null;
-  onSelect: (task: TaskSearchResult) => void;
-  onClear: () => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<TaskSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const runSearch = async () => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setMessage('Type a task id, title, or body text to search.');
-      return;
-    }
-    setIsSearching(true);
-    setMessage(null);
-    try {
-      const response = await kanbanApi.searchTasks({
-        q: trimmed,
-        board: boardId || undefined,
-        limit: 8,
-        sort: 'relevance',
-      });
-      setResults(response.results);
-      if (response.results.length === 0) setMessage('No matching tasks found by id, title, or body.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Search failed');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const select = (result: TaskSearchResult) => {
-    onSelect(result);
-    setQuery('');
-    setResults([]);
-    setMessage(null);
-  };
-
-  if (parent) {
-    return (
-      <div
-        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
-        data-testid="create-task-parent-selected"
-      >
-        <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          {parent.id}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm">{parent.title}</span>
-        <StatusBadge status={parent.status} size="sm" showLabel={false} />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 shrink-0"
-          onClick={onClear}
-          aria-label="Remove parent"
-          data-testid="create-task-parent-clear"
-        >
-          <X size={14} />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2" data-testid="create-task-parent-search">
-      <div className="flex gap-2">
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              void runSearch();
-            }
-          }}
-          placeholder="Search task id, title, or body…"
-          data-testid="create-task-parent-input"
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={runSearch}
-          disabled={isSearching}
-          data-testid="create-task-parent-submit"
-        >
-          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-        </Button>
-      </div>
-      {message && (
-        <p className="text-xs text-muted-foreground" data-testid="create-task-parent-message">
-          {message}
-        </p>
-      )}
-      {results.length > 0 && (
-        <ul className="flex flex-col rounded-lg border border-border bg-card">
-          {results.map((result) => (
-            <li key={`${result.boardId}-${result.id}`}>
-              <button
-                type="button"
-                onClick={() => select(result)}
-                className="flex w-full items-center gap-2 border-b border-border/30 px-3 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-accent/30"
-                data-testid="create-task-parent-result"
-              >
-                <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {result.id}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{result.title}</span>
-                <StatusBadge status={result.status} size="sm" showLabel={false} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

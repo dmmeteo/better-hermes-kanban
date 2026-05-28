@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Loader2, Plus, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LinkedTask, Task, TaskSearchResult } from '@/lib/types';
-import { kanbanApi } from '@/lib/kanbanApi';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { LinkedTaskSearch } from './LinkedTaskSearch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -213,111 +212,21 @@ function AddLinkedTaskSearch({
   onLinkTask: TaskLinkedTasksTabProps['onLinkTask'];
   onDone: () => void;
 }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<TaskSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLinkingId, setIsLinkingId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const runSearch = async () => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setMessage('Type a task id, title, or body text to search.');
-      return;
-    }
-    setIsSearching(true);
-    setMessage(null);
-    try {
-      const response = await kanbanApi.searchTasks({
-        q: trimmed,
-        board: task.boardId || undefined,
-        limit: 8,
-        sort: 'relevance',
-      });
-      setResults(response.results);
-      if (response.results.length === 0) setMessage('No matching tasks found by id, title, or body.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Search failed');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const selectResult = async (result: TaskSearchResult) => {
-    const id = result.id;
-    if (id.toLowerCase() === task.id.toLowerCase()) {
-      setMessage('Cannot link a task to itself.');
-      return;
-    }
-    if (existingIds.has(id.toLowerCase())) {
-      setMessage(`${id} is already linked in this group.`);
-      return;
-    }
-    setIsLinkingId(id);
-    setMessage(null);
-    try {
-      await onLinkTask(id, relation);
-      setQuery('');
-      setResults([]);
-      onDone();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Link failed');
-    } finally {
-      setIsLinkingId(null);
-    }
+  const checkDisabled = (result: TaskSearchResult): string | null => {
+    if (result.id.toLowerCase() === task.id.toLowerCase()) return 'Cannot link a task to itself.';
+    if (existingIds.has(result.id.toLowerCase())) return `${result.id} is already linked in this group.`;
+    return null;
   };
 
   return (
-    <div className="space-y-2 pt-1" data-testid={`linked-tasks-search-${relation}`}>
-      <div className="flex gap-2">
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => event.key === 'Enter' && runSearch()}
-          placeholder="Search task id, title, or body…"
-          data-testid={`linked-tasks-search-input-${relation}`}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={runSearch}
-          disabled={isSearching}
-          data-testid={`linked-tasks-search-submit-${relation}`}
-        >
-          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-        </Button>
-      </div>
-      {message && (
-        <p className="text-xs text-muted-foreground" data-testid="linked-tasks-search-message">
-          {message}
-        </p>
-      )}
-      {results.length > 0 && (
-        <ul className="flex flex-col">
-          {results.map((result) => {
-            const self = result.id.toLowerCase() === task.id.toLowerCase();
-            const duplicate = existingIds.has(result.id.toLowerCase());
-            return (
-              <li key={`${result.boardId}-${result.id}`}>
-                <button
-                  type="button"
-                  onClick={() => selectResult(result)}
-                  disabled={self || duplicate || isLinkingId === result.id}
-                  className="flex w-full items-center gap-2 border-b border-border/30 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
-                  data-testid="linked-tasks-search-result"
-                >
-                  <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {result.id}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{result.title}</span>
-                  <StatusBadge status={result.status} size="sm" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+    <LinkedTaskSearch
+      boardId={task.boardId || undefined}
+      testIdSuffix={relation}
+      isDisabled={checkDisabled}
+      onSelect={async (result) => {
+        await onLinkTask(result.id, relation);
+        onDone();
+      }}
+    />
   );
 }

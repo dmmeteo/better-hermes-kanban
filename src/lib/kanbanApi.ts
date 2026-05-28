@@ -494,6 +494,7 @@ export const kanbanApi = {
         assignee: data.assignee || '',
         status: data.status,
         parent_ids: data.parentIds ?? [],
+        skills: data.skills && data.skills.length ? data.skills : undefined,
         workspace_kind: data.workspaceKind ?? 'scratch',
         workspace_path: data.workspacePath?.trim() || undefined,
       }),
