@@ -1,3 +1,4 @@
+import type { BoardSettings } from '@/lib/boardSettings';
 import type { Task } from '@/lib/types';
 import { TaskDetail } from './TaskDetail';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
@@ -18,6 +19,7 @@ interface TaskDetailSheetProps {
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
+  boardSettings: BoardSettings;
 }
 
 export function TaskDetailSheet({
@@ -35,6 +37,7 @@ export function TaskDetailSheet({
   onLinkTask,
   isUpdating = false,
   isMobile = false,
+  boardSettings,
 }: TaskDetailSheetProps) {
   if (!task) return null;
 
@@ -60,6 +63,7 @@ export function TaskDetailSheet({
           onUpdateTask={onUpdateTask}
           onLinkTask={onLinkTask}
           isUpdating={isUpdating}
+          boardSettings={boardSettings}
         />
       </SheetContent>
     </Sheet>

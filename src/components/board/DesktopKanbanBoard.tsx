@@ -12,7 +12,9 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, TaskStatus } from '@/lib/types';
-import { DROPPABLE_TASK_STATUSES, STATUS_ORDER, isStatusDropEnabled } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
+import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
+import { DROPPABLE_TASK_STATUSES, isStatusDropEnabled } from '@/lib/types';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { toast } from 'sonner';
@@ -24,6 +26,7 @@ interface DesktopKanbanBoardProps {
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
   readOnly?: boolean;
+  boardSettings: BoardSettings;
 }
 
 export function DesktopKanbanBoard({
@@ -33,7 +36,9 @@ export function DesktopKanbanBoard({
   onAddTask,
   searchQuery,
   readOnly = false,
+  boardSettings,
 }: DesktopKanbanBoardProps) {
+  const orderedStatuses = useMemo(() => getOrderedStatuses(boardSettings), [boardSettings]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -55,11 +60,11 @@ export function DesktopKanbanBoard({
 
   const tasksByStatus = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
-    STATUS_ORDER.forEach((status) => {
+    orderedStatuses.forEach((status) => {
       grouped[status] = filteredTasks.filter((t) => t.status === status);
     });
     return grouped;
-  }, [filteredTasks]);
+  }, [filteredTasks, orderedStatuses]);
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
@@ -109,7 +114,7 @@ export function DesktopKanbanBoard({
             : t
         );
         onTasksChange(updated);
-        toast.success(`Moved to ${overStatus}`);
+        toast.success(`Moved to ${getStatusLabel(overStatus, boardSettings)}`);
       }
     } else {
       // Dropped over another card
@@ -149,7 +154,7 @@ export function DesktopKanbanBoard({
             : t
         );
         onTasksChange(updated);
-        toast.success(`Moved to ${overTask.status}`);
+        toast.success(`Moved to ${getStatusLabel(overTask.status, boardSettings)}`);
       }
     }
   }
@@ -162,7 +167,7 @@ export function DesktopKanbanBoard({
       onDragEnd={handleDragEnd}
     >
       <div className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden custom-scrollbar px-4 pt-3 pb-4 items-stretch">
-        {STATUS_ORDER.map((status) => (
+        {orderedStatuses.map((status) => (
           <KanbanColumn
             key={status}
             status={status}
@@ -170,6 +175,7 @@ export function DesktopKanbanBoard({
             onTaskClick={onTaskClick}
             onAddTask={onAddTask}
             readOnly={readOnly}
+            statusLabel={getStatusLabel(status, boardSettings)}
           />
         ))}
       </div>

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
 import type { Task, Board, BotProfile, CreateTaskData, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
+import { getBoardSettings, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
@@ -75,10 +76,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNewBoardOpen, setIsNewBoardOpen] = useState(false);
   const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('settings');
-  const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
-    const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
-    return saved === 'modal' || saved === 'page' ? saved : 'drawer';
-  });
+  const [boardSettings, setBoardSettings] = useState<BoardSettings>(() => getBoardSettings(null));
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'fallback'>('live');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -101,6 +99,7 @@ function App() {
   const isTaskPage = !!routeTaskId;
   const isSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
   const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/' || location.pathname === '/search' || location.pathname === '/search/';
+  const detailPresentation = boardSettings.detailPresentation;
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
@@ -194,8 +193,8 @@ function App() {
   }, [boardIdFromPath, boardIdFromUrl, isSettingsPage, isTaskSearchPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
 
   useEffect(() => {
-    window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
-  }, [detailPresentation]);
+    setBoardSettings(migrateLegacyDetailPresentation(activeBoard?.id));
+  }, [activeBoard?.id]);
 
   useEffect(() => {
     if (routeTaskId) {
@@ -297,7 +296,7 @@ function App() {
   }, [activeBoard, isTaskPage, navigate]);
 
   const handleDetailPresentationChange = useCallback((presentation: TaskDetailPresentation) => {
-    setDetailPresentation(presentation);
+    setBoardSettings(saveBoardSettings(activeBoard?.id, { detailPresentation: presentation }));
     if (presentation === 'page' && selectedTask) {
       navigate(taskPath(selectedTask.id));
       return;
@@ -556,6 +555,7 @@ function App() {
               onLinkTask={handleLinkTask}
               isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
               isMobile={isMobile}
+              boardSettings={boardSettings}
             />
           ) : (
             <BoardView
@@ -564,6 +564,7 @@ function App() {
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
               searchQuery={searchQuery}
+              boardSettings={boardSettings}
             />
           )}
         </div>
@@ -594,6 +595,7 @@ function App() {
           onLinkTask={handleLinkTask}
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
+          boardSettings={boardSettings}
         />
       ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
         <TaskDetailModal
@@ -611,6 +613,7 @@ function App() {
           onLinkTask={handleLinkTask}
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
+          boardSettings={boardSettings}
         />
       ) : null}
 
@@ -644,6 +647,7 @@ function App() {
           assignees={assignees}
           isSubmitting={isCreatingTask}
           boardName={activeBoard.name || activeBoard.id}
+          boardSettings={boardSettings}
           isMobile
         />
       </div>
@@ -655,6 +659,7 @@ function App() {
           assignees={assignees}
           isSubmitting={isCreatingTask}
           boardName={activeBoard.name || activeBoard.id}
+          boardSettings={boardSettings}
         />
       </div>
 

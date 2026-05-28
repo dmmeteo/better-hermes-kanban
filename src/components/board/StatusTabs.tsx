@@ -1,5 +1,7 @@
 import type { TaskStatus } from '@/lib/types';
-import { STATUS_ORDER, STATUS_COLORS, STATUS_LABELS, isStatusReadOnly } from '@/lib/types';
+import type { BoardSettings } from '@/lib/boardSettings';
+import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
+import { STATUS_COLORS, isStatusReadOnly } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Lock } from 'lucide-react';
 
@@ -7,12 +9,14 @@ interface StatusTabsProps {
   activeStatus: TaskStatus;
   onStatusChange: (status: TaskStatus) => void;
   counts: Record<string, number>;
+  boardSettings: BoardSettings;
 }
 
-export function StatusTabs({ activeStatus, onStatusChange, counts }: StatusTabsProps) {
+export function StatusTabs({ activeStatus, onStatusChange, counts, boardSettings }: StatusTabsProps) {
+  const orderedStatuses = getOrderedStatuses(boardSettings);
   return (
     <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2">
-      {STATUS_ORDER.map((status) => {
+      {orderedStatuses.map((status) => {
         const count = counts[status] || 0;
         const isActive = activeStatus === status;
         const color = STATUS_COLORS[status];
@@ -36,7 +40,7 @@ export function StatusTabs({ activeStatus, onStatusChange, counts }: StatusTabsP
             }
           >
             {isReadOnlyStatus && <Lock size={10} />}
-            {STATUS_LABELS[status]}
+            {getStatusLabel(status, boardSettings)}
             {count > 0 && (
               <span
                 className={cn(

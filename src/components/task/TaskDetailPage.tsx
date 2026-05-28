@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Edit3, ExternalLink, Loader2, Save, X } from 'lucide-react';
+import type { BoardSettings } from '@/lib/boardSettings';
 import type { Board, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { TaskDetail } from './TaskDetail';
@@ -22,6 +23,7 @@ interface TaskDetailPageProps {
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
+  boardSettings: BoardSettings;
 }
 
 export function TaskDetailPage({
@@ -40,6 +42,7 @@ export function TaskDetailPage({
   onLinkTask,
   isUpdating = false,
   isMobile = false,
+  boardSettings,
 }: TaskDetailPageProps) {
   const [isEditingDocument, setIsEditingDocument] = useState(false);
   const [draftTitle, setDraftTitle] = useState(task?.title || '');
@@ -193,6 +196,7 @@ export function TaskDetailPage({
                 onUpdateTask={onUpdateTask}
                 onLinkTask={onLinkTask}
                 isUpdating={isUpdating}
+          boardSettings={boardSettings}
                 chrome="page"
                 showDescription={false}
                 showUpdatePanel={false}

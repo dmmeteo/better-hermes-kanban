@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import type { BoardSettings } from '@/lib/boardSettings';
+import { getStatusOptions } from '@/lib/boardSettings';
 import type { Priority, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
-import { PRIORITY_LABELS, SELECTABLE_TASK_STATUSES, STATUS_LABELS, isStatusReadOnly } from '@/lib/types';
+import { PRIORITY_LABELS, SELECTABLE_TASK_STATUSES, isStatusReadOnly } from '@/lib/types';
 
-const STATUS_OPTIONS: TaskStatus[] = SELECTABLE_TASK_STATUSES;
 const PRIORITY_OPTIONS: Priority[] = ['p0', 'p1', 'p2', 'p3'];
 
 function getInitialStatus(status: TaskStatus): TaskStatus {
@@ -14,9 +15,10 @@ interface TaskUpdatePanelProps {
   isSaving?: boolean;
   onUpdate: (patch: UpdateTaskData) => Promise<void> | void;
   showTitleField?: boolean;
+  boardSettings: BoardSettings;
 }
 
-export function TaskUpdatePanel({ task, isSaving = false, onUpdate, showTitleField = true }: TaskUpdatePanelProps) {
+export function TaskUpdatePanel({ task, isSaving = false, onUpdate, showTitleField = true, boardSettings }: TaskUpdatePanelProps) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [assignee, setAssignee] = useState(task.assignee || '');
@@ -120,7 +122,7 @@ export function TaskUpdatePanel({ task, isSaving = false, onUpdate, showTitleFie
             disabled={Boolean(statusDisabledReason) || isSaving}
             className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
           >
-            {STATUS_OPTIONS.map((value) => <option key={value} value={value}>{STATUS_LABELS[value]}</option>)}
+            {getStatusOptions(boardSettings, SELECTABLE_TASK_STATUSES).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <button
             onClick={updateStatus}
