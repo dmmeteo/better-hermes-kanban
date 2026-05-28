@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, Edit3, ExternalLink, Loader2, Save, X } from 'lucide-react';
 import type { Board, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -45,12 +45,6 @@ export function TaskDetailPage({
   const [draftTitle, setDraftTitle] = useState(task?.title || '');
   const [draftDescription, setDraftDescription] = useState(task?.description || '');
 
-  useEffect(() => {
-    if (!isEditingDocument) {
-      setDraftTitle(task?.title || '');
-      setDraftDescription(task?.description || '');
-    }
-  }, [isEditingDocument, task]);
 
   const trimmedTitle = draftTitle.trim();
   const isDirty = useMemo(() => {
