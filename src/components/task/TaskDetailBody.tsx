@@ -23,7 +23,7 @@ import {
 import { TaskLinkedTasksTab } from './TaskLinkedTasksTab';
 import { TaskNotifyMenu } from './TaskNotifyMenu';
 
-type Layout = 'page' | 'overlay' | 'mobile';
+type Layout = 'page' | 'overlay' | 'tablet' | 'mobile';
 
 interface TaskStatusControlProps {
   task: Task;
@@ -171,8 +171,15 @@ export function TaskDetailBody({
           {headerExtra}
         </div>
         {/* Status + Notify render under the title up to lg (status left, notify right).
-            On lg+ the same row renders above the sidebar — see Page/Sheet/Modal. */}
-        <div className="flex items-center justify-between gap-2 lg:hidden">
+            On lg+ the page/modal render the same row above the sidebar instead, so the
+            stacked copy hides at lg. The single-column tablet/mobile layouts have no
+            sidebar column, so they always keep this stacked row. */}
+        <div
+          className={cn(
+            'flex items-center justify-between gap-2',
+            layout !== 'tablet' && layout !== 'mobile' && 'lg:hidden',
+          )}
+        >
           <TaskStatusControl
             task={task}
             onUpdateTask={onUpdateTask}
