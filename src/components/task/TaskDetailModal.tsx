@@ -79,12 +79,13 @@ export function TaskDetailModal({
             />
           </div>
           <div className="min-w-0">
-            <div className="mb-3 hidden md:flex md:justify-end" data-testid="task-modal-status-row">
+            <div className="mb-3 hidden lg:flex lg:justify-start" data-testid="task-modal-status-row">
               <TaskStatusControl
                 task={task}
                 onUpdateTask={onUpdateTask}
                 onSpecify={onSpecify}
                 onDecompose={onDecompose}
+                align="start"
               />
             </div>
             <TaskDetailSidebar

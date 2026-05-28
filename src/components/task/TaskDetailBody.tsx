@@ -127,7 +127,7 @@ interface TaskDetailBodyProps {
   headerExtra?: ReactNode;
 }
 
-type TabKey = 'links' | 'comments' | 'logs' | 'runs';
+type TabKey = 'comments' | 'logs' | 'runs';
 
 export function TaskDetailBody({
   task,
@@ -141,21 +141,20 @@ export function TaskDetailBody({
   onDecompose,
   headerExtra,
 }: TaskDetailBodyProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('links');
+  const [activeTab, setActiveTab] = useState<TabKey>('comments');
 
   const tabs = useMemo(
     () =>
       [
-        { key: 'links', label: 'Linked tasks', count: task.linkedTasks.length },
         { key: 'comments', label: 'Comments', count: task.commentCount },
         { key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount },
         { key: 'runs', label: 'Run history', count: task.runs.length },
       ] satisfies { key: TabKey; label: string; count: number }[],
-    [task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount],
+    [task.commentCount, task.diagnostics.length, task.runs.length, task.warningCount],
   );
 
   useEffect(() => {
-    if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('links');
+    if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('comments');
   }, [tabs, activeTab]);
 
   const readyDisabled = isReadyDisabled(task, allTasks);
@@ -186,9 +185,9 @@ export function TaskDetailBody({
           </div>
           {headerExtra}
         </div>
-        {/* Status + triage-actions render under the title on mobile only.
-            Desktop renders the same control above the sidebar — see Page/Sheet/Modal. */}
-        <div className="md:hidden">
+        {/* Status + triage-actions render under the title up to lg.
+            On lg+ the same control renders above the sidebar — see Page/Sheet/Modal. */}
+        <div className="lg:hidden">
           <TaskStatusControl
             task={task}
             onUpdateTask={onUpdateTask}
@@ -219,6 +218,10 @@ export function TaskDetailBody({
         />
       </section>
 
+      <section data-testid="task-linked-section">
+        <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} onUnlinkTask={onUnlinkTask} />
+      </section>
+
       <section data-testid="task-detail-tabs-section" className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-0 overflow-x-auto border-b border-border/50" data-testid="task-detail-tabs">
           {tabs.map((tab) => (
@@ -243,7 +246,6 @@ export function TaskDetailBody({
           ))}
         </div>
         <div className="min-h-[240px] pt-3" data-testid="task-detail-tab-panel">
-          {activeTab === 'links' && <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} onUnlinkTask={onUnlinkTask} />}
           {activeTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
           {activeTab === 'logs' && <TaskWorkerLogsPanel task={task} />}
           {activeTab === 'runs' && <TaskRunHistoryPanel task={task} />}
