@@ -232,7 +232,7 @@ function App() {
   useEffect(() => {
     if (!selectedTaskId || isTaskPage) return;
     let cancelled = false;
-    kanbanApi.getTask(selectedTaskId)
+    kanbanApi.getTask(selectedTaskId, activeBoard?.id)
       .then((detailTask) => {
         if (cancelled || !detailTask) return;
         setTasks((current) => current.map((task) => (task.id === detailTask.id ? mergeTaskUpdate(task, detailTask) : task)));
@@ -243,7 +243,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [isTaskPage, selectedTaskId]);
+  }, [activeBoard?.id, isTaskPage, selectedTaskId]);
 
   useEffect(() => {
     if (!selectedTaskId || !activeBoard) {
