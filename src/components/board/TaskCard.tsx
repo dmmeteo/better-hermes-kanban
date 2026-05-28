@@ -49,9 +49,9 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
         readOnly ? 'active:cursor-pointer' : 'active:cursor-grabbing active:scale-[0.98]',
         'flex flex-col gap-2',
         'transition-all duration-150',
-        'hover:border-border hover:-translate-y-0.5 hover:shadow-lg',
+        'hover:border-muted-foreground/70 hover:-translate-y-0.5 hover:shadow-lg',
         isDragging && 'opacity-40',
-        isOverlay && 'opacity-85 rotate-[2deg] shadow-2xl cursor-grabbing',
+        isOverlay && 'opacity-90 rotate-[3.5deg] scale-[1.03] shadow-2xl cursor-grabbing',
         isReadOnlyStatus && 'running-card cursor-default',
         'task-slide-in'
       )}
