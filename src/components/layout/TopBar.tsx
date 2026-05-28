@@ -129,13 +129,13 @@ export function TopBar({
       </div>
 
       {/* Desktop header */}
-      <div className="hidden md:flex items-center gap-4 h-14 px-6">
+      <div className="hidden h-14 grid-cols-[1fr_minmax(0,640px)_1fr] items-center gap-4 px-6 md:grid">
         <Link
           to={logoHomeHref}
           aria-label={`Go to ${activeBoard.name || activeBoard.id} board`}
           title={`Go to ${activeBoard.name || activeBoard.id} board`}
           data-testid="app-logo-home-link"
-          className="flex shrink-0 items-center gap-2.5 rounded-xl transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="flex w-fit items-center gap-2.5 rounded-xl transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Feather size={24} style={{ color: '#7C5CFF' }} />
           <span className="font-bold text-sm leading-tight">Hermes</span>
@@ -150,11 +150,11 @@ export function TopBar({
           onFiltersChange={onSearchFiltersChange || (() => undefined)}
           onSubmit={(query, filters) => onSearchSubmit?.(query, filters)}
           placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search all tasks…'}
-          className="min-w-[360px] flex-1 max-w-5xl"
+          className="w-full"
           testId="topbar-global-search"
         />
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
           {!isTaskPage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
