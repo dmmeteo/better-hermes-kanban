@@ -98,7 +98,7 @@ export function InlineSelectField<T>({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>{triggerEl}</DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className={cn('min-w-[12rem]', contentClassName)}>
+      <DropdownMenuContent align={align} className={cn('min-w-[18rem] max-w-[min(20rem,96vw)]', contentClassName)}>
         {options.map((option) => {
           const selected = isSameValue(option.value, value);
           return (
@@ -109,16 +109,22 @@ export function InlineSelectField<T>({
                 e.preventDefault();
                 void handleSelect(option);
               }}
-              className="flex items-start gap-2"
+              className={cn(
+                'flex items-center gap-3 py-1.5 focus:bg-accent/60 focus:text-foreground',
+                selected && 'bg-accent/40',
+              )}
             >
-              <span className="mt-[2px] w-4 shrink-0">
-                {selected ? <Check size={14} className="text-primary" /> : null}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm">{option.label}</span>
-                {option.description && (
-                  <span className="truncate text-xs text-muted-foreground">{option.description}</span>
-                )}
+              <span className="shrink-0">{option.label}</span>
+              {option.description && (
+                <span
+                  className="min-w-0 flex-1 truncate text-[11px] leading-snug text-muted-foreground/85"
+                  title={typeof option.description === 'string' ? option.description : undefined}
+                >
+                  {option.description}
+                </span>
+              )}
+              <span className="ml-auto shrink-0">
+                {selected ? <Check size={13} className="text-primary" /> : null}
               </span>
             </DropdownMenuItem>
           );
