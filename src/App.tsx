@@ -138,12 +138,19 @@ function App() {
   const loadTaskPageData = useCallback(async (taskId: string) => {
     try {
       setIsLoading(true);
-      const lookupBoardId = boardIdFromUrl;
-      const [boardsResult, directTask] = await Promise.all([
-        kanbanApi.getBoards(),
-        kanbanApi.getTask(taskId, lookupBoardId),
-      ]);
-      const taskBoardId = directTask?.boardId || boardIdFromUrl;
+      // Resolve the board *before* fetching the task: Hermes scopes
+      // /tasks/{id} to the requested board (omitting `?board=` 404s when
+      // the task isn't on the dispatcher's current board, which is the
+      // common case when a deep link lands on /tasks/{id} without a
+      // board segment in the URL).
+      const boardsResult = await kanbanApi.getBoards();
+      const fallbackBoardId =
+        boardsResult.boards.find((b) => b.isCurrent)?.id
+        ?? boardsResult.boards.find((b) => b.isDefault)?.id
+        ?? boardsResult.boards[0]?.id;
+      const lookupBoardId = boardIdFromUrl ?? fallbackBoardId;
+      const directTask = await kanbanApi.getTask(taskId, lookupBoardId);
+      const taskBoardId = directTask?.boardId || lookupBoardId;
       const boardData = await kanbanApi.getBoard(taskBoardId);
       const mergedTasks = directTask
         ? boardData.tasks.some((task) => task.id === directTask.id)
