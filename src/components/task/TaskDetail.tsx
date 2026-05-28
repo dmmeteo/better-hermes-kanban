@@ -173,7 +173,7 @@ export function TaskDetail({
               </div>
 
               <aside className="space-y-3 xl:sticky xl:top-0" data-testid="task-detail-overlay-aside">
-                {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={false} />}
+                {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={false} boardSettings={boardSettings} />}
                 {showInlineActions && (
                   <div className="rounded-2xl border border-border/60 bg-background/35 p-3 [&_button]:!rounded-md [&_button]:!px-2.5 [&_button]:!py-2 [&_button]:!text-[11px] [&_svg]:!h-3.5 [&_svg]:!w-3.5" data-testid="task-detail-overlay-actions">
                     <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Actions</p>
