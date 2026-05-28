@@ -377,6 +377,34 @@ function App() {
     [activeBoard]
   );
 
+  const handleLinkTask = useCallback(
+    async (targetTaskId: string, relation: 'parent' | 'child') => {
+      if (!selectedTask || !activeBoard) return;
+      if (targetTaskId.toLowerCase() === selectedTask.id.toLowerCase()) {
+        toast.error('Cannot link a task to itself');
+        return;
+      }
+      const duplicate = selectedTask.linkedTasks.some((link) => link.relation === relation && link.taskId.toLowerCase() === targetTaskId.toLowerCase());
+      if (duplicate) {
+        toast.error('That task is already linked in this group');
+        return;
+      }
+      try {
+        setUpdatingTaskId(selectedTask.id);
+        const updated = await kanbanApi.linkTask(selectedTask.id, targetTaskId, relation, activeBoard.id);
+        setTasks((current) => current.map((task) => (task.id === updated.id ? mergeTaskUpdate(task, updated) : task)));
+        toast.success(`Linked ${targetTaskId}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to link task';
+        toast.error(message);
+        throw error;
+      } finally {
+        setUpdatingTaskId(null);
+      }
+    },
+    [activeBoard, selectedTask]
+  );
+
   const handleAddComment = useCallback(
     async () => {
       toast.info('Read-only mode: comments are disabled in this MVP');
@@ -513,6 +541,7 @@ function App() {
               onDecompose={handleDecompose}
               onDelete={handleDelete}
               onUpdateTask={updateSelectedTask}
+              onLinkTask={handleLinkTask}
               isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
               isMobile={isMobile}
             />
@@ -550,6 +579,7 @@ function App() {
           onDecompose={handleDecompose}
           onDelete={handleDelete}
           onUpdateTask={updateSelectedTask}
+          onLinkTask={handleLinkTask}
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
@@ -566,6 +596,7 @@ function App() {
           onDecompose={handleDecompose}
           onDelete={handleDelete}
           onUpdateTask={updateSelectedTask}
+          onLinkTask={handleLinkTask}
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />

@@ -10,15 +10,14 @@ import { cn } from '@/lib/utils';
 import {
   CompactSection,
   LatestSummaryPanel,
-  LinkedTasksCompact,
   TaskCommentsPanel,
   TaskDescriptionMarkdown,
   TaskDetailHeader,
-  TaskEventsPanel,
   TaskMetaPanel,
   TaskRunHistoryPanel,
   TaskWorkerLogsPanel,
 } from './TaskDetailSections';
+import { TaskLinkedTasksTab } from './TaskLinkedTasksTab';
 
 interface TaskDetailProps {
   task: Task;
@@ -32,6 +31,7 @@ interface TaskDetailProps {
   onDecompose: () => void;
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   showCloseButton?: boolean;
   chrome?: 'panel' | 'page';
@@ -52,6 +52,7 @@ export function TaskDetail({
   onDecompose,
   onDelete,
   onUpdateTask,
+  onLinkTask,
   isUpdating = false,
   showCloseButton = false,
   chrome = 'panel',
@@ -59,7 +60,7 @@ export function TaskDetail({
   showInlineActions = true,
   showDescription = true,
 }: TaskDetailProps) {
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('links');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     comments: false,
     activity: false,
@@ -74,40 +75,37 @@ export function TaskDetail({
   const readyDisabled = isReadyDisabled(task, allTasks);
   const unfinishedParents = readyDisabled ? getUnfinishedParents(task, allTasks) : [];
   const showPanelChrome = chrome === 'panel';
-  const hasLinkedTasks = task.linkedTasks.length > 0;
   const hasDiagnostics = task.diagnostics.length > 0 || task.warningCount > 0;
   const hasPlannedAttachments = task.plannedAttachments.length > 0;
 
   const mobileSections = [
     { key: 'comments', label: 'Comments', icon: MessageSquare, count: task.commentCount },
-    { key: 'activity', label: 'Events / Activity', icon: Activity, count: task.activity.length },
-    { key: 'runs', label: 'Runs / History', icon: Clock, count: task.runs.length },
     { key: 'links', label: 'Linked tasks', icon: Link2, count: task.linkedTasks.length },
-    { key: 'logs', label: 'Worker logs', icon: Activity, count: task.diagnostics.length + task.warningCount },
+    { key: 'comments', label: 'Comments', icon: MessageSquare, count: task.commentCount },
+    { key: 'logs', label: 'Worker log', icon: Activity, count: task.diagnostics.length + task.warningCount },
+    { key: 'runs', label: 'Run history', icon: Clock, count: task.runs.length },
     { key: 'attachments', label: 'Attachments (planned)', icon: Paperclip, count: task.plannedAttachments.length },
   ];
   const visibleMobileSections = mobileSections.filter((section) => {
-    if (section.key === 'links') return hasLinkedTasks;
     if (section.key === 'logs') return hasDiagnostics;
     if (section.key === 'attachments') return hasPlannedAttachments;
     return true;
   });
 
-  const hasDetailsContent = showUpdatePanel || readyDisabled || hasLinkedTasks || hasDiagnostics || hasPlannedAttachments;
   const desktopTabs = useMemo(
     () => [
-      ...(hasDetailsContent ? [{ key: 'details', label: 'Details', count: null as number | null }] : []),
-      { key: 'activity', label: 'Activity', count: task.activity.length },
-      { key: 'runs', label: 'Runs', count: task.runs.length },
+      { key: 'links', label: 'Linked tasks', count: task.linkedTasks.length },
       { key: 'comments', label: 'Comments', count: task.commentCount },
+      { key: 'logs', label: 'Worker log', count: task.diagnostics.length + task.warningCount },
+      { key: 'runs', label: 'Run history', count: task.runs.length },
     ],
-    [hasDetailsContent, task.activity.length, task.commentCount, task.runs.length]
+    [task.commentCount, task.diagnostics.length, task.linkedTasks.length, task.runs.length, task.warningCount]
   );
   const selectedTab = desktopTabs.some((tab) => tab.key === activeTab) ? activeTab : desktopTabs[0]?.key;
 
   useEffect(() => {
     if (!desktopTabs.some((tab) => tab.key === activeTab)) {
-      setActiveTab(desktopTabs[0]?.key || 'comments');
+      setActiveTab(desktopTabs[0]?.key || 'links');
     }
   }, [activeTab, desktopTabs]);
 
@@ -167,11 +165,10 @@ export function TaskDetail({
                     </button>
                     {expandedSections[section.key] && (
                       <div className="ml-6 rounded-lg bg-background/35 px-3 py-2">
+                        {section.key === 'links' && <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} />}
                         {section.key === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
-                        {section.key === 'activity' && <TaskEventsPanel task={task} />}
-                        {section.key === 'runs' && <TaskRunHistoryPanel task={task} />}
-                        {section.key === 'links' && <LinkedTasksCompact task={task} />}
                         {section.key === 'logs' && <TaskWorkerLogsPanel task={task} />}
+                        {section.key === 'runs' && <TaskRunHistoryPanel task={task} />}
                         {section.key === 'attachments' && <TaskAttachmentsPlanned attachments={task.plannedAttachments} />}
                       </div>
                     )}
@@ -200,16 +197,13 @@ export function TaskDetail({
               </div>
 
               <div className="pt-2">
-                {selectedTab === 'details' && (
+                {selectedTab === 'links' && <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} />}
+                {selectedTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
+                {selectedTab === 'logs' && (
                   <div className="space-y-4">
                     {readyDisabled && unfinishedParents.length > 0 && <WarningBanner message={`Ready disabled: ${unfinishedParents.length} parent task${unfinishedParents.length > 1 ? 's' : ''} not done`} />}
                     {showUpdatePanel && <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} showTitleField={showPanelChrome} />}
-                    <LinkedTasksCompact task={task} />
-                    {hasDiagnostics && (
-                      <CompactSection title="Worker logs" count={task.diagnostics.length + task.warningCount} data-testid="task-worker-logs-compact">
-                        <TaskWorkerLogsPanel task={task} />
-                      </CompactSection>
-                    )}
+                    <TaskWorkerLogsPanel task={task} />
                     {hasPlannedAttachments && (
                       <CompactSection title="Planned attachments" count={task.plannedAttachments.length} data-testid="task-attachments-compact">
                         <TaskAttachmentsPlanned attachments={task.plannedAttachments} />
@@ -217,9 +211,7 @@ export function TaskDetail({
                     )}
                   </div>
                 )}
-                {selectedTab === 'activity' && <TaskEventsPanel task={task} />}
                 {selectedTab === 'runs' && <TaskRunHistoryPanel task={task} />}
-                {selectedTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
               </div>
             </>
           )}

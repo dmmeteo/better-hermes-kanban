@@ -19,6 +19,7 @@ interface TaskDetailPageProps {
   onDecompose: () => void;
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
 }
@@ -36,6 +37,7 @@ export function TaskDetailPage({
   onDecompose,
   onDelete,
   onUpdateTask,
+  onLinkTask,
   isUpdating = false,
   isMobile = false,
 }: TaskDetailPageProps) {
@@ -189,6 +191,7 @@ export function TaskDetailPage({
                 onDecompose={onDecompose}
                 onDelete={onDelete}
                 onUpdateTask={onUpdateTask}
+                onLinkTask={onLinkTask}
                 isUpdating={isUpdating}
                 chrome="page"
                 showDescription={false}

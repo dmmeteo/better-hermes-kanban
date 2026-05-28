@@ -487,6 +487,19 @@ export const kanbanApi = {
     return normalizeTask(rawTask, boardId || 'current');
   },
 
+  async linkTask(taskId: string, targetTaskId: string, relation: 'parent' | 'child', boardId?: string): Promise<Task> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const parentId = relation === 'parent' ? targetTaskId : taskId;
+    const childId = relation === 'parent' ? taskId : targetTaskId;
+    const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/links${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_id: parentId, child_id: childId }),
+    });
+    const rawTask = isObject(response) && response.task ? response.task : response;
+    return normalizeTask(rawTask, boardId || 'current');
+  },
+
   async updateTask(taskId: string, data: UpdateTaskData, boardId?: string): Promise<Task> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     const payload: Record<string, unknown> = {};

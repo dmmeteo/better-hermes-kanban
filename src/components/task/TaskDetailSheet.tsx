@@ -15,6 +15,7 @@ interface TaskDetailSheetProps {
   onDecompose: () => void;
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
 }
@@ -31,6 +32,7 @@ export function TaskDetailSheet({
   onDecompose,
   onDelete,
   onUpdateTask,
+  onLinkTask,
   isUpdating = false,
   isMobile = false,
 }: TaskDetailSheetProps) {
@@ -56,6 +58,7 @@ export function TaskDetailSheet({
           onDecompose={onDecompose}
           onDelete={onDelete}
           onUpdateTask={onUpdateTask}
+          onLinkTask={onLinkTask}
           isUpdating={isUpdating}
         />
       </SheetContent>

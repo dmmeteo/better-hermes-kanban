@@ -14,6 +14,7 @@ interface TaskDetailModalProps {
   onDecompose: () => void;
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
 }
@@ -30,6 +31,7 @@ export function TaskDetailModal({
   onDecompose,
   onDelete,
   onUpdateTask,
+  onLinkTask,
   isUpdating = false,
   isMobile = false,
 }: TaskDetailModalProps) {
@@ -56,6 +58,7 @@ export function TaskDetailModal({
           onDecompose={onDecompose}
           onDelete={onDelete}
           onUpdateTask={onUpdateTask}
+          onLinkTask={onLinkTask}
           isUpdating={isUpdating}
           showCloseButton
         />

@@ -16,6 +16,7 @@ Endpoints:
 - GET /api/plugins/kanban/tasks/<id>/logs?board=<slug>&tail_bytes=<n>
 - PUT /api/plugins/kanban/orchestration
 - PATCH /api/plugins/kanban/tasks/<id>?board=<slug>
+- POST /api/plugins/kanban/tasks/<id>/links?board=<slug>
 
 The data source is the Hermes Kanban CLI/SQLite board layer. This is a
 local-only bridge intended to be reverse-proxied by nginx from the BHK static
@@ -243,6 +244,29 @@ def update_task(task_id: str, payload: dict, slug: str | None) -> dict:
                 conn.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", vals)
                 conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'edited', NULL, ?)", (task_id, int(time.time())))
 
+        updated = kanban_db.get_task(conn, task_id)
+        return {"task": task_to_dict(updated, board)}
+    finally:
+        conn.close()
+
+
+def link_task(task_id: str, payload: dict, slug: str | None) -> dict:
+    board = resolve_board(slug)
+    parent_id = str(payload.get("parent_id") or payload.get("parentId") or "").strip()
+    child_id = str(payload.get("child_id") or payload.get("childId") or "").strip()
+    if not parent_id or not child_id:
+        raise ValueError("parent_id and child_id are required")
+    if task_id not in {parent_id, child_id}:
+        raise ValueError("link must include the task from the detail view")
+    if parent_id.lower() == child_id.lower():
+        raise ValueError("Cannot link a task to itself")
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        existing = conn.execute("SELECT 1 FROM task_links WHERE lower(parent_id) = lower(?) AND lower(child_id) = lower(?)", (parent_id, child_id)).fetchone()
+        if existing:
+            return {"_status": 409, "detail": "Tasks are already linked in that direction"}
+        kanban_db.link_tasks(conn, parent_id, child_id)
         updated = kanban_db.get_task(conn, task_id)
         return {"task": task_to_dict(updated, board)}
     finally:
@@ -925,6 +949,25 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"detail": str(exc)})
         except Exception as exc:
             self.send_json(500, {"detail": f"BHK board API error: {exc}"})
+
+    def do_POST(self) -> None:  # noqa: N802 - stdlib callback name
+        parsed = urlparse(self.path)
+        try:
+            prefix = "/api/plugins/kanban/tasks/"
+            if parsed.path.startswith(prefix) and parsed.path.endswith("/links"):
+                task_id = parsed.path[len(prefix):-len("/links")]
+                qs = parse_qs(parsed.query)
+                result = link_task(task_id, self.read_json_body(), (qs.get("board") or [None])[0])
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
+                return
+            self.send_json(404, {"detail": "Not found"})
+        except json.JSONDecodeError:
+            self.send_json(400, {"detail": "Invalid JSON body"})
+        except ValueError as exc:
+            self.send_json(400, {"detail": str(exc)})
+        except Exception as exc:
+            self.send_json(500, {"detail": f"BHK link API error: {exc}"})
 
     def do_PUT(self) -> None:  # noqa: N802 - stdlib callback name
         parsed = urlparse(self.path)
