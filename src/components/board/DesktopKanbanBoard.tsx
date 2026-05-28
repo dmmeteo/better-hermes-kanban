@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
 import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 interface DesktopKanbanBoardProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onTasksChange: (tasks: Task[]) => void;
+  onMoveTask: (taskId: string, toStatus: TaskStatus) => void | Promise<void>;
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
   readOnly?: boolean;
@@ -33,7 +33,7 @@ interface DesktopKanbanBoardProps {
 export function DesktopKanbanBoard({
   tasks,
   onTaskClick,
-  onTasksChange,
+  onMoveTask,
   onAddTask,
   searchQuery,
   readOnly = false,
@@ -78,7 +78,6 @@ export function DesktopKanbanBoard({
   function handleDragEnd(event: DragEndEvent) {
     if (readOnly) {
       setActiveId(null);
-      toast.info('Read-only mode: drag/drop updates are disabled in this MVP');
       return;
     }
     const { active, over } = event;
@@ -89,76 +88,27 @@ export function DesktopKanbanBoard({
     const activeTaskId = active.id as string;
     const overId = over.id as string;
 
-    // Check if dropped over a column (status)
-    const overStatus = DROPPABLE_TASK_STATUSES.find((s) => s === overId);
     const activeTaskItem = tasks.find((t) => t.id === activeTaskId);
-
     if (!activeTaskItem) return;
 
-    if (overStatus) {
-      if (activeTaskItem.status !== overStatus) {
-        const updated = tasks.map((t) =>
-          t.id === activeTaskId
-            ? {
-                ...t,
-                status: overStatus,
-                updatedAt: new Date().toISOString(),
-                activity: [
-                  ...t.activity,
-                  {
-                    id: `a-${Date.now()}`,
-                    type: 'status_change' as const,
-                    description: `Status changed from ${activeTaskItem.status} to ${overStatus}`,
-                    createdAt: new Date().toISOString(),
-                  },
-                ],
-              }
-            : t
-        );
-        onTasksChange(updated);
-        toast.success(`Moved to ${getStatusLabel(overStatus, boardSettings)}`);
-      }
-    } else {
-      // Dropped over another card
-      const overTask = tasks.find((t) => t.id === overId);
-      if (overTask && activeTaskItem.status === overTask.status) {
-        const statusTasks = tasks.filter((t) => t.status === overTask.status);
-        const oldIndex = statusTasks.findIndex((t) => t.id === activeTaskId);
-        const newIndex = statusTasks.findIndex((t) => t.id === overId);
+    // Resolve the target status: a column droppable id, or the column of the
+    // card we dropped on.
+    const overStatus = DROPPABLE_TASK_STATUSES.find((s) => s === overId);
+    const targetStatus = overStatus ?? tasks.find((t) => t.id === overId)?.status;
+    if (!targetStatus) return;
 
-        if (oldIndex !== newIndex) {
-          const reordered = arrayMove(statusTasks, oldIndex, newIndex);
-          const otherTasks = tasks.filter((t) => t.status !== overTask.status);
-          onTasksChange([...otherTasks, ...reordered]);
-        }
-      } else if (overTask) {
-        // Move to different status
-        if (!isStatusDropEnabled(overTask.status)) {
-          toast.error('Cannot drop into Running — status is read-only');
-          return;
-        }
-        const updated = tasks.map((t) =>
-          t.id === activeTaskId
-            ? {
-                ...t,
-                status: overTask.status,
-                updatedAt: new Date().toISOString(),
-                activity: [
-                  ...t.activity,
-                  {
-                    id: `a-${Date.now()}`,
-                    type: 'status_change' as const,
-                    description: `Status changed from ${activeTaskItem.status} to ${overTask.status}`,
-                    createdAt: new Date().toISOString(),
-                  },
-                ],
-              }
-            : t
-        );
-        onTasksChange(updated);
-        toast.success(`Moved to ${getStatusLabel(overTask.status, boardSettings)}`);
-      }
+    // Dropping inside the same column is a no-op: ordering is not persisted
+    // (the backend has no position/rank field yet).
+    if (targetStatus === activeTaskItem.status) return;
+
+    if (!isStatusDropEnabled(targetStatus)) {
+      toast.error('Cannot drop into Running — status is read-only');
+      return;
     }
+
+    // Cross-column move = status change. Persistence + optimistic update +
+    // success/error toasts are handled by the parent (App.handleMoveTask).
+    void onMoveTask(activeTaskId, targetStatus);
   }
 
   return (
