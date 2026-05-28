@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "smoke:static": "node scripts/smoke-static.mjs"
+    "smoke:static": "node scripts/smoke-static.mjs",
+    "ui:add": "shadcn@latest add"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
