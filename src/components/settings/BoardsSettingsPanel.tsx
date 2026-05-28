@@ -1,26 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Plus, Star, Bot, ChevronRight, Radio, Plug, Sliders, Stethoscope, Save, Lock, Pencil, Archive } from 'lucide-react';
+import { ArrowLeft, Plus, Star, Bot, ChevronRight, Radio, Plug, Sliders, Stethoscope, Save, Lock, Pencil, Archive } from 'lucide-react';
 import type { Board, BotProfile, KanbanOrchestrationSettings } from '@/lib/types';
 import { BOT_PROFILES } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface BoardsSettingsPanelProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onBack?: () => void;
   boards: Board[];
   activeBoard: Board;
   onBoardChange: (board: Board) => void;
   onBoardsRefresh?: (preferredBoardId?: string) => Promise<void>;
-  isMobile?: boolean;
 }
 
 type FormState = {
@@ -111,13 +103,12 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
 }
 
 export function BoardsSettingsPanel({
-  open,
-  onClose,
+  open = true,
+  onBack,
   boards,
   activeBoard,
   onBoardChange,
   onBoardsRefresh,
-  isMobile = false,
 }: BoardsSettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'boards' | 'settings'>('boards');
   const [profiles, setProfiles] = useState<BotProfile[]>(BOT_PROFILES);
@@ -477,30 +468,34 @@ export function BoardsSettingsPanel({
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <SheetContent side="bottom" className="h-[85vh] p-0 bg-background border-t border-border rounded-t-2xl">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-            <span className="text-sm font-semibold">Hermes</span>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-accent transition-colors">
-              <X size={18} />
-            </button>
-          </div>
-          <div className="px-4 py-4 overflow-y-auto h-[calc(85vh-60px)]">{content}</div>
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[420px] p-0 bg-background border border-border max-h-[85vh] overflow-y-auto">
-        <DialogHeader className="px-4 pt-4 pb-2">
-          <DialogTitle className="text-base">Board settings</DialogTitle>
-        </DialogHeader>
-        <div className="px-4 pb-6">{content}</div>
-      </DialogContent>
-    </Dialog>
+    <section className="h-full overflow-y-auto bg-background" data-testid="settings-page">
+      <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-4 px-4 py-4 md:px-6 md:py-6">
+        <div className="flex items-center justify-between gap-3 border-b border-border/50 pb-4">
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                type="button"
+                aria-label="Back to board"
+                data-testid="settings-back-button"
+                onClick={onBack}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card hover:bg-accent"
+              >
+                <ArrowLeft size={16} />
+              </button>
+            )}
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Hermes Kanban</p>
+              <h1 className="text-lg font-semibold md:text-2xl">Settings</h1>
+            </div>
+          </div>
+          <div className="hidden rounded-full border border-border/50 px-3 py-1 text-xs text-muted-foreground md:block">
+            {activeBoard.name || activeBoard.id}
+          </div>
+        </div>
+
+        <div className="max-w-3xl pb-8">{content}</div>
+      </div>
+    </section>
   );
 }

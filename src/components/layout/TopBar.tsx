@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Search, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Board } from '@/lib/types';
@@ -56,11 +56,23 @@ export function TopBar({
           <span className="font-bold text-sm">Hermes</span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="p-2 rounded-lg hover:bg-accent" onClick={() => onSearchSubmit?.()} data-testid="mobile-global-search-button">
-            <Search size={18} className={cn(isTaskSearchPage ? "text-foreground" : "text-muted-foreground")} />
+          <button
+            type="button"
+            aria-label="Search tasks"
+            data-testid="mobile-global-search-button"
+            onClick={() => onSearchSubmit?.()}
+            className="p-2 rounded-lg hover:bg-accent"
+          >
+            <Search size={18} className={cn(isTaskSearchPage ? 'text-foreground' : 'text-muted-foreground')} />
           </button>
-          <button className="p-2 rounded-lg hover:bg-accent">
-            <Filter size={18} className="text-muted-foreground" />
+          <button
+            type="button"
+            aria-label="Open settings"
+            data-testid="mobile-settings-button"
+            onClick={onOpenSettings}
+            className="p-2 rounded-lg hover:bg-accent"
+          >
+            <Settings size={18} className="text-muted-foreground" />
           </button>
         </div>
       </div>
@@ -117,7 +129,7 @@ export function TopBar({
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={isTaskSearchPage ? "Find task id, title, comment..." : "Search tasks..."}
+              placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search tasks...'}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => {
@@ -135,12 +147,14 @@ export function TopBar({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1.5"
+                size="icon"
+                className="h-9 w-9 rounded-xl p-0"
                 data-testid="task-detail-presentation-trigger"
+                aria-label={`Task detail view: ${detailPresentation}`}
+                title={`Task detail view: ${detailPresentation}`}
               >
-                {detailPresentation === 'modal' ? <SquareStack size={14} /> : detailPresentation === 'page' ? <FileText size={14} /> : <PanelRightOpen size={14} />}
-                <span>Detail: {detailPresentation === 'modal' ? 'Modal' : detailPresentation === 'page' ? 'Page' : 'Drawer'}</span>
+                {detailPresentation === 'modal' ? <SquareStack size={17} /> : detailPresentation === 'page' ? <FileText size={17} /> : <PanelRightOpen size={17} />}
+                <span className="sr-only">Task detail view: {detailPresentation}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
@@ -177,12 +191,15 @@ export function TopBar({
           {!isTaskPage && (
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
+            size="icon"
+            className="h-9 w-9 rounded-xl p-0"
+            data-testid="desktop-settings-button"
+            aria-label="Settings"
+            title="Settings"
             onClick={onOpenSettings}
           >
-            <Settings size={14} />
-            <span>Board settings</span>
+            <Settings size={17} />
+            <span className="sr-only">Settings</span>
           </Button>
           )}
           <Button

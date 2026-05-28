@@ -5,7 +5,7 @@ import type { Task, Board, BotProfile, CreateTaskData, TaskStatus, UpdateTaskDat
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
 import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
@@ -51,7 +51,6 @@ function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
-  const [isBoardSettingsOpen, setIsBoardSettingsOpen] = useState(false);
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
     return saved === 'modal' || saved === 'page' ? saved : 'drawer';
@@ -76,6 +75,7 @@ function App() {
     return match?.[1] ? decodeURIComponent(match[1]) : null;
   }, [location.pathname]);
   const isTaskPage = !!routeTaskId;
+  const isSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
   const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/';
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
@@ -159,8 +159,12 @@ function App() {
       loadTaskPageData(routeTaskId);
       return;
     }
+    if (isSettingsPage) {
+      loadBoardData(boardIdFromUrl);
+      return;
+    }
     loadBoardData(boardIdFromUrl);
-  }, [boardIdFromPath, boardIdFromUrl, isTaskSearchPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
+  }, [boardIdFromPath, boardIdFromUrl, isSettingsPage, isTaskSearchPage, legacyBoardIdFromUrl, loadBoardData, loadTaskPageData, navigate, routeTaskId]);
 
   useEffect(() => {
     window.localStorage.setItem('bhk.taskDetailPresentation', detailPresentation);
@@ -197,6 +201,10 @@ function App() {
 
   useEffect(() => {
     const appSuffix = 'BHK';
+    if (isSettingsPage) {
+      document.title = `🪽 Settings — ${appSuffix}`;
+      return;
+    }
     if (selectedTask) {
       document.title = `🪽 ${selectedTask.id} · ${selectedTask.title} — ${appSuffix}`;
       return;
@@ -216,7 +224,7 @@ function App() {
       return;
     }
     document.title = `🪽 ${appSuffix}`;
-  }, [activeBoard, boards, isTaskSearchPage, routeTaskId, selectedTask]);
+  }, [activeBoard, boards, isSettingsPage, isTaskSearchPage, routeTaskId, selectedTask]);
 
   const handleTaskClick = useCallback((task: Task) => {
     if (detailPresentation === 'page') {
@@ -401,21 +409,23 @@ function App() {
       />
 
       {/* Top Bar */}
-      <TopBar
-        boards={boards}
-        activeBoard={activeBoard}
-        onBoardChange={handleBoardChange}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={handleGlobalSearch}
-        onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-        onOpenSettings={() => setIsBoardSettingsOpen(true)}
-        detailPresentation={activeDetailPresentation}
-        onDetailPresentationChange={handleDetailPresentationChange}
-        isTaskPage={isTaskPage}
-        isTaskSearchPage={isTaskSearchPage}
-        onNavigateToBoard={handleCloseDetail}
-      />
+      {!isSettingsPage && (
+        <TopBar
+          boards={boards}
+          activeBoard={activeBoard}
+          onBoardChange={handleBoardChange}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onSearchSubmit={handleGlobalSearch}
+          onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+          onOpenSettings={() => navigate('/settings')}
+          detailPresentation={activeDetailPresentation}
+          onDetailPresentationChange={handleDetailPresentationChange}
+          isTaskPage={isTaskPage}
+          isTaskSearchPage={isTaskSearchPage}
+          onNavigateToBoard={handleCloseDetail}
+        />
+      )}
 
       {(dataSource === 'fallback' || loadError) && (
         <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
@@ -426,7 +436,15 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          {isTaskSearchPage ? (
+          {isSettingsPage ? (
+            <BoardsSettingsPanel
+              boards={boards}
+              activeBoard={activeBoard}
+              onBoardChange={handleBoardChange}
+              onBoardsRefresh={loadBoardData}
+              onBack={() => navigate(boardPath(activeBoard.id))}
+            />
+          ) : isTaskSearchPage ? (
             <TaskSearchPage
               boards={boards}
               activeBoard={activeBoard}
@@ -466,27 +484,15 @@ function App() {
       </main>
 
       {/* Desktop Footer Bar */}
-      {!isTaskPage && !isTaskSearchPage && <DesktopFooterBar tasks={tasks} />}
+      {!isTaskPage && !isSettingsPage && !isTaskSearchPage && <DesktopFooterBar tasks={tasks} />}
 
-      {/* Mobile Bottom Nav */}
-      {!isTaskPage && !isTaskSearchPage && (
-        <MobileBottomNav
-          activeTab="boards"
-          onTabChange={(tab) => {
-            if (tab === 'boards') {
-              handleCloseDetail();
-            } else if (tab === 'more') {
-              setIsBoardSettingsOpen(true);
-            } else {
-              toast.info(`${tab} coming soon`);
-            }
-          }}
-          onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-        />
+      {/* Mobile Create FAB */}
+      {!isTaskPage && !isSettingsPage && !isTaskSearchPage && (
+        <MobileCreateTaskFab onOpenQuickCapture={() => setIsQuickCaptureOpen(true)} />
       )}
 
       {/* Task Detail: selectable drawer, centered Jira-style modal, or standalone page */}
-      {!isTaskPage && !isTaskSearchPage && detailPresentation === 'drawer' ? (
+      {!isSettingsPage && !isTaskPage && !isTaskSearchPage && detailPresentation === 'drawer' ? (
         <TaskDetailSheet
           task={selectedTask}
           allTasks={tasks}
@@ -502,7 +508,7 @@ function App() {
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
-      ) : !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
+      ) : !isSettingsPage && !isTaskPage && !isTaskSearchPage && detailPresentation === 'modal' ? (
         <TaskDetailModal
           task={selectedTask}
           allTasks={tasks}
@@ -543,28 +549,6 @@ function App() {
         />
       </div>
 
-      {/* Board Settings */}
-      <div className="md:hidden">
-        <BoardsSettingsPanel
-          open={isBoardSettingsOpen}
-          onClose={() => setIsBoardSettingsOpen(false)}
-          boards={boards}
-          activeBoard={activeBoard}
-          onBoardChange={handleBoardChange}
-          onBoardsRefresh={loadBoardData}
-          isMobile
-        />
-      </div>
-      <div className="hidden md:block">
-        <BoardsSettingsPanel
-          open={isBoardSettingsOpen}
-          onClose={() => setIsBoardSettingsOpen(false)}
-          boards={boards}
-          activeBoard={activeBoard}
-          onBoardChange={handleBoardChange}
-          onBoardsRefresh={loadBoardData}
-        />
-      </div>
     </div>
   );
 }

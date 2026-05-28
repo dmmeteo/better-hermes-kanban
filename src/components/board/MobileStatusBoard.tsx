@@ -98,7 +98,7 @@ export function MobileStatusBoard({
       </div>
 
       {/* Task list */}
-      <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-2.5">
+      <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-2.5">
         {filteredTasks.map((task) => (
           <TaskCard key={task.id} task={task} onClick={onTaskClick} />
         ))}
