@@ -233,7 +233,7 @@ function ResultCard({ result, onOpen }: { result: TaskSearchResult; onOpen: () =
   );
 }
 
-export function TaskSearchPage({ locationSearch, query, filters, activeBoard, onQueryChange, onFiltersChange, onOpenTask }: TaskSearchPageProps) {
+export function TaskSearchPage({ boards, assignees, locationSearch, query, filters, activeBoard, onQueryChange, onFiltersChange, onOpenTask }: TaskSearchPageProps) {
   const urlParams = useMemo(() => new URLSearchParams(locationSearch), [locationSearch]);
   const [submittedQuery, setSubmittedQuery] = useState(filterValue(urlParams, 'q'));
   const [selectedFieldId, setSelectedFieldId] = useState<SearchFilterField['id']>();
@@ -418,6 +418,7 @@ export function TaskSearchPage({ locationSearch, query, filters, activeBoard, on
           {activeTokens.length ? (
             <button type="button" className="hover:text-foreground" onClick={clearFilters}>Clear filters</button>
           ) : null}
+
         </div>
 
         <div className="space-y-3">
