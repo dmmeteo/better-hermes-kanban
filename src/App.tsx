@@ -7,7 +7,6 @@ import { getBoardSettings, getStatusLabel, migrateLegacyDetailPresentation, save
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
-import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
 import { NewBoardModal } from '@/components/board/NewBoardModal';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
@@ -715,9 +714,6 @@ function App() {
           )}
         </div>
       </main>
-
-      {/* Desktop Footer Bar */}
-      {!isTaskPage && !isTaskSearchPage && <DesktopFooterBar tasks={tasks} />}
 
       {/* Mobile Create FAB */}
       {!isTaskPage && !isTaskSearchPage && (
