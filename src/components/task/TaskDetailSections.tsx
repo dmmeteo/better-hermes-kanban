@@ -78,7 +78,7 @@ export function TaskBreadcrumbs({
         href={taskHref}
         target={newTab ? '_blank' : undefined}
         rel={newTab ? 'noopener noreferrer' : undefined}
-        className="rounded bg-secondary/80 px-2 py-0.5 font-mono transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="max-w-[10rem] truncate rounded bg-secondary/80 px-2 py-0.5 font-mono transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-none"
         aria-label={newTab ? `Open task ${task.id} in a new tab` : `Open task ${task.id}`}
         data-testid={idTestId}
       >

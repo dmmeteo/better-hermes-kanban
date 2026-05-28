@@ -1,4 +1,4 @@
-import type { Board, BotProfile, Task, UpdateTaskData } from '@/lib/types';
+import type { Board, BotProfile, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { TaskDetailBody } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
@@ -13,6 +13,7 @@ interface TaskDetailSheetProps {
   onAddComment: (text: string) => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void>;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
+  onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
@@ -29,6 +30,7 @@ export function TaskDetailSheet({
   onAddComment,
   onUpdateTask,
   onLinkTask,
+  onUnlinkTask,
   onNotify,
   onSpecify,
   onDecompose,
@@ -53,6 +55,7 @@ export function TaskDetailSheet({
             onUpdateTask={onUpdateTask}
             onAddComment={onAddComment}
             onLinkTask={onLinkTask}
+            onUnlinkTask={onUnlinkTask}
           />
           <TaskDetailSidebar
             task={task}

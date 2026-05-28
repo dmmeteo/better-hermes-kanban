@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
-import type { Task, Board, BotProfile, CreateTaskData, UpdateTaskData } from '@/lib/types';
+import type { Task, Board, BotProfile, CreateTaskData, LinkedTask, UpdateTaskData } from '@/lib/types';
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
 import { getBoardSettings, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
 import { kanbanApi } from '@/lib/kanbanApi';
@@ -464,6 +464,18 @@ function App() {
     [activeBoard, refetchActiveBoard, selectedTask]
   );
 
+  const handleUnlinkTask = useCallback(
+    async (link: LinkedTask) => {
+      if (!selectedTask || !activeBoard) return;
+      const result = await kanbanApi.unlinkTask(selectedTask.id, link.id, activeBoard.id);
+      if (!result.ok) {
+        throw new Error(result.message || 'Backend does not support unlink yet');
+      }
+      await refetchActiveBoard(activeBoard);
+    },
+    [activeBoard, refetchActiveBoard, selectedTask],
+  );
+
   const handleAddComment = useCallback(
     async (text: string) => {
       if (!selectedTask || !activeBoard) return;
@@ -609,6 +621,7 @@ function App() {
               onAddComment={handleAddComment}
               onUpdateTask={updateSelectedTask}
               onLinkTask={handleLinkTask}
+              onUnlinkTask={handleUnlinkTask}
               onNotify={handleNotify}
               onSpecify={handleSpecify}
               onDecompose={handleDecompose}
@@ -646,6 +659,7 @@ function App() {
           onAddComment={handleAddComment}
           onUpdateTask={updateSelectedTask}
           onLinkTask={handleLinkTask}
+          onUnlinkTask={handleUnlinkTask}
           onNotify={handleNotify}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}
@@ -662,6 +676,7 @@ function App() {
           onAddComment={handleAddComment}
           onUpdateTask={updateSelectedTask}
           onLinkTask={handleLinkTask}
+          onUnlinkTask={handleUnlinkTask}
           onNotify={handleNotify}
           onSpecify={handleSpecify}
           onDecompose={handleDecompose}

@@ -128,7 +128,7 @@ function renderInline(text: string): ReactNode[] {
       const link = token.match(/^\[([^\]]+)\]\(([^\s)]+)\)$/);
       if (link) {
         nodes.push(
-          <a key={key} href={link[2]} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2 hover:text-primary/80">
+          <a key={key} href={link[2]} target="_blank" rel="noreferrer" className="break-all text-primary underline underline-offset-2 hover:text-primary/80">
             {link[1]}
           </a>
         );
@@ -160,7 +160,7 @@ export function MarkdownText({ value, className, compact = false }: MarkdownText
   if (blocks.length === 0) return null;
 
   return (
-    <div className={cn('markdown-text text-sm leading-relaxed text-muted-foreground', compact ? 'space-y-1.5' : 'space-y-3', className)}>
+    <div className={cn('markdown-text break-words text-sm leading-relaxed text-muted-foreground', compact ? 'space-y-1.5' : 'space-y-3', className)}>
       {blocks.map((block, index) => {
         if (block.type === 'heading') {
           const size = block.level === 1 ? 'text-base' : block.level === 2 ? 'text-sm' : 'text-xs';

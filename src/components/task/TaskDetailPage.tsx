@@ -1,5 +1,5 @@
 import { ArrowLeft, ExternalLink } from 'lucide-react';
-import type { BotProfile, Board, Task, UpdateTaskData } from '@/lib/types';
+import type { BotProfile, Board, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { TaskDetailBody } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
@@ -14,6 +14,7 @@ interface TaskDetailPageProps {
   onAddComment: (text: string) => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void>;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
+  onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
@@ -29,6 +30,7 @@ export function TaskDetailPage({
   onAddComment,
   onUpdateTask,
   onLinkTask,
+  onUnlinkTask,
   onNotify,
   onSpecify,
   onDecompose,
@@ -57,19 +59,22 @@ export function TaskDetailPage({
   }
 
   return (
-    <section className="h-full overflow-y-auto bg-background" data-testid="task-detail-page">
+    <section className="h-full overflow-y-auto overflow-x-hidden bg-background" data-testid="task-detail-page">
       <div className="mx-auto grid w-full max-w-7xl gap-4 px-3 py-3 md:px-6 md:py-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <TaskDetailBody
-          task={task}
-          allTasks={allTasks}
-          activeBoard={activeBoard}
-          layout="page"
-          onUpdateTask={onUpdateTask}
-          onAddComment={onAddComment}
-          onLinkTask={onLinkTask}
-        />
+        <div className="min-w-0">
+          <TaskDetailBody
+            task={task}
+            allTasks={allTasks}
+            activeBoard={activeBoard}
+            layout="page"
+            onUpdateTask={onUpdateTask}
+            onAddComment={onAddComment}
+            onLinkTask={onLinkTask}
+            onUnlinkTask={onUnlinkTask}
+          />
+        </div>
 
-        <div className="lg:sticky lg:top-3 lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-3 lg:self-start">
           <TaskDetailSidebar
             task={task}
             assignees={assignees}

@@ -500,6 +500,23 @@ export const kanbanApi = {
     return normalizeTask(rawTask, boardId || 'current');
   },
 
+  // TODO(unlink-api): backend currently returns 404 for every variant tried
+  // (DELETE /tasks/{id}/links/{linkId}, DELETE /links/{linkId}, PATCH parents=[],
+  // POST .../actions {action:'unlink'}, etc.). Wired the front-end at the most
+  // RESTful guess; surface graceful errors until backend ships the route.
+  async unlinkTask(taskId: string, linkId: string, boardId?: string): Promise<{ ok: boolean; message?: string }> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    try {
+      await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/links/${encodeURIComponent(linkId)}${query}`, {
+        method: 'DELETE',
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to unlink';
+      return { ok: false, message };
+    }
+  },
+
   async updateTask(taskId: string, data: UpdateTaskData, boardId?: string): Promise<Task> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     const payload: Record<string, unknown> = {};

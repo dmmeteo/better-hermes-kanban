@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Board, Task, UpdateTaskData } from '@/lib/types';
+import type { Board, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { MarkdownText } from '@/components/shared/MarkdownText';
 import { WarningBanner } from '@/components/shared/WarningBanner';
 import { InlineEditField } from '@/components/shared/InlineEditField';
@@ -22,6 +22,7 @@ interface TaskDetailBodyProps {
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
   onAddComment: (text: string) => void;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
+  onUnlinkTask: (link: LinkedTask) => Promise<void>;
   headerExtra?: ReactNode;
 }
 
@@ -35,6 +36,7 @@ export function TaskDetailBody({
   onUpdateTask,
   onAddComment,
   onLinkTask,
+  onUnlinkTask,
   headerExtra,
 }: TaskDetailBodyProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('links');
@@ -65,7 +67,7 @@ export function TaskDetailBody({
   };
 
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col gap-4', layout === 'mobile' && 'gap-3')} data-testid="task-detail-body">
+    <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-4', layout === 'mobile' && 'gap-3')} data-testid="task-detail-body">
       <header className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <TaskBreadcrumbs
@@ -81,7 +83,7 @@ export function TaskDetailBody({
           ariaLabel="Edit task title"
           dataTestId="task-title-field"
           inputClassName="text-base font-semibold"
-          displayClassName="text-base font-semibold leading-tight"
+          displayClassName="text-base font-semibold leading-tight break-words"
           validate={(v) => (v.trim() ? null : 'Title is required')}
           placeholder="Untitled task"
         />
@@ -131,7 +133,7 @@ export function TaskDetailBody({
           ))}
         </div>
         <div className="min-h-[240px] pt-3" data-testid="task-detail-tab-panel">
-          {activeTab === 'links' && <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} />}
+          {activeTab === 'links' && <TaskLinkedTasksTab task={task} onLinkTask={onLinkTask} onUnlinkTask={onUnlinkTask} />}
           {activeTab === 'comments' && <TaskCommentsPanel task={task} onAddComment={onAddComment} />}
           {activeTab === 'logs' && <TaskWorkerLogsPanel task={task} />}
           {activeTab === 'runs' && <TaskRunHistoryPanel task={task} />}

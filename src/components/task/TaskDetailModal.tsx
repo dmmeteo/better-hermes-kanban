@@ -1,4 +1,4 @@
-import type { Board, BotProfile, Task, UpdateTaskData } from '@/lib/types';
+import type { Board, BotProfile, LinkedTask, Task, UpdateTaskData } from '@/lib/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TaskDetailBody } from './TaskDetailBody';
 import { TaskDetailSidebar } from './TaskDetailSidebar';
@@ -13,6 +13,7 @@ interface TaskDetailModalProps {
   onAddComment: (text: string) => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void>;
   onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
+  onUnlinkTask: (link: LinkedTask) => Promise<void>;
   onNotify: (channel: 'telegram' | 'discord') => Promise<void>;
   onSpecify: () => Promise<void>;
   onDecompose: () => Promise<void>;
@@ -29,6 +30,7 @@ export function TaskDetailModal({
   onAddComment,
   onUpdateTask,
   onLinkTask,
+  onUnlinkTask,
   onNotify,
   onSpecify,
   onDecompose,
@@ -54,6 +56,7 @@ export function TaskDetailModal({
             onUpdateTask={onUpdateTask}
             onAddComment={onAddComment}
             onLinkTask={onLinkTask}
+            onUnlinkTask={onUnlinkTask}
           />
           <TaskDetailSidebar
             task={task}
