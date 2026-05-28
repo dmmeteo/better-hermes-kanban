@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { MessageSquare, Link2, AlertTriangle, Lock, GripVertical } from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { STATUS_COLORS, isStatusReadOnly } from '@/lib/types';
@@ -33,6 +34,22 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
     transition,
   };
 
+  // Suppress the click that browsers may fire right after a drag ends, so a
+  // completed drag never opens the detail drawer. A plain tap (movement below
+  // the sensor's 5px threshold) never sets isDragging, so it still opens.
+  const wasDraggingRef = useRef(false);
+  useEffect(() => {
+    if (isDragging) wasDraggingRef.current = true;
+  }, [isDragging]);
+
+  const handleClick = () => {
+    if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      return;
+    }
+    onClick(task);
+  };
+
   const statusColor = STATUS_COLORS[task.status];
   const isReadOnlyStatus = isStatusReadOnly(task.status);
 
@@ -42,7 +59,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
       style={style}
       {...(!readOnly ? attributes : {})}
       {...(!readOnly ? listeners : {})}
-      onClick={() => !isDragging && onClick(task)}
+      onClick={handleClick}
       className={cn(
         'relative bg-secondary/80 text-card-foreground border border-border/80 rounded-lg p-3.5',
         readOnly ? 'cursor-pointer' : 'cursor-grab',

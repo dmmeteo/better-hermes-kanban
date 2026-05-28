@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { Toaster, toast } from 'sonner';
 import type { Task, Board, BotProfile, CreateTaskData, LinkedTask, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { isStatusCreateSelectable, isStatusSelectable } from '@/lib/types';
-import { getBoardSettings, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
+import { getBoardSettings, getStatusLabel, migrateLegacyDetailPresentation, saveBoardSettings, type BoardSettings } from '@/lib/boardSettings';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar';
 import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
@@ -394,6 +394,39 @@ function App() {
     [activeBoard, refetchActiveBoard, selectedTask, tasks]
   );
 
+  const handleMoveTask = useCallback(
+    async (taskId: string, toStatus: TaskStatus) => {
+      if (!activeBoard) return;
+      const target = tasks.find((t) => t.id === taskId);
+      if (!target || target.status === toStatus) return;
+      if (!isStatusSelectable(toStatus)) {
+        toast.error('Running status is dispatcher-owned and cannot be set manually');
+        return;
+      }
+      const snapshot = tasks;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? { ...t, status: toStatus, updatedAt: new Date().toISOString() }
+            : t,
+        ),
+      );
+      try {
+        setUpdatingTaskId(taskId);
+        await kanbanApi.updateTask(taskId, { status: toStatus }, activeBoard.id);
+        await refetchActiveBoard(activeBoard);
+        toast.success(`Moved to ${getStatusLabel(toStatus, boardSettings)}`);
+      } catch (error) {
+        setTasks(snapshot);
+        const message = error instanceof Error ? error.message : 'Failed to move task';
+        toast.error(message);
+      } finally {
+        setUpdatingTaskId(null);
+      }
+    },
+    [activeBoard, boardSettings, refetchActiveBoard, tasks]
+  );
+
   const handleToggleNotify = useCallback(
     async (channel: 'telegram' | 'discord', subscribed: boolean) => {
       if (!selectedTask || !activeBoard) return;
@@ -673,7 +706,7 @@ function App() {
             <BoardView
               tasks={tasks}
               onTaskClick={handleTaskClick}
-              onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
+              onMoveTask={handleMoveTask}
               onAddTask={() => setIsQuickCaptureOpen(true)}
               searchQuery={searchQuery}
               boardSettings={boardSettings}

@@ -6,7 +6,7 @@ import { DesktopKanbanBoard } from './DesktopKanbanBoard';
 interface BoardViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onTasksChange: (tasks: Task[]) => void;
+  onMoveTask: (taskId: string, toStatus: TaskStatus) => void | Promise<void>;
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
   boardSettings: BoardSettings;
@@ -16,7 +16,7 @@ interface BoardViewProps {
 export function BoardView({
   tasks,
   onTaskClick,
-  onTasksChange,
+  onMoveTask,
   onAddTask,
   searchQuery,
   boardSettings,
@@ -37,12 +37,11 @@ export function BoardView({
           <DesktopKanbanBoard
             tasks={tasks}
             onTaskClick={onTaskClick}
-            onTasksChange={onTasksChange}
+            onMoveTask={onMoveTask}
             onAddTask={onAddTask}
             searchQuery={searchQuery}
             boardSettings={boardSettings}
             onRenameStatus={onRenameStatus}
-            readOnly
           />
         </div>
       </div>
