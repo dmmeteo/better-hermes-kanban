@@ -67,6 +67,16 @@ export interface TaskRun {
   output?: string;
 }
 
+export interface TaskWorkerLog {
+  taskId: string;
+  boardId: string;
+  text: string;
+  sizeBytes: number;
+  truncated: boolean;
+  path?: string;
+  refreshedAt: string;
+}
+
 export interface TaskDiagnostic {
   id: string;
   name: string;
@@ -81,6 +91,7 @@ export interface LinkedTask {
   title: string;
   status: TaskStatus;
   relation: 'parent' | 'child';
+  boardId?: string;
 }
 
 export interface PlannedAttachment {
@@ -107,6 +118,7 @@ export interface Task {
   comments: TaskComment[];
   activity: TaskActivity[];
   runs: TaskRun[];
+  workerLog: TaskWorkerLog | null;
   linkedTasks: LinkedTask[];
   plannedAttachments: PlannedAttachment[];
   warningCount: number;

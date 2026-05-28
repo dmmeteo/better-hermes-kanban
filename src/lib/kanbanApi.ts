@@ -10,6 +10,7 @@ import type {
   TaskActivity,
   LinkedTask,
   TaskRun,
+  TaskWorkerLog,
   UpdateTaskData,
   CreateTaskData,
   TaskSearchParams,
@@ -17,6 +18,8 @@ import type {
   TaskSearchResult,
 } from './types';
 import { mockTasks, boards as mockBoards, BOT_PROFILES } from '@/data/mockTasks';
+import { nativeKanbanClient } from './nativeKanbanClient';
+import { nativeBoardFromPayload, nativeBoardsFromPayload, nativeTasksFromBoardPayload, mapNativeTask } from './nativeKanbanMappers';
 
 const API_BASE = '/api/plugins/kanban';
 const NATIVE_STATUSES: TaskStatus[] = [
@@ -182,8 +185,26 @@ function normalizeLinks(raw: unknown): LinkedTask[] {
       title: asString(link.title, 'Linked task'),
       status,
       relation,
+      boardId: asString(link.board ?? link.board_id ?? link.boardId, ''),
     };
   }).filter((link) => link.taskId);
+}
+
+function normalizeWorkerLog(raw: unknown, taskId: string, boardId: string): TaskWorkerLog | null {
+  if (!isObject(raw)) return null;
+  const text = asString(raw.text ?? raw.content ?? raw.tail, '');
+  const path = asString(raw.path, '');
+  const sizeBytes = asNumber(raw.size_bytes ?? raw.sizeBytes, text.length);
+  if (!text && sizeBytes <= 0 && !path) return null;
+  return {
+    taskId: asString(raw.task_id ?? raw.taskId, taskId),
+    boardId: asString(raw.board ?? raw.board_id ?? raw.boardId, boardId),
+    text,
+    sizeBytes,
+    truncated: Boolean(raw.truncated),
+    path: path || undefined,
+    refreshedAt: toIso(raw.refreshed_at ?? raw.refreshedAt ?? raw.read_at),
+  };
 }
 
 function normalizeProfile(raw: unknown, index = 0): BotProfile {
@@ -271,6 +292,7 @@ function normalizeTask(raw: unknown, boardId: string): Task {
     comments,
     activity: normalizeActivity(item.events ?? item.activity),
     runs: normalizeRuns(item.runs),
+    workerLog: normalizeWorkerLog(item.worker_log ?? item.workerLog ?? item.logs, id, asString(item.board ?? item.board_id ?? item.boardId, boardId)),
     linkedTasks: normalizeLinks(item.links ?? item.linkedTasks),
     plannedAttachments: [],
     warningCount: asNumber(item.warning_count ?? item.warningCount ?? item.warnings, diagnostics.length),
@@ -308,30 +330,6 @@ function normalizeSearchResult(raw: unknown, index = 0): TaskSearchResult {
   };
 }
 
-function flattenTasksFromBoard(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return payload;
-  if (!isObject(payload)) return [];
-  if (Array.isArray(payload.tasks)) return payload.tasks;
-  if (Array.isArray(payload.cards)) return payload.cards;
-
-  const columns = payload.columns;
-  if (Array.isArray(columns)) {
-    return columns.flatMap((column) => {
-      if (!isObject(column)) return [];
-      const status = column.status ?? column.id ?? column.name;
-      const cards = Array.isArray(column.tasks) ? column.tasks : Array.isArray(column.cards) ? column.cards : [];
-      return cards.map((card) => (isObject(card) ? { ...card, status: card.status ?? status } : card));
-    });
-  }
-  if (isObject(columns)) {
-    return Object.entries(columns).flatMap(([status, value]) => {
-      const cards = Array.isArray(value) ? value : isObject(value) && Array.isArray(value.tasks) ? value.tasks : [];
-      return cards.map((card) => (isObject(card) ? { ...card, status: card.status ?? status } : card));
-    });
-  }
-  return [];
-}
-
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
@@ -353,19 +351,12 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function boardFromPayload(payload: unknown, fallbackBoardId?: string): Board {
-  if (isObject(payload) && isObject(payload.board)) return normalizeBoard(payload.board);
-  const id = fallbackBoardId || (isObject(payload) ? asString(payload.board_slug ?? payload.board ?? payload.slug, 'current') : 'current');
-  return { id, name: id, taskCount: flattenTasksFromBoard(payload).length, isDefault: true };
-}
-
 export const kanbanApi = {
   async getBoard(boardId?: string): Promise<{ tasks: Task[]; board: Board; source: 'live' | 'fallback' }> {
-    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     try {
-      const payload = await requestJson<unknown>(`/board${query}`);
-      const board = boardFromPayload(payload, boardId);
-      const tasks = flattenTasksFromBoard(payload).map((task) => normalizeTask(task, board.id));
+      const payload = await nativeKanbanClient.getBoard(boardId);
+      const board = nativeBoardFromPayload(payload, boardId);
+      const tasks = nativeTasksFromBoardPayload(payload).map((task) => mapNativeTask(task, board.id));
       return { tasks, board: { ...board, taskCount: tasks.length }, source: 'live' };
     } catch (error) {
       const board = mockBoards.find((b) => b.id === boardId) || mockBoards[0];
@@ -382,13 +373,8 @@ export const kanbanApi = {
 
   async getBoards(): Promise<{ boards: Board[]; source: 'live' | 'fallback' }> {
     try {
-      const payload = await requestJson<unknown>('/boards');
-      const rawBoards = Array.isArray(payload)
-        ? payload
-        : isObject(payload) && Array.isArray(payload.boards)
-          ? payload.boards
-          : [];
-      const boards = rawBoards.map(normalizeBoard);
+      const payload = await nativeKanbanClient.getBoards();
+      const boards = nativeBoardsFromPayload(payload);
       return { boards, source: 'live' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load live boards';
@@ -402,6 +388,13 @@ export const kanbanApi = {
     const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query}`);
     const rawTask = isObject(payload) && payload.task ? payload.task : payload;
     return normalizeTask(rawTask, boardId || 'current');
+  },
+
+  async getTaskWorkerLog(taskId: string, boardId?: string): Promise<TaskWorkerLog | null> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const payload = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/log${query}`);
+    const rawLog = isObject(payload) && payload.worker_log ? payload.worker_log : payload;
+    return normalizeWorkerLog(rawLog, taskId, boardId || 'current');
   },
 
   async searchTasks(params: TaskSearchParams = {}): Promise<TaskSearchResponse> {
@@ -489,6 +482,19 @@ export const kanbanApi = {
         workspace_kind: data.workspaceKind ?? 'scratch',
         workspace_path: data.workspacePath?.trim() || undefined,
       }),
+    });
+    const rawTask = isObject(response) && response.task ? response.task : response;
+    return normalizeTask(rawTask, boardId || 'current');
+  },
+
+  async linkTask(taskId: string, targetTaskId: string, relation: 'parent' | 'child', boardId?: string): Promise<Task> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const parentId = relation === 'parent' ? targetTaskId : taskId;
+    const childId = relation === 'parent' ? taskId : targetTaskId;
+    const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/links${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_id: parentId, child_id: childId }),
     });
     const rawTask = isObject(response) && response.task ? response.task : response;
     return normalizeTask(rawTask, boardId || 'current');

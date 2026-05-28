@@ -1,8 +1,9 @@
-import { Search, Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import type { Board } from '@/lib/types';
+import type { Board, BotProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { DataViewSearchAndFilter, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,11 +19,14 @@ export type TaskDetailPresentation = 'drawer' | 'modal' | 'page';
 
 interface TopBarProps {
   boards: Board[];
+  assignees: BotProfile[];
   activeBoard: Board;
   onBoardChange: (board: Board) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onSearchSubmit?: (query?: string) => void;
+  searchFilters?: DataViewSearchFilters;
+  onSearchFiltersChange?: (filters: DataViewSearchFilters) => void;
+  onSearchSubmit?: (query?: string, filters?: DataViewSearchFilters) => void;
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
   onOpenNewBoard: () => void;
@@ -31,14 +35,18 @@ interface TopBarProps {
   isTaskPage?: boolean;
   isTaskSearchPage?: boolean;
   onNavigateToBoard?: () => void;
+  logoHomeHref: string;
 }
 
 export function TopBar({
   boards,
+  assignees,
   activeBoard,
   onBoardChange,
   searchQuery,
   onSearchChange,
+  searchFilters = {},
+  onSearchFiltersChange,
   onSearchSubmit,
   onOpenQuickCapture,
   onOpenSettings,
@@ -48,30 +56,76 @@ export function TopBar({
   isTaskPage = false,
   isTaskSearchPage = false,
   onNavigateToBoard,
+  logoHomeHref,
 }: TopBarProps) {
   return (
     <header className="shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-sm">
       {/* Mobile header */}
-      <div className="md:hidden flex items-center justify-between h-12 px-4">
-        <div className="flex items-center gap-2">
+      <div className="md:hidden flex items-center gap-2 h-12 px-4">
+        <Link
+          to={logoHomeHref}
+          aria-label={`Go to ${activeBoard.name || activeBoard.id} board`}
+          title={`Go to ${activeBoard.name || activeBoard.id} board`}
+          data-testid="app-logo-home-link"
+          className="flex min-w-0 shrink-0 items-center gap-2 rounded-lg transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
           <Feather size={20} style={{ color: '#7C5CFF' }} />
           <span className="font-bold text-sm">Hermes</span>
-        </div>
-        <button
-          type="button"
-          aria-label="Search all tasks"
-          title="Search all tasks"
-          data-testid="mobile-global-search-button"
-          onClick={() => onSearchSubmit?.()}
-          className="p-2 rounded-lg hover:bg-accent"
-        >
-          <Search size={18} className={cn(isTaskSearchPage ? 'text-foreground' : 'text-muted-foreground')} />
-        </button>
+        </Link>
+        {!isTaskPage && (
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-testid="mobile-board-selector-trigger"
+                  className="flex min-w-0 max-w-[180px] flex-1 items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                >
+                  <span className="truncate">{activeBoard.name}</span>
+                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {boards.map((board) => (
+                  <DropdownMenuItem
+                    key={board.id}
+                    onClick={() => onBoardChange(board)}
+                    className={cn(board.id === activeBoard.id && 'bg-accent')}
+                  >
+                    <span className="flex-1 truncate">{board.name}</span>
+                    <span className="text-muted-foreground text-xs">{board.taskCount}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onOpenNewBoard} data-testid="mobile-board-dropdown-new-board">
+                  <Plus size={14} className="mr-2" />
+                  New board
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <button
+              type="button"
+              aria-label="Open settings"
+              title="Open settings"
+              data-testid="mobile-settings-button"
+              onClick={onOpenSettings}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Settings size={17} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Desktop header */}
       <div className="hidden md:flex items-center gap-4 h-14 px-6">
-        <div className="flex shrink-0 items-center gap-2.5">
+        <Link
+          to={logoHomeHref}
+          aria-label={`Go to ${activeBoard.name || activeBoard.id} board`}
+          title={`Go to ${activeBoard.name || activeBoard.id} board`}
+          data-testid="app-logo-home-link"
+          className="flex shrink-0 items-center gap-2.5 rounded-xl transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
           <Feather size={24} style={{ color: '#7C5CFF' }} />
           <div className="flex flex-col">
             <span className="font-bold text-sm leading-tight">Hermes</span>
@@ -79,26 +133,20 @@ export function TopBar({
               Kanban Control Room
             </span>
           </div>
-        </div>
+        </Link>
 
-        <div className="relative min-w-[360px] flex-1 max-w-5xl">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={isTaskSearchPage ? 'Find task id, title, comment...' : 'Search all tasks…'}
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                onSearchSubmit?.(searchQuery);
-              }
-            }}
-            className="h-9 w-full rounded-xl border-border bg-secondary pl-8 text-xs"
-            data-testid="topbar-global-search"
-            aria-label="Search all tasks"
-            title="Global search: press Enter to open /tasks"
-          />
-        </div>
+        <DataViewSearchAndFilter
+          query={searchQuery}
+          filters={searchFilters}
+          boards={boards}
+          assignees={assignees}
+          onQueryChange={onSearchChange}
+          onFiltersChange={onSearchFiltersChange || (() => undefined)}
+          onSubmit={(query, filters) => onSearchSubmit?.(query, filters)}
+          placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search all tasks…'}
+          className="min-w-[360px] flex-1 max-w-5xl"
+          testId="topbar-global-search"
+        />
 
         <div className="flex shrink-0 items-center gap-3">
           {isTaskPage ? (
@@ -114,7 +162,7 @@ export function TopBar({
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent">
+                <button className="flex max-w-[260px] items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-accent" data-testid="board-selector-trigger">
                   <span className="text-muted-foreground">Board</span>
                   <span className="truncate">{activeBoard.name}</span>
                   <ChevronDown size={14} className="shrink-0 text-muted-foreground" />

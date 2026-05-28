@@ -8,13 +8,19 @@ import { kanbanApi } from '@/lib/kanbanApi';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { getSearchParamValue, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 
 const EXACT_TASK_ID = /^t_[0-9a-f]{8}$/i;
 
 type TaskSearchPageProps = {
   boards: Board[];
-  activeBoard: Board;
   assignees: BotProfile[];
+  locationSearch: string;
+  query: string;
+  filters: DataViewSearchFilters;
+  activeBoard: Board;
+  onQueryChange: (query: string) => void;
+  onFiltersChange: (filters: DataViewSearchFilters) => void;
   onOpenTask: (taskId: string, boardId?: string) => void;
 };
 
@@ -227,14 +233,9 @@ function ResultCard({ result, onOpen }: { result: TaskSearchResult; onOpen: () =
   );
 }
 
-export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: TaskSearchPageProps) {
-  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
-  const [query, setQuery] = useState(filterValue(urlParams, 'q'));
+export function TaskSearchPage({ locationSearch, query, filters, activeBoard, onQueryChange, onFiltersChange, onOpenTask }: TaskSearchPageProps) {
+  const urlParams = useMemo(() => new URLSearchParams(locationSearch), [locationSearch]);
   const [submittedQuery, setSubmittedQuery] = useState(filterValue(urlParams, 'q'));
-  const [board, setBoard] = useState(filterValue(urlParams, 'board'));
-  const [status, setStatus] = useState(filterValue(urlParams, 'status'));
-  const [assignee, setAssignee] = useState(filterValue(urlParams, 'assignee'));
-  const [priority, setPriority] = useState(filterValue(urlParams, 'priority'));
   const [selectedFieldId, setSelectedFieldId] = useState<SearchFilterField['id']>();
   const [results, setResults] = useState<TaskSearchResult[]>([]);
   const [total, setTotal] = useState(0);
@@ -243,6 +244,25 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
   const [state, setState] = useState<SearchState>(submittedQuery ? 'loading' : 'first-use');
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const nextQuery = filterValue(urlParams, 'q');
+    const nextFilters = {
+      board: filterValue(urlParams, 'board'),
+      status: filterValue(urlParams, 'status'),
+      assignee: filterValue(urlParams, 'assignee'),
+      priority: filterValue(urlParams, 'priority'),
+    };
+    queueMicrotask(() => {
+      onQueryChange(nextQuery);
+      setSubmittedQuery(nextQuery);
+      onFiltersChange(nextFilters);
+    });
+  }, [onFiltersChange, onQueryChange, urlParams]);
+
+  const board = filters.board || '';
+  const status = filters.status || '';
+  const assignee = filters.assignee || '';
+  const priority = filters.priority || '';
   const syncUrl = (next: { q?: string; board?: string; status?: string; assignee?: string; priority?: string }) => {
     const params = new URLSearchParams();
     const q = next.q ?? submittedQuery;
@@ -251,10 +271,10 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
     const a = next.assignee ?? assignee;
     const p = next.priority ?? priority;
     if (q) params.set('q', q);
-    if (b) params.set('board', b);
-    if (s) params.set('status', s);
-    if (a) params.set('assignee', a);
-    if (p) params.set('priority', p);
+    if (b) params.set('board', getSearchParamValue(b));
+    if (s) params.set('status', getSearchParamValue(s));
+    if (a) params.set('assignee', getSearchParamValue(a));
+    if (p) params.set('priority', getSearchParamValue(p));
     window.history.replaceState(null, '', `/tasks${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
@@ -276,10 +296,10 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
     });
     kanbanApi.searchTasks({
       q: submittedQuery,
-      board: board || undefined,
-      status: status || undefined,
-      assignee: assignee || undefined,
-      priority: priority || undefined,
+      board: getSearchParamValue(board) || undefined,
+      status: getSearchParamValue(status) || undefined,
+      assignee: getSearchParamValue(assignee) || undefined,
+      priority: getSearchParamValue(priority) || undefined,
       limit: 50,
       sort: submittedQuery ? 'relevance' : 'updated',
     })
@@ -320,8 +340,7 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
     };
   }, [assignee, board, onOpenTask, priority, status, submittedQuery]);
 
-  const submit = (event?: FormEvent) => {
-    event?.preventDefault();
+  const submit = () => {
     const nextQuery = query.trim();
     setSubmittedQuery(nextQuery);
     syncUrl({ q: nextQuery });
@@ -330,18 +349,12 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
   const updateFilter = (key: 'board' | 'status' | 'assignee' | 'priority', value: string) => {
     const currentValue = key === 'board' ? board : key === 'status' ? status : key === 'assignee' ? assignee : priority;
     const nextValue = value === currentValue ? '' : value;
-    if (key === 'board') setBoard(nextValue);
-    if (key === 'status') setStatus(nextValue);
-    if (key === 'assignee') setAssignee(nextValue);
-    if (key === 'priority') setPriority(nextValue);
+    onFiltersChange({ ...filters, [key]: nextValue || undefined });
     syncUrl({ [key]: nextValue });
   };
 
   const clearFilters = () => {
-    setBoard('');
-    setStatus('');
-    setAssignee('');
-    setPriority('');
+    onFiltersChange({});
     syncUrl({ board: '', status: '', assignee: '', priority: '' });
   };
 
@@ -384,7 +397,7 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
           tokens={activeTokens}
           fields={filterFields}
           selectedFieldId={selectedFieldId}
-          onQueryChange={setQuery}
+          onQueryChange={onQueryChange}
           onSubmit={() => submit()}
           onSelectField={(fieldId) => setSelectedFieldId((current) => current === fieldId ? undefined : fieldId)}
           onSelectValue={(fieldId, value) => {
@@ -393,7 +406,7 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
           }}
           onRemoveToken={(fieldId) => updateFilter(fieldId, '')}
           onClearAll={() => {
-            setQuery('');
+            onQueryChange('');
             setSubmittedQuery('');
             clearFilters();
             syncUrl({ q: '', board: '', status: '', assignee: '', priority: '' });
@@ -415,7 +428,7 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
               <h2 className="text-lg font-semibold">Start with a search term or filter token</h2>
               <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">Search by task id, title, body, summary, comment, assignee, or status. Exact task ids still open directly.</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {['t_ae86dc88', 'blocked', 'designer', 'review-required'].map((example) => <SearchChip key={example} onClick={() => { setQuery(example); setSubmittedQuery(example); syncUrl({ q: example }); }}>{example}</SearchChip>)}
+                {['t_ae86dc88', 'blocked', 'designer', 'review-required'].map((example) => <SearchChip key={example} onClick={() => { onQueryChange(example); setSubmittedQuery(example); syncUrl({ q: example }); }}>{example}</SearchChip>)}
               </div>
             </div>
           )}
@@ -442,6 +455,7 @@ export function TaskSearchPage({ boards, activeBoard, assignees, onOpenTask }: T
           {(state === 'ready' || state === 'exact-id-ambiguous') && results.map((result) => (
             <ResultCard key={`${result.boardId}-${result.id}`} result={result} onOpen={() => onOpenTask(result.id, result.boardId)} />
           ))}
+
         </div>
       </div>
     </section>

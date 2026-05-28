@@ -8,12 +8,14 @@ import { TopBar, type TaskDetailPresentation } from '@/components/layout/TopBar'
 import { MobileCreateTaskFab } from '@/components/layout/MobileCreateTaskFab';
 import { DesktopFooterBar } from '@/components/layout/DesktopFooterBar';
 import { BoardView } from '@/components/board/BoardView';
+import { NewBoardModal } from '@/components/board/NewBoardModal';
 import { TaskDetailSheet } from '@/components/task/TaskDetailSheet';
 import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { TaskDetailPage } from '@/components/task/TaskDetailPage';
 import { TaskQuickCapture } from '@/components/task/TaskQuickCapture';
 import { BoardsSettingsPanel, type BoardSettingsMode } from '@/components/settings/BoardsSettingsPanel';
 import { TaskSearchPage } from '@/components/search/TaskSearchPage';
+import { DataViewSearchAndFilter, type DataViewSearchFilters } from '@/components/search/DataViewSearchAndFilter';
 import { useIsMobile } from '@/hooks/use-mobile';
 import './App.css';
 
@@ -39,6 +41,7 @@ function mergeTaskUpdate(existing: Task, updated: Task): Task {
     commentCount: updated.comments.length > 0 ? updated.commentCount : Math.max(existing.commentCount, updated.commentCount),
     activity: updated.activity.length > 0 ? updated.activity : existing.activity,
     runs: updated.runs.length > 0 ? updated.runs : existing.runs,
+    workerLog: updated.workerLog ?? existing.workerLog,
     linkedTasks: updated.linkedTasks.length > 0 ? updated.linkedTasks : existing.linkedTasks,
     linkCount: updated.linkedTasks.length > 0 ? updated.linkCount : Math.max(existing.linkCount, updated.linkCount),
     diagnostics: updated.diagnostics.length > 0 ? updated.diagnostics : existing.diagnostics,
@@ -56,10 +59,11 @@ function App() {
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [boardFilterQuery, setBoardFilterQuery] = useState('');
+  const [searchFilters, setSearchFilters] = useState<DataViewSearchFilters>({});
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('list');
+  const [isNewBoardOpen, setIsNewBoardOpen] = useState(false);
+  const [settingsMode, setSettingsMode] = useState<BoardSettingsMode>('settings');
   const [detailPresentation, setDetailPresentation] = useState<TaskDetailPresentation>(() => {
     const saved = window.localStorage.getItem('bhk.taskDetailPresentation');
     return saved === 'modal' || saved === 'page' ? saved : 'drawer';
@@ -85,7 +89,7 @@ function App() {
   }, [location.pathname]);
   const isTaskPage = !!routeTaskId;
   const isSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
-  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/';
+  const isTaskSearchPage = location.pathname === '/tasks' || location.pathname === '/tasks/' || location.pathname === '/search' || location.pathname === '/search/';
   const activeDetailPresentation: TaskDetailPresentation = isTaskPage ? 'page' : detailPresentation;
 
   const loadBoardData = useCallback(async (preferredBoardId?: string) => {
@@ -158,7 +162,7 @@ function App() {
   // Load route data
   useEffect(() => {
     if (isSettingsPage) {
-      setSettingsMode('list');
+      setSettingsMode('settings');
       setIsSettingsOpen(true);
       navigate(boardPath(boardIdFromUrl), { replace: true });
       return;
@@ -247,7 +251,7 @@ function App() {
     navigate(`${taskPath(taskId)}${params}`);
   }, [navigate]);
 
-  const handleGlobalSearch = useCallback(async (query?: string) => {
+  const handleGlobalSearch = useCallback(async (query?: string, filters: DataViewSearchFilters = searchFilters) => {
     const trimmed = (query ?? searchQuery).trim();
     const exactTaskId = normalizeExactTaskId(trimmed);
     if (EXACT_TASK_ID.test(exactTaskId)) {
@@ -264,8 +268,14 @@ function App() {
         // Fall through to the shareable search page where the bridge error is shown in context.
       }
     }
-    navigate(`/tasks${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''}`);
-  }, [navigate, searchQuery]);
+    const params = new URLSearchParams();
+    if (trimmed) params.set('q', trimmed);
+    (['board', 'status', 'assignee', 'priority'] as const).forEach((key) => {
+      const value = filters[key]?.replace(/^!/, '');
+      if (value) params.set(key, value);
+    });
+    navigate(`/tasks${params.toString() ? `?${params.toString()}` : ''}`);
+  }, [navigate, searchFilters, searchQuery]);
 
   const handleCloseDetail = useCallback(() => {
     if (isTaskPage) {
@@ -367,6 +377,34 @@ function App() {
     [activeBoard]
   );
 
+  const handleLinkTask = useCallback(
+    async (targetTaskId: string, relation: 'parent' | 'child') => {
+      if (!selectedTask || !activeBoard) return;
+      if (targetTaskId.toLowerCase() === selectedTask.id.toLowerCase()) {
+        toast.error('Cannot link a task to itself');
+        return;
+      }
+      const duplicate = selectedTask.linkedTasks.some((link) => link.relation === relation && link.taskId.toLowerCase() === targetTaskId.toLowerCase());
+      if (duplicate) {
+        toast.error('That task is already linked in this group');
+        return;
+      }
+      try {
+        setUpdatingTaskId(selectedTask.id);
+        const updated = await kanbanApi.linkTask(selectedTask.id, targetTaskId, relation, activeBoard.id);
+        setTasks((current) => current.map((task) => (task.id === updated.id ? mergeTaskUpdate(task, updated) : task)));
+        toast.success(`Linked ${targetTaskId}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to link task';
+        toast.error(message);
+        throw error;
+      } finally {
+        setUpdatingTaskId(null);
+      }
+    },
+    [activeBoard, selectedTask]
+  );
+
   const handleAddComment = useCallback(
     async () => {
       toast.info('Read-only mode: comments are disabled in this MVP');
@@ -434,20 +472,40 @@ function App() {
       {/* Top Bar */}
       <TopBar
           boards={boards}
+          assignees={assignees}
           activeBoard={activeBoard}
           onBoardChange={handleBoardChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          searchFilters={searchFilters}
+          onSearchFiltersChange={setSearchFilters}
           onSearchSubmit={handleGlobalSearch}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
-          onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
-          onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
+          onOpenSettings={() => { setSettingsMode('settings'); setIsSettingsOpen(true); }}
+          onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
           detailPresentation={activeDetailPresentation}
           onDetailPresentationChange={handleDetailPresentationChange}
           isTaskPage={isTaskPage}
           isTaskSearchPage={isTaskSearchPage}
           onNavigateToBoard={handleCloseDetail}
+          logoHomeHref={boardPath(activeBoard.id)}
         />
+
+      {!isTaskPage && (
+        <div className="shrink-0 border-b border-border/50 bg-card/80 px-4 py-2 md:hidden">
+          <DataViewSearchAndFilter
+            query={searchQuery}
+            filters={searchFilters}
+            boards={boards}
+            assignees={assignees}
+            onQueryChange={setSearchQuery}
+            onFiltersChange={setSearchFilters}
+            onSubmit={(query, filters) => handleGlobalSearch(query, filters)}
+            placeholder={isTaskSearchPage ? 'Find task id, title, comment…' : 'Search this board…'}
+            testId="mobile-topbar-search"
+          />
+        </div>
+      )}
 
       {(dataSource === 'fallback' || loadError) && (
         <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
@@ -461,8 +519,13 @@ function App() {
           {isTaskSearchPage ? (
             <TaskSearchPage
               boards={boards}
-              activeBoard={activeBoard}
               assignees={assignees}
+              locationSearch={location.search}
+              query={searchQuery}
+              filters={searchFilters}
+              activeBoard={activeBoard}
+              onQueryChange={setSearchQuery}
+              onFiltersChange={setSearchFilters}
               onOpenTask={handleOpenSearchTask}
             />
           ) : activeDetailPresentation === 'page' && (selectedTask || routeTaskId) ? (
@@ -479,22 +542,17 @@ function App() {
               onDecompose={handleDecompose}
               onDelete={handleDelete}
               onUpdateTask={updateSelectedTask}
+              onLinkTask={handleLinkTask}
               isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
               isMobile={isMobile}
             />
           ) : (
             <BoardView
               tasks={tasks}
-              boards={boards}
-              activeBoard={activeBoard}
-              onBoardChange={handleBoardChange}
               onTaskClick={handleTaskClick}
-              onOpenSettings={() => { setSettingsMode('list'); setIsSettingsOpen(true); }}
-              onOpenNewBoard={() => { setSettingsMode('create'); setIsSettingsOpen(true); }}
               onTasksChange={() => toast.info('Read-only mode: drag/drop updates are disabled in this MVP')}
               onAddTask={() => setIsQuickCaptureOpen(true)}
-              boardFilterQuery={boardFilterQuery}
-              onBoardFilterChange={setBoardFilterQuery}
+              searchQuery={searchQuery}
             />
           )}
         </div>
@@ -522,6 +580,7 @@ function App() {
           onDecompose={handleDecompose}
           onDelete={handleDelete}
           onUpdateTask={updateSelectedTask}
+          onLinkTask={handleLinkTask}
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
@@ -538,6 +597,7 @@ function App() {
           onDecompose={handleDecompose}
           onDelete={handleDelete}
           onUpdateTask={updateSelectedTask}
+          onLinkTask={handleLinkTask}
           isUpdating={!!selectedTask && updatingTaskId === selectedTask.id}
           isMobile={isMobile}
         />
@@ -551,6 +611,17 @@ function App() {
         activeBoard={activeBoard}
         onBoardChange={handleBoardChange}
         onBoardsRefresh={loadBoardData}
+        assignees={assignees}
+      />
+
+      <NewBoardModal
+        open={isNewBoardOpen}
+        boards={boards}
+        onClose={() => setIsNewBoardOpen(false)}
+        onCreated={async (board) => {
+          await loadBoardData(board.id);
+          navigate(boardPath(board.id));
+        }}
       />
 
       {/* Quick Capture */}

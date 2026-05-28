@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, Plus, Save } from 'lucide-react';
-import type { Board } from '@/lib/types';
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react';
+import { Save, X } from 'lucide-react';
+import type { Board, BotProfile, KanbanOrchestrationSettings } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-export type BoardSettingsMode = 'list' | 'create';
+export type BoardSettingsMode = 'settings' | 'list';
 
 interface BoardsSettingsPanelProps {
   open: boolean;
@@ -16,192 +15,281 @@ interface BoardsSettingsPanelProps {
   activeBoard: Board;
   onBoardChange: (board: Board) => void;
   onBoardsRefresh?: (preferredBoardId?: string) => Promise<void>;
+  assignees?: BotProfile[];
 }
 
-type BoardFormState = {
-  slug: string;
-  name: string;
-  description: string;
+type OrchestrationFormState = {
+  orchestratorProfile: string;
+  defaultAssignee: string;
+  autoDecompose: boolean;
+  autoPromoteChildren: boolean;
 };
 
-const emptyBoardForm: BoardFormState = {
-  slug: '',
-  name: '',
-  description: '',
+const emptyOrchestrationForm: OrchestrationFormState = {
+  orchestratorProfile: '',
+  defaultAssignee: '',
+  autoDecompose: true,
+  autoPromoteChildren: true,
 };
+
+function settingsToForm(settings: KanbanOrchestrationSettings | null): OrchestrationFormState {
+  if (!settings) return emptyOrchestrationForm;
+  return {
+    orchestratorProfile: settings.orchestratorProfile || '',
+    defaultAssignee: settings.defaultAssignee || '',
+    autoDecompose: settings.autoDecompose,
+    autoPromoteChildren: settings.autoPromoteChildren,
+  };
+}
+
+function formatSettingValue(value: number | null) {
+  return value === null || value === undefined ? 'Not configured' : String(value);
+}
+
+function mergeOptions(...groups: BotProfile[][]) {
+  const byId = new Map<string, BotProfile>();
+  groups.flat().forEach((item) => {
+    if (item.id) byId.set(item.id, item);
+  });
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export function BoardsSettingsPanel({
   open,
   onClose,
-  mode = 'list',
-  boards,
+  mode = 'settings',
   activeBoard,
-  onBoardChange,
-  onBoardsRefresh,
+  assignees = [],
 }: BoardsSettingsPanelProps) {
-  const [boardMode, setBoardMode] = useState<BoardSettingsMode>(mode);
-  const [boardForm, setBoardForm] = useState<BoardFormState>(emptyBoardForm);
-  const [boardSaving, setBoardSaving] = useState(false);
+  const [panelMode, setPanelMode] = useState<BoardSettingsMode>(mode);
+  const [settings, setSettings] = useState<KanbanOrchestrationSettings | null>(null);
+  const [form, setForm] = useState<OrchestrationFormState>(emptyOrchestrationForm);
+  const [profiles, setProfiles] = useState<BotProfile[]>([]);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+
+  const profileOptions = useMemo(() => mergeOptions(profiles, assignees), [assignees, profiles]);
 
   useEffect(() => {
     if (!open) return;
-    setBoardMode(mode);
-    setBoardForm(emptyBoardForm);
+    setPanelMode(mode === 'list' ? 'list' : 'settings');
   }, [mode, open]);
 
-  const refreshBoards = async (preferredBoardId?: string) => {
-    if (onBoardsRefresh) await onBoardsRefresh(preferredBoardId);
-  };
+  useEffect(() => {
+    if (!open || panelMode !== 'settings') return;
+    let cancelled = false;
+    setSettingsLoading(true);
+    Promise.all([
+      kanbanApi.getOrchestration(),
+      kanbanApi.getProfiles().catch(() => []),
+    ])
+      .then(([nextSettings, nextProfiles]) => {
+        if (cancelled) return;
+        setSettings(nextSettings);
+        setForm(settingsToForm(nextSettings));
+        setProfiles(nextProfiles);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : 'Failed to load settings');
+      })
+      .finally(() => {
+        if (!cancelled) setSettingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, panelMode]);
 
-  const openCreateBoard = () => {
-    setBoardMode('create');
-    setBoardForm(emptyBoardForm);
-  };
-
-  const saveBoard = async () => {
-    const slug = boardForm.slug.trim().toLowerCase();
-    const name = boardForm.name.trim();
-    const description = boardForm.description.trim();
-
-    if (!slug) {
-      toast.error('Board slug is required');
-      return;
-    }
-    if (!name) {
-      toast.error('Board name is required');
-      return;
-    }
-
-    setBoardSaving(true);
+  const saveSettings = async () => {
+    setSettingsSaving(true);
     try {
-      const next = await kanbanApi.createBoard({ slug, name, description });
-      await refreshBoards(next.id);
-      setBoardMode('list');
-      setBoardForm(emptyBoardForm);
-      toast.success(`Created ${next.name}`);
+      const next = await kanbanApi.updateOrchestration({
+        orchestratorProfile: form.orchestratorProfile || '',
+        defaultAssignee: form.defaultAssignee || '',
+        autoDecompose: form.autoDecompose,
+        autoPromoteChildren: form.autoPromoteChildren,
+      });
+      setSettings(next);
+      setForm(settingsToForm(next));
+      toast.success('Kanban settings saved');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create board');
+      toast.error(error instanceof Error ? error.message : 'Failed to save settings');
     } finally {
-      setBoardSaving(false);
+      setSettingsSaving(false);
     }
   };
 
-  const showCreateForm = boardMode === 'create';
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (!swipeStart.current) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - swipeStart.current.x;
+    const deltaY = touch.clientY - swipeStart.current.y;
+    swipeStart.current = null;
+    if (deltaX > 80 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
+      onClose();
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
         data-testid="settings-drawer"
-        className="w-[92vw] gap-0 border-border bg-background p-0 sm:max-w-[420px]"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="inset-0 h-[100dvh] w-screen max-w-none gap-0 overflow-hidden border-0 bg-background p-0 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[460px] sm:max-w-[460px] sm:border-l"
       >
         <SheetHeader className="border-b border-border/50 px-4 py-4">
-          <div className="flex items-start gap-3 pr-8">
-            {showCreateForm && (
-              <button
-                type="button"
-                aria-label="Back to boards"
-                onClick={() => setBoardMode('list')}
-                className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card hover:bg-accent"
-              >
-                <ArrowLeft size={15} />
-              </button>
-            )}
+          <div className="flex items-start justify-between gap-3 pr-8">
             <div>
-              <SheetTitle className="text-base">{showCreateForm ? 'New board' : 'Settings'}</SheetTitle>
+              <SheetTitle className="text-base">Settings</SheetTitle>
               <SheetDescription className="text-xs">
-                {showCreateForm ? 'Create a board with only the required basics.' : 'Switch boards or create a new one.'}
+                Active board settings for {activeBoard.name || activeBoard.id}.
               </SheetDescription>
             </div>
+            <button
+              type="button"
+              data-testid="settings-close-button"
+              aria-label="Close settings"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card hover:bg-accent"
+            >
+              <X size={15} />
+            </button>
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          {!showCreateForm ? (
-            <div className="space-y-4">
-              <section className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Boards</h3>
-                  <span className="text-[10px] text-muted-foreground">{boards.length}</span>
-                </div>
-                <div className="space-y-1">
-                  {boards.map((board) => {
-                    const isActive = board.id === activeBoard.id;
-                    return (
-                      <button
-                        key={board.id}
-                        type="button"
-                        onClick={() => onBoardChange(board)}
-                        className={cn(
-                          'flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors',
-                          isActive ? 'border-primary/30 bg-primary/10' : 'border-border/60 bg-card/30 hover:bg-accent/40'
-                        )}
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{board.name}</span>
-                        <span className="text-xs text-muted-foreground">{board.taskCount}</span>
-                        {isActive && <Check size={14} className="text-primary" />}
-                      </button>
-                    );
-                  })}
+        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4">
+          <div className="space-y-4">
+              <section className="rounded-xl border border-border/60 bg-card/30 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active board</div>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Name</span>
+                    <span data-testid="settings-board-name" className="min-w-0 truncate font-medium">{activeBoard.name || activeBoard.id}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Slug</span>
+                    <span data-testid="settings-board-slug" className="font-mono text-xs">{activeBoard.id}</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-muted-foreground">Description</span>
+                    <span data-testid="settings-board-description" className="max-w-[240px] text-right text-xs">{activeBoard.description || 'No description'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Tasks</span>
+                    <span data-testid="settings-board-task-count">{activeBoard.taskCount}</span>
+                  </div>
                 </div>
               </section>
 
-              <button
-                type="button"
-                data-testid="settings-new-board-button"
-                onClick={openCreateBoard}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/10 px-3 py-3 text-sm font-medium text-primary hover:bg-primary/15"
-              >
-                <Plus size={15} />
-                New board
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-border/60 bg-card/30 p-3">
-                <div className="grid gap-3">
-                  <label className="space-y-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Slug</span>
-                    <input
-                      value={boardForm.slug}
-                      onChange={(event) => setBoardForm((current) => ({ ...current, slug: event.target.value }))}
-                      placeholder="my-board"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</span>
-                    <input
-                      value={boardForm.name}
-                      onChange={(event) => setBoardForm((current) => ({ ...current, name: event.target.value }))}
-                      placeholder="Board name"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="space-y-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Description</span>
-                    <textarea
-                      value={boardForm.description}
-                      onChange={(event) => setBoardForm((current) => ({ ...current, description: event.target.value }))}
-                      rows={3}
-                      placeholder="Optional"
-                      className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </label>
-                </div>
-              </div>
+              <section className="rounded-xl border border-border/60 bg-card/30 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Orchestration</div>
+                {settingsLoading ? (
+                  <p className="mt-3 text-xs text-muted-foreground">Loading settings…</p>
+                ) : (
+                  <div className="mt-3 grid gap-3">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium">Orchestrator profile</span>
+                      <select
+                        data-testid="settings-orchestrator-profile"
+                        value={form.orchestratorProfile}
+                        onChange={(event) => setForm((current) => ({ ...current, orchestratorProfile: event.target.value }))}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Use resolved default</option>
+                        {profileOptions.map((profile) => (
+                          <option key={profile.id} value={profile.id}>{profile.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium">Default assignee</span>
+                      <select
+                        data-testid="settings-default-assignee"
+                        value={form.defaultAssignee}
+                        onChange={(event) => setForm((current) => ({ ...current, defaultAssignee: event.target.value }))}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Use resolved default</option>
+                        {profileOptions.map((profile) => (
+                          <option key={profile.id} value={profile.id}>{profile.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
+                      <span>Auto-decompose triage tasks</span>
+                      <input
+                        type="checkbox"
+                        data-testid="settings-auto-decompose"
+                        checked={form.autoDecompose}
+                        onChange={(event) => setForm((current) => ({ ...current, autoDecompose: event.target.checked }))}
+                        className="h-4 w-4 accent-primary"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
+                      <span>Auto-promote children</span>
+                      <input
+                        type="checkbox"
+                        data-testid="settings-auto-promote-children"
+                        checked={form.autoPromoteChildren}
+                        onChange={(event) => setForm((current) => ({ ...current, autoPromoteChildren: event.target.checked }))}
+                        className="h-4 w-4 accent-primary"
+                      />
+                    </label>
+                  </div>
+                )}
+              </section>
 
-              <button
-                type="button"
-                onClick={saveBoard}
-                disabled={boardSaving}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
-              >
-                <Save size={13} />
-                {boardSaving ? 'Creating…' : 'Create board'}
-              </button>
+              <section className="rounded-xl border border-border/60 bg-card/30 p-3 text-xs">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resolved runtime helpers</div>
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Resolved orchestrator</span><span data-testid="settings-resolved-orchestrator-profile">{settings?.resolvedOrchestratorProfile || 'default'}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Resolved assignee</span><span data-testid="settings-resolved-default-assignee">{settings?.resolvedDefaultAssignee || 'default'}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Active profile</span><span data-testid="settings-active-profile">{settings?.activeProfile || 'default'}</span></div>
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border/60 bg-card/30 p-3 text-xs">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Advanced dispatcher limits</div>
+                <p className="mt-1 text-[11px] text-muted-foreground">Read-only until backend save support exists.</p>
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Max in progress</span><span data-testid="settings-advanced-max-in-progress">{formatSettingValue(settings?.advanced.maxInProgress ?? null)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Max spawn</span><span data-testid="settings-advanced-max-spawn">{formatSettingValue(settings?.advanced.maxSpawn ?? null)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Dispatch interval</span><span data-testid="settings-advanced-dispatch-interval">{formatSettingValue(settings?.advanced.dispatchIntervalSeconds ?? null)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Failure limit</span><span data-testid="settings-advanced-failure-limit">{formatSettingValue(settings?.advanced.failureLimit ?? null)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Stale timeout</span><span data-testid="settings-advanced-stale-timeout">{formatSettingValue(settings?.advanced.dispatchStaleTimeoutSeconds ?? null)}</span></div>
+                </div>
+              </section>
             </div>
-          )}
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-2 border-t border-border/50 bg-background px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            data-testid="settings-cancel-button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-accent"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="settings-save-button"
+            onClick={saveSettings}
+            disabled={settingsLoading || settingsSaving}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
+          >
+            <Save size={13} />
+            {settingsSaving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </SheetContent>
     </Sheet>

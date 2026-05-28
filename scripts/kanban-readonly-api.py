@@ -13,8 +13,10 @@ Endpoints:
 - GET /api/plugins/kanban/orchestration
 - GET /api/plugins/kanban/search?q=<query>&board=<slug|all>&status=<status>&assignee=<profile>&priority=<p0|p1|p2|p3>&has_warnings=<bool>&has_links=<bool>&limit=<n>&offset=<n>&sort=<relevance|updated|priority>
 - GET /api/plugins/kanban/tasks/<id>?board=<slug>
+- GET /api/plugins/kanban/tasks/<id>/logs?board=<slug>&tail_bytes=<n>
 - PUT /api/plugins/kanban/orchestration
 - PATCH /api/plugins/kanban/tasks/<id>?board=<slug>
+- POST /api/plugins/kanban/tasks/<id>/links?board=<slug>
 
 The data source is the Hermes Kanban CLI/SQLite board layer. This is a
 local-only bridge intended to be reverse-proxied by nginx from the BHK static
@@ -242,6 +244,29 @@ def update_task(task_id: str, payload: dict, slug: str | None) -> dict:
                 conn.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", vals)
                 conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'edited', NULL, ?)", (task_id, int(time.time())))
 
+        updated = kanban_db.get_task(conn, task_id)
+        return {"task": task_to_dict(updated, board)}
+    finally:
+        conn.close()
+
+
+def link_task(task_id: str, payload: dict, slug: str | None) -> dict:
+    board = resolve_board(slug)
+    parent_id = str(payload.get("parent_id") or payload.get("parentId") or "").strip()
+    child_id = str(payload.get("child_id") or payload.get("childId") or "").strip()
+    if not parent_id or not child_id:
+        raise ValueError("parent_id and child_id are required")
+    if task_id not in {parent_id, child_id}:
+        raise ValueError("link must include the task from the detail view")
+    if parent_id.lower() == child_id.lower():
+        raise ValueError("Cannot link a task to itself")
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        existing = conn.execute("SELECT 1 FROM task_links WHERE lower(parent_id) = lower(?) AND lower(child_id) = lower(?)", (parent_id, child_id)).fetchone()
+        if existing:
+            return {"_status": 409, "detail": "Tasks are already linked in that direction"}
+        kanban_db.link_tasks(conn, parent_id, child_id)
         updated = kanban_db.get_task(conn, task_id)
         return {"task": task_to_dict(updated, board)}
     finally:
@@ -523,6 +548,7 @@ def task_runs(conn, task_id: str) -> list[dict]:
     return [
         {
             "id": str(row["id"]),
+            "run_id": row["id"],
             "status": row["status"] or row["outcome"] or "started",
             "outcome": row["outcome"],
             "summary": row["summary"],
@@ -640,6 +666,31 @@ def linked_tasks(conn, task_id: str, board: str) -> list[dict]:
     return links
 
 
+
+def task_worker_log_payload(task_id: str, slug: str | None = None, tail_bytes: int = 65536) -> dict:
+    """Return the per-task worker terminal log as a separate refreshable DTO.
+
+    This keeps comments, run rows, event rows, and raw worker stdout/stderr as
+    distinct streams for the BHK detail layout. Missing/GC'd logs intentionally
+    return an empty text payload so panels render an empty state instead of an
+    API error.
+    """
+    board = resolve_board(slug)
+    path = kanban_db.worker_log_path(task_id, board=board)
+    text = kanban_db.read_worker_log(task_id, tail_bytes=tail_bytes, board=board)
+    size = path.stat().st_size if path.exists() else 0
+    return {
+        "worker_log": {
+            "task_id": task_id,
+            "board": board or kanban_db.get_current_board(),
+            "text": text or "",
+            "size_bytes": size,
+            "truncated": bool(size and tail_bytes and size > tail_bytes),
+            "path": str(path) if path.exists() else None,
+            "refreshed_at": int(time.time()),
+        }
+    }
+
 def board_choices(slug: str | None) -> list[dict]:
     if slug and slug.lower() not in {"all", "*"}:
         board = resolve_board(slug)
@@ -652,10 +703,28 @@ def task_detail_payload(task_id: str, slug: str | None = None) -> dict:
     exact = search_tasks({"q": [task_id], "board": [slug]} if slug else {"q": [task_id]}, exact_task_id=task_id, limit_override=1)
     if not exact["results"]:
         return {"_status": 404, "detail": f"task {task_id} not found"}
-    return {"task": exact["results"][0]["task"]}
+    task = exact["results"][0]["task"]
+    task["worker_log"] = task_worker_log_payload(task_id, task.get("board") or slug)["worker_log"]
+    return {"task": task}
 
 
-def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, limit_override: int | None = None) -> dict:
+def empty_search_response(now: int | None = None) -> dict:
+    return {
+        "results": [],
+        "total": 0,
+        "nextCursor": None,
+        "source": "sqlite",
+        "indexedAt": now or int(time.time()),
+    }
+
+
+def search_tasks(
+    qs: dict[str, list[str]],
+    *,
+    exact_task_id: str | None = None,
+    limit_override: int | None = None,
+    empty_on_unknown_board: bool = False,
+) -> dict:
     query = (qs.get("q") or [""])[0].strip()
     board_filter = (qs.get("board") or [None])[0]
     status_filter = (qs.get("status") or [""])[0].strip().lower()
@@ -672,7 +741,14 @@ def search_tasks(qs: dict[str, list[str]], *, exact_task_id: str | None = None, 
     results: list[dict] = []
     seen_sources: set[tuple[str, str]] = set()
 
-    for board_meta in board_choices(board_filter):
+    try:
+        boards = board_choices(board_filter)
+    except ValueError:
+        if empty_on_unknown_board:
+            return empty_search_response(now)
+        raise
+
+    for board_meta in boards:
         board = board_meta.get("slug") or board_meta.get("id") or kanban_db.DEFAULT_BOARD
         db_identity = str(board_meta.get("db_path") or board)
         try:
@@ -866,13 +942,21 @@ class Handler(BaseHTTPRequestHandler):
                 status = int(result.pop("_status", 200))
                 self.send_json(status, result)
                 return
+            prefix = "/api/plugins/kanban/tasks/"
+            if parsed.path.startswith(prefix) and parsed.path.endswith("/links"):
+                task_id = parsed.path[len(prefix):-len("/links")]
+                qs = parse_qs(parsed.query)
+                result = link_task(task_id, self.read_json_body(), (qs.get("board") or [None])[0])
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
+                return
             self.send_json(404, {"detail": "Not found"})
         except json.JSONDecodeError:
             self.send_json(400, {"detail": "Invalid JSON body"})
         except ValueError as exc:
             self.send_json(400, {"detail": str(exc)})
         except Exception as exc:
-            self.send_json(500, {"detail": f"BHK board API error: {exc}"})
+            self.send_json(500, {"detail": f"BHK POST API error: {exc}"})
 
     def do_PUT(self) -> None:  # noqa: N802 - stdlib callback name
         parsed = urlparse(self.path)
@@ -956,12 +1040,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, orchestration_payload())
                 return
             if parsed.path == "/api/plugins/kanban/search":
-                self.send_json(200, search_tasks(parse_qs(parsed.query)))
+                self.send_json(200, search_tasks(parse_qs(parsed.query), empty_on_unknown_board=True))
                 return
             prefix = "/api/plugins/kanban/tasks/"
             if parsed.path.startswith(prefix):
                 qs = parse_qs(parsed.query)
-                result = task_detail_payload(parsed.path[len(prefix):], (qs.get("board") or [None])[0])
+                task_path = parsed.path[len(prefix):]
+                if task_path.endswith("/logs"):
+                    task_id = task_path[:-len("/logs")]
+                    result = task_worker_log_payload(
+                        task_id,
+                        (qs.get("board") or [None])[0],
+                        limit_from_query((qs.get("tail_bytes") or [None])[0], default=65536, maximum=524288),
+                    )
+                else:
+                    result = task_detail_payload(task_path, (qs.get("board") or [None])[0])
                 status = int(result.pop("_status", 200))
                 self.send_json(status, result)
                 return

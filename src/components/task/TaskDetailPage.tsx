@@ -2,16 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Edit3, ExternalLink, Loader2, Save, X } from 'lucide-react';
 import type { Board, Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { PriorityBadge } from '@/components/shared/PriorityBadge';
-import { BotAvatar } from '@/components/shared/BotAvatar';
-import { MarkdownText } from '@/components/shared/MarkdownText';
 import { TaskDetail } from './TaskDetail';
 import { MobileTaskActionBar, TaskActionsRail } from './TaskActionsRail';
-
-function TaskDetailPageBody({ value }: { value: string }) {
-  return <MarkdownText value={value} className="text-sm leading-relaxed" />;
-}
+import { TaskDescriptionMarkdown, TaskDetailHeader } from './TaskDetailSections';
 
 interface TaskDetailPageProps {
   task: Task | null;
@@ -26,6 +19,7 @@ interface TaskDetailPageProps {
   onDecompose: () => void;
   onDelete: () => void;
   onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  onLinkTask: (targetTaskId: string, relation: 'parent' | 'child') => Promise<void> | void;
   isUpdating?: boolean;
   isMobile?: boolean;
 }
@@ -43,6 +37,7 @@ export function TaskDetailPage({
   onDecompose,
   onDelete,
   onUpdateTask,
+  onLinkTask,
   isUpdating = false,
   isMobile = false,
 }: TaskDetailPageProps) {
@@ -117,23 +112,12 @@ export function TaskDetailPage({
     <section className="h-full overflow-y-auto bg-background" data-testid="task-detail-page">
       <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-4 px-3 pb-24 pt-3 md:px-6 md:py-5 lg:pb-5">
         <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.18)] md:px-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1 space-y-3">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                <Button variant="ghost" size="sm" className="-ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={onBack} data-testid="task-page-back">
-                  <ArrowLeft size={14} />
-                  Board
-                </Button>
-                <span className="text-border">/</span>
-                <a
-                  href={`/tasks/${encodeURIComponent(task.id)}`}
-                  className="font-mono rounded bg-secondary/80 px-2 py-0.5 transition-colors hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  data-testid="task-page-id-link"
-                >
-                  {task.id}
-                </a>
-                <span>on {activeBoard.name || activeBoard.id}</span>
-              </div>
+          <TaskDetailHeader
+            task={task}
+            activeBoard={activeBoard}
+            onBack={onBack}
+            showActionButton={false}
+            titleSlot={(
               <div data-testid="task-page-title-slot">
                 {isEditingDocument ? (
                   <input
@@ -147,30 +131,25 @@ export function TaskDetailPage({
                   <h1 className="max-w-4xl text-2xl font-bold leading-tight tracking-[-0.02em] md:text-3xl">{task.title}</h1>
                 )}
               </div>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-              <StatusBadge status={task.status} />
-              <PriorityBadge priority={task.priority} />
-              <BotAvatar name={task.assignee} />
-              {isEditingDocument ? (
-                <>
-                  <Button variant="outline" size="sm" className="h-8 gap-2" onClick={cancelEditing} disabled={isUpdating} data-testid="task-page-edit-cancel">
-                    <X size={14} />
-                    Cancel
-                  </Button>
-                  <Button size="sm" className="h-8 gap-2" onClick={saveDocumentFields} disabled={!canSave} data-testid="task-page-edit-save">
-                    {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    Save
-                  </Button>
-                </>
-              ) : (
-                <Button variant="outline" size="sm" className="h-8 gap-2" onClick={startEditing} data-testid="task-page-edit">
-                  <Edit3 size={14} />
-                  Edit
+            )}
+            actionsSlot={isEditingDocument ? (
+              <>
+                <Button variant="outline" size="sm" className="h-8 gap-2" onClick={cancelEditing} disabled={isUpdating} data-testid="task-page-edit-cancel">
+                  <X size={14} />
+                  Cancel
                 </Button>
-              )}
-            </div>
-          </div>
+                <Button size="sm" className="h-8 gap-2" onClick={saveDocumentFields} disabled={!canSave} data-testid="task-page-edit-save">
+                  {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" className="h-8 gap-2" onClick={startEditing} data-testid="task-page-edit">
+                <Edit3 size={14} />
+                Edit
+              </Button>
+            )}
+          />
         </div>
 
         <div className="grid min-h-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -191,7 +170,7 @@ export function TaskDetailPage({
                   <p className="text-[11px] text-muted-foreground">Markdown-friendly body edit. Save is enabled after a valid change.</p>
                 </div>
               ) : task.description ? (
-                <TaskDetailPageBody value={task.description} />
+                <TaskDescriptionMarkdown value={task.description} />
               ) : (
                 <div className="rounded-xl border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
                   No body yet. Use Edit to add a task description.
@@ -212,6 +191,7 @@ export function TaskDetailPage({
                 onDecompose={onDecompose}
                 onDelete={onDelete}
                 onUpdateTask={onUpdateTask}
+                onLinkTask={onLinkTask}
                 isUpdating={isUpdating}
                 chrome="page"
                 showDescription={false}
