@@ -297,6 +297,14 @@ function App() {
     }
   }, [activeBoard, isTaskPage, navigate, routeTaskId, selectedTask]);
 
+  const refetchActiveBoard = useCallback(async (board: Board) => {
+    const data = await kanbanApi.getBoard(board.id);
+    setTasks(data.tasks);
+    setActiveBoard(data.board);
+    setDataSource(data.source);
+    setLoadError(data.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
+  }, []);
+
   const updateSelectedTask = useCallback(
     async (patch: UpdateTaskData) => {
       if (!selectedTask || !activeBoard) return;
@@ -309,8 +317,8 @@ function App() {
       }
       try {
         setUpdatingTaskId(selectedTask.id);
-        const updated = await kanbanApi.updateTask(selectedTask.id, patch, activeBoard.id);
-        setTasks((current) => current.map((task) => (task.id === updated.id ? mergeTaskUpdate(task, updated) : task)));
+        await kanbanApi.updateTask(selectedTask.id, patch, activeBoard.id);
+        await refetchActiveBoard(activeBoard);
         toast.success('Task updated');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update task';
@@ -320,7 +328,7 @@ function App() {
         setUpdatingTaskId(null);
       }
     },
-    [activeBoard, selectedTask]
+    [activeBoard, refetchActiveBoard, selectedTask]
   );
 
   const handleStatusChange = useCallback(
@@ -331,20 +339,74 @@ function App() {
   );
 
   const handleBlock = useCallback(async () => {
-    toast.info('Read-only mode: task actions are disabled in this MVP');
-  }, []);
+    if (!selectedTask || !activeBoard) return;
+    const reason = window.prompt(`Reason to block ${selectedTask.id}?`, 'Blocked from BHK');
+    if (reason === null) return;
+    try {
+      setUpdatingTaskId(selectedTask.id);
+      await kanbanApi.blockTask(selectedTask.id, activeBoard.id, reason);
+      await refetchActiveBoard(activeBoard);
+      toast.success('Task blocked');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to block task';
+      toast.error(message);
+      throw error;
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }, [activeBoard, refetchActiveBoard, selectedTask]);
 
   const handleReclaim = useCallback(async () => {
-    toast.info('Read-only mode: task actions are disabled in this MVP');
-  }, []);
+    if (!selectedTask || !activeBoard) return;
+    if (!window.confirm(`Reclaim ${selectedTask.id} back to ready?`)) return;
+    try {
+      setUpdatingTaskId(selectedTask.id);
+      await kanbanApi.reclaimTask(selectedTask.id, activeBoard.id);
+      await refetchActiveBoard(activeBoard);
+      toast.success('Task reclaimed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reclaim task';
+      toast.error(message);
+      throw error;
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }, [activeBoard, refetchActiveBoard, selectedTask]);
 
   const handleDecompose = useCallback(async () => {
-    toast.info('Read-only mode: task actions are disabled in this MVP');
-  }, []);
+    if (!selectedTask || !activeBoard) return;
+    if (!window.confirm(`Mark ${selectedTask.id} ready for decomposition/workflow?`)) return;
+    try {
+      setUpdatingTaskId(selectedTask.id);
+      await kanbanApi.decomposeTask(selectedTask.id, activeBoard.id);
+      await refetchActiveBoard(activeBoard);
+      toast.success('Task action applied');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to run task action';
+      toast.error(message);
+      throw error;
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }, [activeBoard, refetchActiveBoard, selectedTask]);
 
   const handleDelete = useCallback(async () => {
-    toast.info('Read-only mode: task deletion is disabled in this MVP');
-  }, []);
+    if (!selectedTask || !activeBoard) return;
+    if (!window.confirm(`Archive ${selectedTask.id}? This removes it from active board views.`)) return;
+    try {
+      setUpdatingTaskId(selectedTask.id);
+      await kanbanApi.deleteTask(selectedTask.id, activeBoard.id);
+      await refetchActiveBoard(activeBoard);
+      setSelectedTaskId(null);
+      toast.success('Task archived');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to archive task';
+      toast.error(message);
+      throw error;
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }, [activeBoard, refetchActiveBoard, selectedTask]);
 
   const handleCreateTask = useCallback(
     async (data: CreateTaskData) => {
@@ -363,7 +425,7 @@ function App() {
       try {
         setIsCreatingTask(true);
         const created = await kanbanApi.createTask(data, activeBoard.id);
-        setTasks((current) => [created, ...current]);
+        await refetchActiveBoard(activeBoard);
         setIsQuickCaptureOpen(false);
         toast.success(`Task ${created.id} created`);
       } catch (error) {
@@ -374,7 +436,7 @@ function App() {
         setIsCreatingTask(false);
       }
     },
-    [activeBoard]
+    [activeBoard, refetchActiveBoard]
   );
 
   const handleLinkTask = useCallback(
@@ -391,8 +453,8 @@ function App() {
       }
       try {
         setUpdatingTaskId(selectedTask.id);
-        const updated = await kanbanApi.linkTask(selectedTask.id, targetTaskId, relation, activeBoard.id);
-        setTasks((current) => current.map((task) => (task.id === updated.id ? mergeTaskUpdate(task, updated) : task)));
+        await kanbanApi.linkTask(selectedTask.id, targetTaskId, relation, activeBoard.id);
+        await refetchActiveBoard(activeBoard);
         toast.success(`Linked ${targetTaskId}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to link task';
@@ -402,14 +464,26 @@ function App() {
         setUpdatingTaskId(null);
       }
     },
-    [activeBoard, selectedTask]
+    [activeBoard, refetchActiveBoard, selectedTask]
   );
 
   const handleAddComment = useCallback(
-    async () => {
-      toast.info('Read-only mode: comments are disabled in this MVP');
+    async (text: string) => {
+      if (!selectedTask || !activeBoard) return;
+      try {
+        setUpdatingTaskId(selectedTask.id);
+        await kanbanApi.addComment(selectedTask.id, text, activeBoard.id);
+        await refetchActiveBoard(activeBoard);
+        toast.success('Comment added');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to add comment';
+        toast.error(message);
+        throw error;
+      } finally {
+        setUpdatingTaskId(null);
+      }
     },
-    []
+    [activeBoard, refetchActiveBoard, selectedTask]
   );
 
   const handleBoardChange = useCallback(

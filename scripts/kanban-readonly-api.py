@@ -155,6 +155,7 @@ def create_task(payload: dict, slug: str | None) -> dict:
     kanban_db.init_db(board=board)
     conn = kanban_db.connect(board=board)
     try:
+        initial_status = "blocked" if status == "blocked" else "todo" if status == "scheduled" else status
         task_id = kanban_db.create_task(
             conn,
             title=title,
@@ -166,7 +167,7 @@ def create_task(payload: dict, slug: str | None) -> dict:
             priority=priority_from_payload(payload.get("priority"), 50),
             parents=parents,
             triage=status == "triage",
-            initial_status="blocked" if status == "blocked" else "running",
+            initial_status=initial_status,
             board=board,
         )
         if status == "scheduled":
@@ -269,6 +270,77 @@ def link_task(task_id: str, payload: dict, slug: str | None) -> dict:
         kanban_db.link_tasks(conn, parent_id, child_id)
         updated = kanban_db.get_task(conn, task_id)
         return {"task": task_to_dict(updated, board)}
+    finally:
+        conn.close()
+
+
+def add_task_comment(task_id: str, payload: dict, slug: str | None) -> dict:
+    board = resolve_board(slug)
+    body = str(payload.get("body") or payload.get("text") or payload.get("message") or "").strip()
+    if not body:
+        raise ValueError("comment body is required")
+    if len(body) > 20000:
+        raise ValueError("comment body must be 20000 characters or less")
+    author = str(payload.get("author") or "bhk").strip() or "bhk"
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        if kanban_db.get_task(conn, task_id) is None:
+            return {"_status": 404, "detail": f"task {task_id} not found"}
+        comment_id = kanban_db.add_comment(conn, task_id, author, body)
+        task = task_detail_payload(task_id, board).get("task")
+        return {"comment": {"id": str(comment_id), "author": author, "body": body, "text": body, "created_at": int(time.time())}, "task": task}
+    finally:
+        conn.close()
+
+
+def run_task_action(task_id: str, payload: dict, slug: str | None) -> dict:
+    board = resolve_board(slug)
+    action = str(payload.get("action") or "").strip().lower()
+    reason = str(payload.get("reason") or "").strip() or None
+    allowed = {"block", "unblock", "reclaim", "schedule", "ready", "complete", "archive"}
+    if action not in allowed:
+        raise ValueError(f"action must be one of {', '.join(sorted(allowed))}")
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        task = kanban_db.get_task(conn, task_id)
+        if task is None:
+            return {"_status": 404, "detail": f"task {task_id} not found"}
+        if task.status == "running" and action not in {"block", "complete", "archive"}:
+            return {"_status": 409, "detail": "running tasks are dispatcher-owned; choose block, complete, or archive only when appropriate"}
+        if action == "block":
+            ok = kanban_db.block_task(conn, task_id, reason=reason or "Blocked from BHK guarded action")
+        elif action in {"unblock", "ready", "reclaim"}:
+            ok = kanban_db.unblock_task(conn, task_id)
+        elif action == "schedule":
+            ok = kanban_db.schedule_task(conn, task_id, reason=reason or "Scheduled from BHK guarded action")
+        elif action == "complete":
+            ok = kanban_db.complete_task(conn, task_id, summary=reason, result=None, metadata=None)
+        else:
+            ok = kanban_db.archive_task(conn, task_id)
+        if not ok:
+            return {"_status": 409, "detail": f"action {action!r} is not valid from current state"}
+        if action == "archive":
+            updated = kanban_db.get_task(conn, task_id)
+            return {"task": task_to_dict(updated, board)}
+        return task_detail_payload(task_id, board)
+    finally:
+        conn.close()
+
+
+def remove_task(task_id: str, slug: str | None, *, hard_delete: bool = False) -> dict:
+    board = resolve_board(slug)
+    kanban_db.init_db(board=board)
+    conn = kanban_db.connect(board=board)
+    try:
+        task = kanban_db.get_task(conn, task_id)
+        if task is None:
+            return {"_status": 404, "detail": f"task {task_id} not found"}
+        ok = kanban_db.delete_task(conn, task_id) if hard_delete else kanban_db.archive_task(conn, task_id)
+        if not ok:
+            return {"_status": 409, "detail": "task could not be removed from current state"}
+        return {"ok": True, "task_id": task_id, "archived": not hard_delete, "deleted": hard_delete}
     finally:
         conn.close()
 
@@ -942,22 +1014,20 @@ class Handler(BaseHTTPRequestHandler):
                 status = int(result.pop("_status", 200))
                 self.send_json(status, result)
                 return
-            self.send_json(404, {"detail": "Not found"})
-        except json.JSONDecodeError:
-            self.send_json(400, {"detail": "Invalid JSON body"})
-        except ValueError as exc:
-            self.send_json(400, {"detail": str(exc)})
-        except Exception as exc:
-            self.send_json(500, {"detail": f"BHK board API error: {exc}"})
-
-    def do_POST(self) -> None:  # noqa: N802 - stdlib callback name
-        parsed = urlparse(self.path)
-        try:
             prefix = "/api/plugins/kanban/tasks/"
-            if parsed.path.startswith(prefix) and parsed.path.endswith("/links"):
-                task_id = parsed.path[len(prefix):-len("/links")]
+            if parsed.path.startswith(prefix):
                 qs = parse_qs(parsed.query)
-                result = link_task(task_id, self.read_json_body(), (qs.get("board") or [None])[0])
+                if parsed.path.endswith("/links"):
+                    task_id = parsed.path[len(prefix):-len("/links")]
+                    result = link_task(task_id, self.read_json_body(), (qs.get("board") or [None])[0])
+                elif parsed.path.endswith("/comments"):
+                    task_id = parsed.path[len(prefix):-len("/comments")]
+                    result = add_task_comment(task_id, self.read_json_body(), (qs.get("board") or [None])[0])
+                elif parsed.path.endswith("/actions"):
+                    task_id = parsed.path[len(prefix):-len("/actions")]
+                    result = run_task_action(task_id, self.read_json_body(), (qs.get("board") or [None])[0])
+                else:
+                    result = {"_status": 404, "detail": "Not found"}
                 status = int(result.pop("_status", 200))
                 self.send_json(status, result)
                 return
@@ -967,7 +1037,7 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as exc:
             self.send_json(400, {"detail": str(exc)})
         except Exception as exc:
-            self.send_json(500, {"detail": f"BHK link API error: {exc}"})
+            self.send_json(500, {"detail": f"BHK mutation API error: {exc}"})
 
     def do_PUT(self) -> None:  # noqa: N802 - stdlib callback name
         parsed = urlparse(self.path)
@@ -1018,6 +1088,15 @@ class Handler(BaseHTTPRequestHandler):
                 qs = parse_qs(parsed.query)
                 hard_delete = (qs.get("delete") or [""])[0].lower() in {"1", "true", "yes"}
                 self.send_json(200, remove_board(match.group(1), hard_delete=hard_delete))
+                return
+            prefix = "/api/plugins/kanban/tasks/"
+            if parsed.path.startswith(prefix):
+                qs = parse_qs(parsed.query)
+                task_id = parsed.path[len(prefix):]
+                hard_delete = (qs.get("delete") or [""])[0].lower() in {"1", "true", "yes"}
+                result = remove_task(task_id, (qs.get("board") or [None])[0], hard_delete=hard_delete)
+                status = int(result.pop("_status", 200))
+                self.send_json(status, result)
                 return
             self.send_json(404, {"detail": "Not found"})
         except ValueError as exc:
