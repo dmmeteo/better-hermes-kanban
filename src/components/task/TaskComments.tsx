@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MessageSquare, Send } from 'lucide-react';
 import type { TaskComment } from '@/lib/types';
 import { timeAgo } from '@/lib/utils';
+import { MarkdownText } from '@/components/shared/MarkdownText';
 
 interface TaskCommentsProps {
   comments: TaskComment[];
@@ -63,7 +64,7 @@ export function TaskComments({ comments, onAddComment }: TaskCommentsProps) {
                   <span className="text-xs font-semibold">{comment.author}</span>
                   <span className="text-[10px] text-muted-foreground">{timeAgo(comment.createdAt)}</span>
                 </div>
-                <p className="text-xs text-foreground leading-relaxed">{comment.text}</p>
+                <MarkdownText value={comment.text} compact className="text-xs text-foreground" />
               </div>
             </div>
           ))}

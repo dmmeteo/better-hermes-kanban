@@ -23,6 +23,7 @@ interface DesktopKanbanBoardProps {
   onTasksChange: (tasks: Task[]) => void;
   onAddTask: (status: TaskStatus) => void;
   searchQuery: string;
+  readOnly?: boolean;
 }
 
 export function DesktopKanbanBoard({
@@ -31,6 +32,7 @@ export function DesktopKanbanBoard({
   onTasksChange,
   onAddTask,
   searchQuery,
+  readOnly = false,
 }: DesktopKanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -61,10 +63,16 @@ export function DesktopKanbanBoard({
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
+    if (readOnly) return;
     setActiveId(event.active.id as string);
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    if (readOnly) {
+      setActiveId(null);
+      toast.info('Read-only mode: drag/drop updates are disabled in this MVP');
+      return;
+    }
     const { active, over } = event;
     setActiveId(null);
 
@@ -157,7 +165,7 @@ export function DesktopKanbanBoard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pt-3 pb-4 h-full items-start">
+      <div className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden custom-scrollbar px-4 pt-3 pb-4 items-stretch">
         {STATUS_ORDER.map((status) => (
           <KanbanColumn
             key={status}
@@ -165,6 +173,7 @@ export function DesktopKanbanBoard({
             tasks={tasksByStatus[status] || []}
             onTaskClick={onTaskClick}
             onAddTask={onAddTask}
+            readOnly={readOnly}
           />
         ))}
       </div>

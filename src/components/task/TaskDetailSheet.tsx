@@ -1,7 +1,7 @@
 import type { Task } from '@/lib/types';
 import { TaskDetail } from './TaskDetail';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import type { TaskStatus } from '@/lib/types';
+import type { TaskStatus, UpdateTaskData } from '@/lib/types';
 
 interface TaskDetailSheetProps {
   task: Task | null;
@@ -14,6 +14,9 @@ interface TaskDetailSheetProps {
   onReclaim: () => void;
   onDecompose: () => void;
   onDelete: () => void;
+  onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  isUpdating?: boolean;
+  isMobile?: boolean;
 }
 
 export function TaskDetailSheet({
@@ -27,6 +30,9 @@ export function TaskDetailSheet({
   onReclaim,
   onDecompose,
   onDelete,
+  onUpdateTask,
+  isUpdating = false,
+  isMobile = false,
 }: TaskDetailSheetProps) {
   if (!task) return null;
 
@@ -34,17 +40,21 @@ export function TaskDetailSheet({
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:w-[480px] p-0 border-l border-border bg-background"
+        className="!w-screen !max-w-none p-0 border-l border-border bg-background md:!w-[50vw] md:!max-w-none"
       >
         <TaskDetail
           task={task}
           allTasks={allTasks}
+          isMobile={isMobile}
+          onBack={onClose}
           onStatusChange={onStatusChange}
           onAddComment={onAddComment}
           onBlock={onBlock}
           onReclaim={onReclaim}
           onDecompose={onDecompose}
           onDelete={onDelete}
+          onUpdateTask={onUpdateTask}
+          isUpdating={isUpdating}
         />
       </SheetContent>
     </Sheet>

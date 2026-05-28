@@ -9,11 +9,12 @@ import {
   Paperclip,
   ChevronRight,
 } from 'lucide-react';
-import type { Task, TaskStatus } from '@/lib/types';
+import type { Task, TaskStatus, UpdateTaskData } from '@/lib/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
 import { BotAvatar } from '@/components/shared/BotAvatar';
 import { WarningBanner } from '@/components/shared/WarningBanner';
+import { MarkdownText } from '@/components/shared/MarkdownText';
 import { TaskActions } from './TaskActions';
 import { TaskComments } from './TaskComments';
 import { TaskActivity } from './TaskActivity';
@@ -21,6 +22,7 @@ import { TaskRuns } from './TaskRuns';
 import { TaskLinks } from './TaskLinks';
 import { TaskDiagnostics } from './TaskDiagnostics';
 import { TaskAttachmentsPlanned } from './TaskAttachmentsPlanned';
+import { TaskUpdatePanel } from './TaskUpdatePanel';
 import { isReadyDisabled, getUnfinishedParents, timeAgo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +37,8 @@ interface TaskDetailProps {
   onReclaim: () => void;
   onDecompose: () => void;
   onDelete: () => void;
+  onUpdateTask: (patch: UpdateTaskData) => Promise<void> | void;
+  isUpdating?: boolean;
 }
 
 export function TaskDetail({
@@ -48,6 +52,8 @@ export function TaskDetail({
   onReclaim,
   onDecompose,
   onDelete,
+  onUpdateTask,
+  isUpdating = false,
 }: TaskDetailProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -148,7 +154,9 @@ export function TaskDetail({
 
           {/* Description */}
           {task.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed">{task.description}</p>
+            <div className="rounded-xl border border-border/60 bg-card/50 p-3.5">
+              <MarkdownText value={task.description} />
+            </div>
           )}
 
           {/* Meta grid */}
@@ -196,7 +204,7 @@ export function TaskDetail({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-foreground leading-relaxed">{task.latestSummary}</p>
+              <MarkdownText value={task.latestSummary} compact className="text-xs text-foreground" />
             </div>
           )}
 
@@ -253,6 +261,8 @@ export function TaskDetail({
                 ))}
               </div>
 
+              <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} />
+
               {/* Actions */}
               <TaskActions
                 task={task}
@@ -303,6 +313,8 @@ export function TaskDetail({
                         message={`Ready disabled: ${unfinishedParents.length} parent task${unfinishedParents.length > 1 ? 's' : ''} not done`}
                       />
                     )}
+
+                    <TaskUpdatePanel task={task} onUpdate={onUpdateTask} isSaving={isUpdating} />
 
                     {/* Linked tasks */}
                     <div>
