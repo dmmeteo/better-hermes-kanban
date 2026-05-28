@@ -49,15 +49,15 @@ export function TaskDetailSheet({
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
-        className="!w-screen !max-w-none gap-3 overflow-y-auto border-l border-border bg-background p-4 md:!w-[65vw] md:!max-w-none md:p-5"
+        className="!w-screen !max-w-none gap-3 overflow-y-auto border-l border-border bg-background p-4 md:!w-[30vw] md:!min-w-[360px] md:!max-w-none md:p-5"
       >
         <SheetTitle className="sr-only">Task detail: {task.title}</SheetTitle>
         <SheetDescription className="sr-only">Read and update task {task.id}</SheetDescription>
         <div className="pr-8" data-testid="task-sheet-breadcrumbs">
           <TaskBreadcrumbs task={task} activeBoard={activeBoard} />
         </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_1fr] xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+        <div className="flex flex-col gap-4">
+          <div className="min-w-0">
             <TaskDetailBody
               task={task}
               allTasks={allTasks}
@@ -72,7 +72,7 @@ export function TaskDetailSheet({
               boardSettings={boardSettings}
             />
           </div>
-          <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="min-w-0">
             <div className="mb-3 hidden lg:flex lg:items-center lg:justify-between lg:gap-2" data-testid="task-sheet-status-row">
               <TaskStatusControl
                 task={task}
@@ -93,7 +93,7 @@ export function TaskDetailSheet({
               onUpdate={onUpdateTask}
             />
           </div>
-          <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+          <div className="min-w-0">
             <TaskDetailTabs task={task} onAddComment={onAddComment} />
           </div>
         </div>
