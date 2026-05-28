@@ -1,4 +1,11 @@
-import type { NativeKanbanBoardResponseDto, NativeKanbanBoardsResponseDto } from './nativeKanbanTypes';
+import type {
+  NativeKanbanAssigneesResponseDto,
+  NativeKanbanBoardResponseDto,
+  NativeKanbanBoardsResponseDto,
+  NativeKanbanOrchestrationResponseDto,
+  NativeKanbanOrchestrationUpdateDto,
+  NativeKanbanProfilesResponseDto,
+} from './nativeKanbanTypes';
 
 const NATIVE_KANBAN_API_BASE = '/api/plugins/kanban';
 
@@ -53,5 +60,26 @@ export const nativeKanbanClient = {
   getBoard(boardId?: string): Promise<NativeKanbanBoardResponseDto | unknown[]> {
     const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
     return requestNativeKanbanJson<NativeKanbanBoardResponseDto | unknown[]>(`/board${query}`);
+  },
+
+  getProfiles(): Promise<NativeKanbanProfilesResponseDto | unknown[]> {
+    return requestNativeKanbanJson<NativeKanbanProfilesResponseDto | unknown[]>('/profiles');
+  },
+
+  getAssignees(boardId?: string): Promise<NativeKanbanAssigneesResponseDto | unknown[]> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    return requestNativeKanbanJson<NativeKanbanAssigneesResponseDto | unknown[]>(`/assignees${query}`);
+  },
+
+  getOrchestration(): Promise<NativeKanbanOrchestrationResponseDto> {
+    return requestNativeKanbanJson<NativeKanbanOrchestrationResponseDto>('/orchestration');
+  },
+
+  updateOrchestration(input: NativeKanbanOrchestrationUpdateDto): Promise<NativeKanbanOrchestrationResponseDto> {
+    return requestNativeKanbanJson<NativeKanbanOrchestrationResponseDto>('/orchestration', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
   },
 };

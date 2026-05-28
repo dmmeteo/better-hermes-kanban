@@ -89,6 +89,52 @@ export interface NativeKanbanBoardsResponseDto {
   boards?: NativeKanbanBoardDto[];
 }
 
+export interface NativeKanbanProfileDto {
+  id?: string;
+  name?: string;
+  assignee?: string;
+  icon?: string;
+  source?: string;
+  task_count?: number;
+  taskCount?: number;
+  running_count?: number;
+  runningCount?: number;
+}
+
+export interface NativeKanbanProfilesResponseDto {
+  profiles?: NativeKanbanProfileDto[];
+}
+
+export interface NativeKanbanAssigneesResponseDto {
+  assignees?: NativeKanbanProfileDto[];
+}
+
+export interface NativeKanbanOrchestrationResponseDto {
+  orchestrator_profile?: string;
+  orchestratorProfile?: string;
+  default_assignee?: string;
+  defaultAssignee?: string;
+  auto_decompose?: boolean;
+  autoDecompose?: boolean;
+  auto_promote_children?: boolean;
+  autoPromoteChildren?: boolean;
+  resolved_orchestrator_profile?: string;
+  resolvedOrchestratorProfile?: string;
+  resolved_default_assignee?: string;
+  resolvedDefaultAssignee?: string;
+  active_profile?: string;
+  activeProfile?: string;
+  advanced?: Record<string, unknown>;
+  explicit?: Record<string, unknown>;
+}
+
+export interface NativeKanbanOrchestrationUpdateDto {
+  orchestrator_profile?: string;
+  default_assignee?: string;
+  auto_decompose?: boolean;
+  auto_promote_children?: boolean;
+}
+
 export interface NativeKanbanBoardResponseDto {
   board?: string | NativeKanbanBoardDto;
   board_slug?: string;
