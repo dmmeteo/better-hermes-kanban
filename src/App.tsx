@@ -435,8 +435,7 @@ function App() {
   }, [activeBoard, refetchActiveBoard, selectedTask]);
 
   const handleCreateTask = useCallback(
-    async (data: CreateTaskData) => {
-      if (!activeBoard) return;
+    async (data: CreateTaskData, boardId: string) => {
       if (!isStatusCreateSelectable(data.status)) {
         toast.error('Choose a safe starting status: triage, todo, scheduled, ready, or blocked');
         return;
@@ -445,15 +444,22 @@ function App() {
         toast.error('Workspace path must be absolute');
         return;
       }
-      if (!window.confirm(`Create this task on board ${activeBoard.name || activeBoard.id}?`)) {
-        return;
-      }
       try {
         setIsCreatingTask(true);
-        const created = await kanbanApi.createTask(data, activeBoard.id);
-        await refetchActiveBoard(activeBoard);
+        const created = await kanbanApi.createTask(data, boardId);
+        // Only refresh the current view if the task landed on the board we're
+        // looking at — otherwise stay where we are.
+        if (activeBoard && boardId === activeBoard.id) {
+          await refetchActiveBoard(activeBoard);
+        }
         setIsQuickCaptureOpen(false);
-        toast.success(`Task ${created.id} created`);
+        toast.success(`Task ${created.id} created`, {
+          duration: 30000,
+          action: {
+            label: 'Open',
+            onClick: () => navigate(taskPath(created.id)),
+          },
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create task';
         toast.error(message);
@@ -462,7 +468,7 @@ function App() {
         setIsCreatingTask(false);
       }
     },
-    [activeBoard, refetchActiveBoard]
+    [activeBoard, refetchActiveBoard, navigate]
   );
 
   const handleLinkTask = useCallback(
@@ -738,29 +744,16 @@ function App() {
       />
 
       {/* Quick Capture */}
-      <div className="md:hidden">
-        <TaskQuickCapture
-          open={isQuickCaptureOpen}
-          onClose={() => setIsQuickCaptureOpen(false)}
-          onCreate={handleCreateTask}
-          assignees={assignees}
-          isSubmitting={isCreatingTask}
-          boardName={activeBoard.name || activeBoard.id}
-          boardSettings={boardSettings}
-          isMobile
-        />
-      </div>
-      <div className="hidden md:block">
-        <TaskQuickCapture
-          open={isQuickCaptureOpen}
-          onClose={() => setIsQuickCaptureOpen(false)}
-          onCreate={handleCreateTask}
-          assignees={assignees}
-          isSubmitting={isCreatingTask}
-          boardName={activeBoard.name || activeBoard.id}
-          boardSettings={boardSettings}
-        />
-      </div>
+      <TaskQuickCapture
+        open={isQuickCaptureOpen}
+        onClose={() => setIsQuickCaptureOpen(false)}
+        onCreate={handleCreateTask}
+        boards={boards}
+        activeBoard={activeBoard}
+        assignees={assignees}
+        isSubmitting={isCreatingTask}
+        boardSettings={boardSettings}
+      />
 
     </div>
   );
