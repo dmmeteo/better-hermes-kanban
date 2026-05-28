@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getUnfinishedParents, isReadyDisabled } from '@/lib/utils';
 import { toast } from 'sonner';
+import { TaskEventsPanel } from './TaskDetailSections';
 
 interface TaskActionsRailProps {
   task: Task;
@@ -130,8 +131,20 @@ function TaskActionSet({
   onDelete,
   compact = false,
 }: Omit<TaskActionsRailProps, 'activeBoard'> & { compact?: boolean }) {
+  const [open, setOpen] = useState(false);
   const state = getTaskActionState(task, allTasks);
   const { showConfirmDelete, setShowConfirmDelete, confirmDelete } = useConfirmDelete(onDelete);
+  const primaryDisabled = task.status === 'done' || task.status === 'running' || state.readyDisabled;
+
+  const menuActions = [
+    state.showBlock ? { icon: Octagon, label: 'Block', tone: 'danger' as ActionTone, onClick: onBlock } : null,
+    task.status !== 'done' ? { icon: UserCog, label: 'Reassign', onClick: () => toast.info('Reassign coming soon') } : null,
+    state.showReclaim ? { icon: RotateCcw, label: 'Reclaim', onClick: onReclaim } : null,
+    state.showSchedule ? { icon: Calendar, label: 'Schedule', tone: 'purple' as ActionTone, onClick: () => onStatusChange('scheduled') } : null,
+    state.showSpecify ? { icon: ListChecks, label: 'Specify', onClick: () => toast.info('Specify requirements coming soon') } : null,
+    task.status !== 'done' ? { icon: GitBranch, label: 'Decompose', onClick: onDecompose } : null,
+    state.showDone ? { icon: CheckCircle, label: 'Done', tone: 'success' as ActionTone, onClick: () => onStatusChange('done') } : null,
+  ].filter(Boolean) as Array<{ icon: ElementType; label: string; tone?: ActionTone; onClick: () => void }>;
 
   return (
     <div className="space-y-3">
@@ -139,45 +152,55 @@ function TaskActionSet({
         <WarningBanner message={`Ready disabled: ${state.unfinishedParents.length} parent task${state.unfinishedParents.length > 1 ? 's' : ''} not done`} />
       )}
 
-      <div className={cn('grid gap-2', compact ? 'grid-cols-2' : 'grid-cols-1')}>
-        {state.showReady && (
-          <ActionButton
-            icon={Send}
-            label="Ready / Send"
-            tone="primary"
-            disabled={state.readyDisabled}
-            onClick={() => onStatusChange('ready')}
-          />
+      <div className={cn('relative flex gap-2', compact && 'grid grid-cols-[minmax(0,1fr)_auto]')} data-testid="task-actions-dropdown">
+        <Button className="h-10 flex-1 gap-2" disabled={primaryDisabled} onClick={() => onStatusChange('ready')} data-testid="task-primary-action">
+          {task.status === 'running' ? <CheckCircle size={15} /> : <Send size={15} />}
+          {state.primaryLabel}
+        </Button>
+        <Button variant="outline" className="h-10 gap-2 px-3" onClick={() => setOpen((value) => !value)} aria-expanded={open} data-testid="task-actions-dropdown-trigger">
+          Actions
+          <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
+        </Button>
+        {open && (
+          <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-border bg-card p-2 shadow-2xl" data-testid="task-actions-dropdown-menu">
+            <div className="space-y-1">
+              {menuActions.map((action) => (
+                <ActionButton
+                  key={action.label}
+                  icon={action.icon}
+                  label={action.label}
+                  tone={action.tone}
+                  onClick={() => {
+                    setOpen(false);
+                    action.onClick();
+                  }}
+                  className="min-h-9 w-full justify-start rounded-lg border-transparent bg-transparent px-2.5 py-2"
+                />
+              ))}
+            </div>
+            <div className="mt-2 border-t border-border/60 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDelete((value) => !value)}
+                className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+              >
+                <span className="flex items-center gap-2">
+                  <Archive size={14} />
+                  Archive / Delete
+                </span>
+                <ChevronDown size={14} className={cn('transition-transform', showConfirmDelete && 'rotate-180')} />
+              </button>
+              {showConfirmDelete && <div className="mt-2">{confirmDelete}</div>}
+            </div>
+          </div>
         )}
-        {state.showBlock && <ActionButton icon={Octagon} label="Block" tone="danger" onClick={onBlock} />}
-        {task.status !== 'done' && <ActionButton icon={UserCog} label="Reassign" onClick={() => toast.info('Reassign coming soon')} />}
-        {state.showReclaim && <ActionButton icon={RotateCcw} label="Reclaim" onClick={onReclaim} />}
-        {state.showSchedule && <ActionButton icon={Calendar} label="Schedule" tone="purple" onClick={() => onStatusChange('scheduled')} />}
-        {state.showSpecify && <ActionButton icon={ListChecks} label="Specify" onClick={() => toast.info('Specify requirements coming soon')} />}
-        {task.status !== 'done' && <ActionButton icon={GitBranch} label="Decompose" onClick={onDecompose} />}
-        {state.showDone && <ActionButton icon={CheckCircle} label="Done" tone="success" onClick={() => onStatusChange('done')} />}
       </div>
 
       {task.status === 'done' && (
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200/80">
-          This task is done. Destructive controls are tucked below.
+          This task is done. Destructive controls are tucked into Actions.
         </div>
       )}
-
-      <div className="rounded-xl border border-border/60 bg-background/35 p-2">
-        <button
-          type="button"
-          onClick={() => setShowConfirmDelete((value) => !value)}
-          className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-        >
-          <span className="flex items-center gap-2">
-            <Archive size={14} />
-            Archive / Delete
-          </span>
-          <ChevronDown size={14} className={cn('transition-transform', showConfirmDelete && 'rotate-180')} />
-        </button>
-        {showConfirmDelete && <div className="mt-2">{confirmDelete}</div>}
-      </div>
     </div>
   );
 }
@@ -187,9 +210,9 @@ export function TaskActionsRail({ task, allTasks, activeBoard, onStatusChange, o
     <aside className="hidden rounded-2xl border border-border/70 bg-card/45 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.16)] lg:block" data-testid="task-actions-rail">
       <div className="sticky top-4 space-y-4">
         <div className="space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Task actions</p>
-          <p className="text-sm font-semibold">Actions</p>
-          <p className="text-xs text-muted-foreground">Only available workflow controls are shown here.</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Task sidebar</p>
+          <p className="text-sm font-semibold">Actions + meta</p>
+          <p className="text-xs text-muted-foreground">Workflow controls are grouped into one primary action and menu.</p>
         </div>
 
         <TaskActionSet
@@ -223,8 +246,18 @@ export function TaskActionsRail({ task, allTasks, activeBoard, onStatusChange, o
                 {activeBoard.name || activeBoard.id}
               </a>
             </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Workspace</span>
+              <span className="rounded bg-secondary/70 px-2 py-1 font-mono text-[10px]">worktree</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Notify</span>
+              <span className="rounded bg-secondary/70 px-2 py-1 text-[10px]">home channels</span>
+            </div>
           </div>
         </div>
+
+        <TaskEventsPanel task={task} />
       </div>
     </aside>
   );

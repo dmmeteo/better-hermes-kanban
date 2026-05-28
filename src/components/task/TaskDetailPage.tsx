@@ -123,12 +123,12 @@ export function TaskDetailPage({
                   <input
                     value={draftTitle}
                     onChange={(event) => setDraftTitle(event.target.value)}
-                    className="w-full rounded-xl border border-border bg-background/70 px-3 py-2 text-2xl font-bold leading-tight outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 md:text-3xl"
+                    className="w-full max-w-3xl rounded-xl border border-border bg-background/70 px-3 py-2 text-xl font-bold leading-tight outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 md:text-2xl"
                     aria-label="Task title"
                     data-testid="task-page-title-input"
                   />
                 ) : (
-                  <h1 className="max-w-4xl text-2xl font-bold leading-tight tracking-[-0.02em] md:text-3xl">{task.title}</h1>
+                  <h1 className="max-w-3xl break-words text-xl font-bold leading-tight tracking-[-0.02em] md:text-2xl">{task.title}</h1>
                 )}
               </div>
             )}
