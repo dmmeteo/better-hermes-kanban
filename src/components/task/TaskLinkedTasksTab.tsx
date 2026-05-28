@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Link2, Loader2, Plus, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Loader2, Plus, Search } from 'lucide-react';
 import type { LinkedTask, Task, TaskSearchResult } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -17,9 +17,10 @@ interface TaskLinkedTasksTabProps {
 export function TaskLinkedTasksTab({ task, onLinkTask }: TaskLinkedTasksTabProps) {
   const parents = useMemo(() => task.linkedTasks.filter((link) => link.relation === 'parent'), [task.linkedTasks]);
   const children = useMemo(() => task.linkedTasks.filter((link) => link.relation === 'child'), [task.linkedTasks]);
+  const hasLinks = task.linkedTasks.length > 0;
 
   return (
-    <section className="space-y-4" data-testid="task-linked-tasks-tab">
+    <section className={cn('space-y-2', hasLinks && 'space-y-3')} data-testid="task-linked-tasks-tab">
       <LinkedTaskGroup task={task} title="Dependencies / parents" helpText="Selected task becomes a parent of this task." relation="parent" links={parents} onLinkTask={onLinkTask} />
       <LinkedTaskGroup task={task} title="Dependents / children" helpText="Selected task becomes a child of this task." relation="child" links={children} onLinkTask={onLinkTask} />
     </section>
@@ -29,30 +30,27 @@ export function TaskLinkedTasksTab({ task, onLinkTask }: TaskLinkedTasksTabProps
 function LinkedTaskGroup({ task, title, helpText, relation, links, onLinkTask }: { task: Task; title: string; helpText: string; relation: LinkRelation; links: LinkedTask[]; onLinkTask: TaskLinkedTasksTabProps['onLinkTask'] }) {
   const [open, setOpen] = useState(false);
   const existingIds = new Set(links.map((link) => link.taskId.toLowerCase()));
+  const hasLinks = links.length > 0;
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/35 p-3" data-testid={`linked-tasks-${relation}-group`}>
+    <div className={cn('rounded-xl border border-border/50 bg-background/25 px-3 py-2', (hasLinks || open) && 'rounded-2xl border-border/60 bg-background/35 p-3')} data-testid={`linked-tasks-${relation}-group`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
             {relation === 'parent' ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
             {title}
+            {!hasLinks && <span className="rounded-full bg-secondary/60 px-1.5 py-0.5 text-[10px] tracking-normal">none</span>}
           </h3>
-          <p className="mt-1 text-xs text-muted-foreground">{helpText}</p>
+          {(hasLinks || open) && <p className="mt-1 text-xs text-muted-foreground">{helpText}</p>}
         </div>
         <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setOpen((value) => !value)} data-testid={`linked-tasks-add-${relation}`}>
           <Plus size={14} /> add task
         </Button>
       </div>
 
-      {links.length > 0 ? (
+      {hasLinks && (
         <div className="mt-3 space-y-1.5">
           {links.map((link) => <LinkedTaskRow key={link.id} link={link} />)}
-        </div>
-      ) : (
-        <div className="mt-3 rounded-xl border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
-          <Link2 size={18} className="mx-auto mb-2 opacity-45" />
-          No {relation === 'parent' ? 'dependencies' : 'dependents'} linked yet.
         </div>
       )}
 

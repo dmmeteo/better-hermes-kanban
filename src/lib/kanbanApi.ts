@@ -518,28 +518,59 @@ export const kanbanApi = {
     return normalizeTask(rawTask, boardId || 'current');
   },
 
-  async deleteTask(): Promise<void> {
-    throw new KanbanApiError('Read-only mode: task deletion is disabled in this MVP');
+  async deleteTask(taskId: string, boardId?: string, options: { hardDelete?: boolean } = {}): Promise<void> {
+    const query = new URLSearchParams();
+    if (boardId) query.set('board', boardId);
+    if (options.hardDelete) query.set('delete', 'true');
+    await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}${query.toString() ? `?${query.toString()}` : ''}`, { method: 'DELETE' });
   },
 
-  async addComment(): Promise<TaskComment> {
-    throw new KanbanApiError('Read-only mode: comments are disabled in this MVP');
+  async addComment(taskId: string, text: string, boardId?: string): Promise<{ comment: TaskComment; task: Task | null }> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/comments${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: text }),
+    });
+    const item = isObject(response) ? response : {};
+    const rawComment = isObject(item.comment) ? item.comment : {};
+    return {
+      comment: {
+        id: asString(rawComment.id, `c-${Date.now()}`),
+        author: asString(rawComment.author, 'bhk'),
+        text: asString(rawComment.text ?? rawComment.body, text),
+        createdAt: toIso(rawComment.created_at ?? rawComment.createdAt),
+      },
+      task: item.task ? normalizeTask(item.task, boardId || 'current') : null,
+    };
   },
 
-  async blockTask(): Promise<Task> {
-    throw new KanbanApiError('Read-only mode: task actions are disabled in this MVP');
+  async runTaskAction(taskId: string, action: 'block' | 'unblock' | 'reclaim' | 'schedule' | 'ready' | 'complete' | 'archive', boardId?: string, reason?: string): Promise<Task> {
+    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+    const response = await requestJson<unknown>(`/tasks/${encodeURIComponent(taskId)}/actions${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, reason }),
+    });
+    const rawTask = isObject(response) && response.task ? response.task : response;
+    return normalizeTask(rawTask, boardId || 'current');
   },
 
-  async reclaimTask(): Promise<Task> {
-    throw new KanbanApiError('Read-only mode: task actions are disabled in this MVP');
+  async blockTask(taskId: string, boardId?: string, reason?: string): Promise<Task> {
+    return this.runTaskAction(taskId, 'block', boardId, reason);
   },
 
-  async specifyTask(): Promise<Task> {
-    throw new KanbanApiError('Read-only mode: task actions are disabled in this MVP');
+  async reclaimTask(taskId: string, boardId?: string): Promise<Task> {
+    return this.runTaskAction(taskId, 'reclaim', boardId);
   },
 
-  async decomposeTask(): Promise<Task[]> {
-    throw new KanbanApiError('Read-only mode: task actions are disabled in this MVP');
+  async specifyTask(taskId: string, boardId?: string): Promise<Task> {
+    return this.runTaskAction(taskId, 'ready', boardId);
+  },
+
+  async decomposeTask(taskId: string, boardId?: string): Promise<Task[]> {
+    const updated = await this.runTaskAction(taskId, 'ready', boardId, 'Marked ready for decomposition from BHK');
+    return [updated];
   },
 
   async getProfiles(): Promise<BotProfile[]> {
