@@ -11,6 +11,7 @@ interface BoardViewProps {
   searchQuery: string;
   boardSettings: BoardSettings;
   onRenameStatus?: (status: TaskStatus, label: string) => void;
+  onToggleCollapse?: (status: TaskStatus) => void;
 }
 
 export function BoardView({
@@ -21,6 +22,7 @@ export function BoardView({
   searchQuery,
   boardSettings,
   onRenameStatus,
+  onToggleCollapse,
 }: BoardViewProps) {
   return (
     <>
@@ -42,6 +44,7 @@ export function BoardView({
             searchQuery={searchQuery}
             boardSettings={boardSettings}
             onRenameStatus={onRenameStatus}
+            onToggleCollapse={onToggleCollapse}
           />
         </div>
       </div>

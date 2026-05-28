@@ -1,24 +1,31 @@
 import type { TaskStatus } from './types';
-import { STATUS_LABELS, STATUS_ORDER, SELECTABLE_TASK_STATUSES } from './types';
+import { STATUS_LABELS, NATIVE_STATUS_ORDER, SELECTABLE_TASK_STATUSES } from './types';
 import type { TaskDetailPresentation } from '@/components/layout/TopBar';
 
 export type BoardStatusLabels = Partial<Record<TaskStatus, string>>;
 
 export interface BoardSettings {
+  /** Column order — only real API statuses (NATIVE_STATUS_ORDER); never the UI-only `review`. */
   statusOrder: TaskStatus[];
+  /** Sparse map of user-renamed labels. Absent key = original STATUS_LABELS name. */
   statusLabels: BoardStatusLabels;
+  /** Statuses whose column is collapsed on the desktop board. */
+  collapsedColumns: TaskStatus[];
   detailPresentation: TaskDetailPresentation;
 }
 
 type StoredBoardSettings = Partial<BoardSettings>;
 type StoredSettingsMap = Record<string, StoredBoardSettings | undefined>;
 
-export const BOARD_SETTINGS_STORAGE_KEY = 'bhk.boardSettings.v1';
+export const BOARD_SETTINGS_STORAGE_KEY = 'bhk.boardSettings.v2';
+const LEGACY_BOARD_SETTINGS_STORAGE_KEY = 'bhk.boardSettings.v1';
 export const LEGACY_DETAIL_PRESENTATION_KEY = 'bhk.taskDetailPresentation';
 
 const PRESENTATIONS: TaskDetailPresentation[] = ['drawer', 'modal', 'page'];
-const DEFAULT_STATUS_LABELS: BoardStatusLabels = {
-  ...STATUS_LABELS,
+
+// Labels that earlier builds auto-injected as defaults. The v1→v2 migration strips
+// these so columns fall back to their original status names unless the user renamed them.
+const LEGACY_DEFAULT_STATUS_LABELS: BoardStatusLabels = {
   scheduled: 'Backlog',
   running: 'In progress',
   blocked: 'Suspended',
@@ -35,39 +42,93 @@ export const STATUS_HELPER_COPY: Record<TaskStatus, string> = {
   done: 'Complete.',
 };
 
-function isTaskStatus(value: unknown): value is TaskStatus {
-  return typeof value === 'string' && (STATUS_ORDER as string[]).includes(value);
+function isNativeStatus(value: unknown): value is TaskStatus {
+  return typeof value === 'string' && (NATIVE_STATUS_ORDER as string[]).includes(value);
 }
 
+// Columns mirror real API statuses only: base on NATIVE_STATUS_ORDER and drop any
+// stored non-native status (e.g. the UI-only `review`).
 function normalizeStatusOrder(value: unknown): TaskStatus[] {
-  if (!Array.isArray(value)) return [...STATUS_ORDER];
-  const ordered = value.filter(isTaskStatus);
-  const missing = STATUS_ORDER.filter((status) => !ordered.includes(status));
+  if (!Array.isArray(value)) return [...NATIVE_STATUS_ORDER];
+  const ordered = value.filter(isNativeStatus);
+  const missing = NATIVE_STATUS_ORDER.filter((status) => !ordered.includes(status));
   return [...ordered, ...missing];
 }
 
+// Sparse: keep only genuine renames (non-empty and different from the original name).
 function normalizeStatusLabels(value: unknown): BoardStatusLabels {
-  if (!value || typeof value !== 'object') return { ...DEFAULT_STATUS_LABELS };
-  const labels: BoardStatusLabels = { ...DEFAULT_STATUS_LABELS };
-  for (const status of STATUS_ORDER) {
+  if (!value || typeof value !== 'object') return {};
+  const labels: BoardStatusLabels = {};
+  for (const status of NATIVE_STATUS_ORDER) {
     const label = (value as Record<string, unknown>)[status];
-    if (typeof label === 'string' && label.trim()) labels[status] = label.trim();
+    if (typeof label === 'string' && label.trim() && label.trim() !== STATUS_LABELS[status]) {
+      labels[status] = label.trim();
+    }
   }
   return labels;
+}
+
+function normalizeCollapsed(value: unknown): TaskStatus[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isNativeStatus);
 }
 
 function normalizePresentation(value: unknown): TaskDetailPresentation {
   return PRESENTATIONS.includes(value as TaskDetailPresentation) ? (value as TaskDetailPresentation) : 'drawer';
 }
 
-function readSettingsMap(): StoredSettingsMap {
-  if (typeof window === 'undefined') return {};
+function parseMap(raw: string | null): StoredSettingsMap {
+  if (!raw) return {};
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(BOARD_SETTINGS_STORAGE_KEY) || '{}');
+    const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
   }
+}
+
+// One-time v1→v2: strip auto-injected legacy default labels so they revert to
+// original names, while keeping real user renames.
+function migrateV1ToV2(): StoredSettingsMap {
+  const v1 = parseMap(window.localStorage.getItem(LEGACY_BOARD_SETTINGS_STORAGE_KEY));
+  const migrated: StoredSettingsMap = {};
+  for (const [boardId, stored] of Object.entries(v1)) {
+    if (!stored) continue;
+    let nextLabels: BoardStatusLabels | undefined;
+    const labels = stored.statusLabels;
+    if (labels && typeof labels === 'object') {
+      nextLabels = {};
+      for (const status of NATIVE_STATUS_ORDER) {
+        const v = (labels as Record<string, unknown>)[status];
+        if (
+          typeof v === 'string' &&
+          v.trim() &&
+          v.trim() !== STATUS_LABELS[status] &&
+          v.trim() !== LEGACY_DEFAULT_STATUS_LABELS[status]
+        ) {
+          nextLabels[status] = v.trim();
+        }
+      }
+    }
+    migrated[boardId] = { ...stored, statusLabels: nextLabels };
+  }
+  return migrated;
+}
+
+function readSettingsMap(): StoredSettingsMap {
+  if (typeof window === 'undefined') return {};
+  const rawV2 = window.localStorage.getItem(BOARD_SETTINGS_STORAGE_KEY);
+  if (rawV2 != null) return parseMap(rawV2);
+  // No v2 yet: lazily migrate from v1 (if present) and persist.
+  const migrated = migrateV1ToV2();
+  if (window.localStorage.getItem(LEGACY_BOARD_SETTINGS_STORAGE_KEY) != null) {
+    try {
+      window.localStorage.setItem(BOARD_SETTINGS_STORAGE_KEY, JSON.stringify(migrated));
+    } catch {
+      // ignore quota / serialization issues
+    }
+  }
+  return migrated;
 }
 
 function writeSettingsMap(settings: StoredSettingsMap) {
@@ -77,8 +138,9 @@ function writeSettingsMap(settings: StoredSettingsMap) {
 
 function defaultSettings(): BoardSettings {
   return {
-    statusOrder: [...STATUS_ORDER],
-    statusLabels: { ...DEFAULT_STATUS_LABELS },
+    statusOrder: [...NATIVE_STATUS_ORDER],
+    statusLabels: {},
+    collapsedColumns: [],
     detailPresentation: 'drawer',
   };
 }
@@ -90,17 +152,20 @@ export function getBoardSettings(boardId?: string | null): BoardSettings {
   return {
     statusOrder: normalizeStatusOrder(stored.statusOrder),
     statusLabels: normalizeStatusLabels(stored.statusLabels),
+    collapsedColumns: normalizeCollapsed(stored.collapsedColumns),
     detailPresentation: normalizePresentation(stored.detailPresentation),
   };
 }
 
 export function saveBoardSettings(boardId: string | null | undefined, patch: Partial<BoardSettings>): BoardSettings {
-  const next = {
-    ...getBoardSettings(boardId),
+  const current = getBoardSettings(boardId);
+  const next: BoardSettings = {
+    ...current,
     ...patch,
-    statusOrder: patch.statusOrder ? normalizeStatusOrder(patch.statusOrder) : getBoardSettings(boardId).statusOrder,
-    statusLabels: patch.statusLabels ? normalizeStatusLabels(patch.statusLabels) : getBoardSettings(boardId).statusLabels,
-    detailPresentation: patch.detailPresentation ? normalizePresentation(patch.detailPresentation) : getBoardSettings(boardId).detailPresentation,
+    statusOrder: patch.statusOrder ? normalizeStatusOrder(patch.statusOrder) : current.statusOrder,
+    statusLabels: patch.statusLabels ? normalizeStatusLabels(patch.statusLabels) : current.statusLabels,
+    collapsedColumns: patch.collapsedColumns ? normalizeCollapsed(patch.collapsedColumns) : current.collapsedColumns,
+    detailPresentation: patch.detailPresentation ? normalizePresentation(patch.detailPresentation) : current.detailPresentation,
   };
   if (boardId) {
     const settings = readSettingsMap();
@@ -126,7 +191,7 @@ export function getOrderedStatuses(settings?: BoardSettings): TaskStatus[] {
 }
 
 export function getStatusLabel(status: TaskStatus, settings?: BoardSettings): string {
-  return settings?.statusLabels?.[status] || DEFAULT_STATUS_LABELS[status] || STATUS_LABELS[status] || status;
+  return settings?.statusLabels?.[status] || STATUS_LABELS[status] || status;
 }
 
 export function getStatusOptions(settings?: BoardSettings, statuses: TaskStatus[] = SELECTABLE_TASK_STATUSES) {

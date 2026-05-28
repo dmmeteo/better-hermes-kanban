@@ -346,6 +346,15 @@ function App() {
     );
   }, [activeBoard]);
 
+  const handleToggleColumnCollapse = useCallback((status: TaskStatus) => {
+    setBoardSettings((prev) => {
+      const collapsed = prev.collapsedColumns.includes(status)
+        ? prev.collapsedColumns.filter((s) => s !== status)
+        : [...prev.collapsedColumns, status];
+      return saveBoardSettings(activeBoard?.id, { collapsedColumns: collapsed });
+    });
+  }, [activeBoard]);
+
   const refetchActiveBoard = useCallback(async (board: Board) => {
     const data = await kanbanApi.getBoard(board.id);
     setTasks(data.tasks);
@@ -710,6 +719,7 @@ function App() {
               searchQuery={searchQuery}
               boardSettings={boardSettings}
               onRenameStatus={handleRenameStatus}
+              onToggleCollapse={handleToggleColumnCollapse}
             />
           )}
         </div>

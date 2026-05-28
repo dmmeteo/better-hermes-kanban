@@ -28,6 +28,7 @@ interface DesktopKanbanBoardProps {
   readOnly?: boolean;
   boardSettings: BoardSettings;
   onRenameStatus?: (status: TaskStatus, label: string) => void;
+  onToggleCollapse?: (status: TaskStatus) => void;
 }
 
 export function DesktopKanbanBoard({
@@ -39,6 +40,7 @@ export function DesktopKanbanBoard({
   readOnly = false,
   boardSettings,
   onRenameStatus,
+  onToggleCollapse,
 }: DesktopKanbanBoardProps) {
   const orderedStatuses = useMemo(() => getOrderedStatuses(boardSettings), [boardSettings]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -129,6 +131,8 @@ export function DesktopKanbanBoard({
             readOnly={readOnly}
             statusLabel={getStatusLabel(status, boardSettings)}
             onRenameStatus={onRenameStatus}
+            collapsed={boardSettings.collapsedColumns.includes(status)}
+            onToggleCollapse={onToggleCollapse}
           />
         ))}
       </div>

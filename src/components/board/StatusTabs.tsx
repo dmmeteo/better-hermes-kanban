@@ -1,9 +1,8 @@
 import type { TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
 import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
-import { STATUS_COLORS, isStatusReadOnly } from '@/lib/types';
+import { STATUS_COLORS } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Lock } from 'lucide-react';
 
 interface StatusTabsProps {
   activeStatus: TaskStatus;
@@ -20,7 +19,6 @@ export function StatusTabs({ activeStatus, onStatusChange, counts, boardSettings
         const count = counts[status] || 0;
         const isActive = activeStatus === status;
         const color = STATUS_COLORS[status];
-        const isReadOnlyStatus = isStatusReadOnly(status);
 
         return (
           <button
@@ -39,7 +37,6 @@ export function StatusTabs({ activeStatus, onStatusChange, counts, boardSettings
                 : {}
             }
           >
-            {isReadOnlyStatus && <Lock size={10} />}
             {getStatusLabel(status, boardSettings)}
             {count > 0 && (
               <span

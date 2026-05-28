@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Lock } from 'lucide-react';
+import { Plus, Lock, ChevronsRightLeft, ChevronsLeftRight } from 'lucide-react';
 import type { Task, TaskStatus } from '@/lib/types';
 import { STATUS_COLORS, isStatusDropEnabled, isStatusReadOnly } from '@/lib/types';
 import { TaskCard } from './TaskCard';
@@ -15,9 +15,11 @@ interface KanbanColumnProps {
   readOnly?: boolean;
   statusLabel?: string;
   onRenameStatus?: (status: TaskStatus, label: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: (status: TaskStatus) => void;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus, collapsed = false, onToggleCollapse }: KanbanColumnProps) {
   const isReadOnlyStatus = isStatusReadOnly(status);
   const isDropDisabled = !isStatusDropEnabled(status);
   const { setNodeRef, isOver } = useDroppable({
@@ -28,6 +30,34 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
 
   const color = STATUS_COLORS[status];
   const label = statusLabel || status;
+
+  if (collapsed) {
+    return (
+      <div
+        className="flex-shrink-0 w-11 h-full min-h-0 flex flex-col items-center gap-2 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm py-2.5"
+        data-testid={`column-collapsed-${status}`}
+      >
+        <button
+          type="button"
+          onClick={() => onToggleCollapse?.(status)}
+          title="Expand column"
+          aria-label={`Expand ${label} column`}
+          data-testid={`column-expand-${status}`}
+          className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
+        >
+          <ChevronsLeftRight size={14} />
+        </button>
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[11px] text-muted-foreground font-medium">{tasks.length}</span>
+        <span
+          className="mt-1 text-[11px] font-bold uppercase tracking-wider [writing-mode:vertical-rl]"
+          style={{ color }}
+        >
+          {label}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -57,21 +87,29 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
           <span className="text-[11px] text-muted-foreground font-medium">
             {tasks.length}
           </span>
-          {(isReadOnlyStatus || readOnly) && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-              <Lock size={10} />
-              read-only
-            </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {!isReadOnlyStatus && !readOnly && (
+            <button
+              onClick={() => onAddTask?.(status)}
+              className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <Plus size={14} />
+            </button>
+          )}
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={() => onToggleCollapse(status)}
+              title="Collapse column"
+              aria-label={`Collapse ${label} column`}
+              data-testid={`column-collapse-${status}`}
+              className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <ChevronsRightLeft size={14} />
+            </button>
           )}
         </div>
-        {!isReadOnlyStatus && !readOnly && (
-          <button
-            onClick={() => onAddTask?.(status)}
-            className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
-          >
-            <Plus size={14} />
-          </button>
-        )}
       </div>
 
       {/* Column Body */}
