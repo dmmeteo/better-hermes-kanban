@@ -189,16 +189,16 @@ export function DataViewSearchAndFilter({
         )}
       >
         <Search size={density === 'page' ? 17 : 14} className="shrink-0 text-muted-foreground" />
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid={`${testId}-tokens`}>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 overflow-x-visible py-1 md:flex-nowrap md:overflow-x-auto md:[scrollbar-width:thin] md:[scrollbar-color:rgba(184,167,255,0.45)_transparent]" data-testid={`${testId}-tokens`}>
           {activeTokens.map(([key, value]) => (
             <span
               key={key}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#7C5CFF]/35 bg-[#7C5CFF]/12 px-2 py-1 text-[11px] font-medium text-[#DED6FF]"
+              className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-[#7C5CFF]/35 bg-[#7C5CFF]/12 px-2 py-1 text-[11px] font-medium text-[#DED6FF]"
               data-testid={`${testId}-token-${key}`}
             >
               <span className="text-[#B8A7FF]">{FIELD_LABELS[key]}</span>
               <span className="text-muted-foreground">{tokenOperator(value) === 'is_not' ? 'is not' : 'is'}</span>
-              <span>{valueLabel(key, value || '', boards, assignees)}</span>
+              <span className="max-w-[11rem] truncate sm:max-w-[14rem]">{valueLabel(key, value || '', boards, assignees)}</span>
               <button type="button" onClick={() => removeFilter(key)} className="rounded-full p-0.5 hover:bg-white/10" aria-label={`Remove ${FIELD_LABELS[key]} filter`} data-testid={`${testId}-remove-${key}`}>
                 <X size={11} />
               </button>
@@ -214,7 +214,7 @@ export function DataViewSearchAndFilter({
             }}
             onKeyDown={handleKeyDown}
             placeholder={activeTokens.length ? 'Add text…' : placeholder}
-            className="h-7 min-w-[150px] flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+            className="h-7 min-w-[110px] flex-[1_0_120px] bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground md:min-w-[150px]"
             aria-label="Search and filter tasks"
             aria-expanded={isOpen}
             aria-controls={panelId}

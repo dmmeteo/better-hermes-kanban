@@ -96,7 +96,7 @@ function ResultCard({ result, onOpen }: { result: TaskSearchResult; onOpen: () =
   );
 }
 
-export function TaskSearchPage({ locationSearch, query, filters, onQueryChange, onFiltersChange, onOpenTask }: TaskSearchPageProps) {
+export function TaskSearchPage({ boards, locationSearch, query, filters, onQueryChange, onFiltersChange, onOpenTask }: TaskSearchPageProps) {
   const urlParams = useMemo(() => new URLSearchParams(locationSearch), [locationSearch]);
   const [submittedQuery, setSubmittedQuery] = useState(filterValue(urlParams, 'q'));
   const [results, setResults] = useState<TaskSearchResult[]>([]);
@@ -216,12 +216,13 @@ export function TaskSearchPage({ locationSearch, query, filters, onQueryChange, 
 
   const resultCountLabel = state === 'first-use' ? 'Ready' : state === 'loading' ? 'Searching…' : `${total} result${total === 1 ? '' : 's'}`;
   const freshness = source === 'fallback' ? 'Current-board-only fallback' : indexedAt ? formatRelative(indexedAt) : 'Live bridge';
+  const scopeLabel = board ? boards.find((item) => item.id === getSearchParamValue(board))?.name || getSearchParamValue(board) : 'All boards';
 
   return (
     <section className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(124,92,255,0.16),transparent_34%),linear-gradient(180deg,rgba(12,15,24,0.96),rgba(8,10,16,1))]" data-testid="task-search-page">
       <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-5 px-4 py-4 md:px-6 md:py-6">
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/55 px-4 py-3 text-xs text-muted-foreground">
-          <span>All boards · {resultCountLabel} · {freshness}</span>
+          <span>{scopeLabel} · {resultCountLabel} · {freshness}</span>
         </div>
 
         <div className="flex-1">
