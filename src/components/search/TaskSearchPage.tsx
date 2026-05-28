@@ -275,7 +275,7 @@ export function TaskSearchPage({ locationSearch, query, filters, activeBoard, on
     if (s) params.set('status', getSearchParamValue(s));
     if (a) params.set('assignee', getSearchParamValue(a));
     if (p) params.set('priority', getSearchParamValue(p));
-    window.history.replaceState(null, '', `/tasks${params.toString() ? `?${params.toString()}` : ''}`);
+    window.history.replaceState(null, '', `/search${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   useEffect(() => {

@@ -63,7 +63,7 @@ function LinkedTaskGroup({ task, title, helpText, relation, links, onLinkTask }:
 
 function LinkedTaskRow({ link }: { link: LinkedTask }) {
   return (
-    <a href={`/tasks/${encodeURIComponent(link.taskId)}${link.boardId ? `?board=${encodeURIComponent(link.boardId)}` : ''}`} className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/70 p-2.5 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="linked-task-row">
+    <a href={`/tasks/${encodeURIComponent(link.taskId)}`} className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/70 p-2.5 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="linked-task-row">
       <span className="min-w-0 text-sm">
         <span className="font-mono text-[11px] text-muted-foreground">[{link.taskId}]</span>{' '}
         <span className="truncate">{link.title}</span>
