@@ -5,7 +5,7 @@ import { inspectAttr } from 'kimi-plugin-inspect-react'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const target = env.HERMES_API_URL || 'https://her.dmmeteo.dev'
+  const target = env.HERMES_API_URL || 'https://bhk.dmmeteo.dev'
   const user = env.HERMES_BASIC_USER || ''
   const pass = env.HERMES_BASIC_PASS || ''
   const basicAuth = user && pass
