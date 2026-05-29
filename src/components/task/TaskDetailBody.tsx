@@ -25,7 +25,7 @@ import {
 import { TaskLinkedTasksTab } from './TaskLinkedTasksTab';
 import { TaskNotifyMenu } from './TaskNotifyMenu';
 
-type Layout = 'page' | 'overlay' | 'mobile';
+type Layout = 'page' | 'overlay' | 'mobile' | 'drawer';
 
 interface TaskStatusControlProps {
   task: Task;
@@ -181,7 +181,7 @@ export function TaskDetailBody({
         </div>
         {/* Status + Notify render under the title up to lg (status left, notify right).
             On lg+ the same row renders above the sidebar — see Page/Sheet/Modal. */}
-        <div className="flex items-center justify-between gap-2 lg:hidden">
+        <div className={cn('flex items-center justify-between gap-2', layout !== 'drawer' && 'lg:hidden')}>
           <TaskStatusControl
             task={task}
             onUpdateTask={onUpdateTask}
