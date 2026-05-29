@@ -40,12 +40,12 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
     isDragging,
   } = useSortable({ id: `column:${status}`, data: { type: 'column', status } });
 
-  const baseTransform = CSS.Transform.toString(transform);
+  // The lifted clone is rendered in the board's DragOverlay (free to float
+  // anywhere, like a task card); the in-place column just reflows + dims.
   const sortableStyle: CSSProperties = {
-    // While dragging, tilt the column like a task card but a touch less (card ≈ 3.5deg).
-    transform: isDragging && baseTransform ? `${baseTransform} rotate(2deg)` : baseTransform,
+    transform: CSS.Transform.toString(transform),
     transition,
-    ...(isDragging ? { opacity: 0.5, zIndex: 50 } : {}),
+    ...(isDragging ? { opacity: 0.4 } : {}),
   };
 
   const color = STATUS_COLORS[status];
@@ -183,6 +183,46 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Presentational clone shown in the board's DragOverlay while a column is
+ * being dragged — lets the column float freely under the cursor (like a task
+ * card) with a slight tilt, instead of sliding only along the row.
+ */
+export function ColumnDragPreview({
+  status,
+  label,
+  count,
+  collapsed = false,
+}: {
+  status: TaskStatus;
+  label: string;
+  count: number;
+  collapsed?: boolean;
+}) {
+  const color = STATUS_COLORS[status];
+  if (collapsed) {
+    return (
+      <div className="w-11 h-80 flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card py-2.5 shadow-2xl rotate-[2deg]">
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[11px] text-muted-foreground font-medium">{count}</span>
+        <span className="mt-1 text-[11px] font-bold uppercase tracking-wider [writing-mode:vertical-rl]" style={{ color }}>
+          {label}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="w-[300px] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl rotate-[2deg]">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color }}>{label}</span>
+        <span className="text-[11px] text-muted-foreground font-medium">{count}</span>
+      </div>
+      <div className="h-40 bg-card/40" />
     </div>
   );
 }

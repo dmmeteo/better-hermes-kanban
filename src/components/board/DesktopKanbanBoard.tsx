@@ -15,7 +15,7 @@ import type { Task, TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
 import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
 import { DROPPABLE_TASK_STATUSES, isStatusDropEnabled } from '@/lib/types';
-import { KanbanColumn } from './KanbanColumn';
+import { KanbanColumn, ColumnDragPreview } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { toast } from 'sonner';
 
@@ -73,6 +73,8 @@ export function DesktopKanbanBoard({
   }, [filteredTasks, orderedStatuses]);
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
+  const activeColumnStatus =
+    activeId && activeId.startsWith('column:') ? (activeId.slice('column:'.length) as TaskStatus) : null;
 
   function handleDragStart(event: DragStartEvent) {
     if (readOnly) return;
@@ -165,6 +167,13 @@ export function DesktopKanbanBoard({
       <DragOverlay>
         {activeTask ? (
           <TaskCard task={activeTask} onClick={() => {}} isOverlay />
+        ) : activeColumnStatus ? (
+          <ColumnDragPreview
+            status={activeColumnStatus}
+            label={getStatusLabel(activeColumnStatus, boardSettings)}
+            count={tasksByStatus[activeColumnStatus]?.length ?? 0}
+            collapsed={boardSettings.collapsedColumns.includes(activeColumnStatus)}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>
