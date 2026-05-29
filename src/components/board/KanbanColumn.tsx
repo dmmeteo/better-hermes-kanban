@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Plus, Lock, ChevronsRightLeft, ChevronsLeftRight } from 'lucide-react';
 import type { Task, TaskStatus } from '@/lib/types';
 import { STATUS_COLORS, isStatusDropEnabled, isStatusReadOnly } from '@/lib/types';
-import { TaskCard } from './TaskCard';
+import { TaskCard, TaskCardView, TASK_CARD_BASE_CLASS } from './TaskCard';
 import { cn } from '@/lib/utils';
 
 interface KanbanColumnProps {
@@ -41,15 +41,31 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
   } = useSortable({ id: `column:${status}`, data: { type: 'column', status } });
 
   // The lifted clone is rendered in the board's DragOverlay (free to float
-  // anywhere, like a task card); the in-place column just reflows + dims.
+  // anywhere, like a task card); the in-place node becomes a placeholder that
+  // dnd-kit slides to the drop slot.
   const sortableStyle: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    ...(isDragging ? { opacity: 0.4 } : {}),
   };
 
   const color = STATUS_COLORS[status];
   const label = statusLabel || status;
+
+  // While this column is the one being dragged, leave a translucent placeholder
+  // (the "shadow" that tracks where the column will land).
+  if (isDragging) {
+    return (
+      <div
+        ref={setSortableRef}
+        style={sortableStyle}
+        className={cn(
+          'flex-shrink-0 h-full min-h-0 rounded-xl border-2 border-dashed border-border/40 bg-muted/10',
+          collapsed ? 'w-11' : 'w-[300px]',
+        )}
+        data-testid={`column-placeholder-${status}`}
+      />
+    );
+  }
 
   if (collapsed) {
     return (
@@ -58,7 +74,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         style={sortableStyle}
         {...attributes}
         {...listeners}
-        className="flex-shrink-0 w-11 h-full min-h-0 flex flex-col items-center gap-2 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm py-2.5 cursor-grab active:cursor-grabbing"
+        className="flex-shrink-0 w-11 h-full min-h-0 flex flex-col items-center gap-2 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm py-2.5 cursor-default active:cursor-grabbing"
         data-testid={`column-collapsed-${status}`}
       >
         <button
@@ -100,7 +116,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
       <div
         {...attributes}
         {...listeners}
-        className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 cursor-grab active:cursor-grabbing"
+        className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 cursor-default active:cursor-grabbing"
       >
         <div className="flex items-center gap-2">
           <span
@@ -195,12 +211,12 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
 export function ColumnDragPreview({
   status,
   label,
-  count,
+  tasks,
   collapsed = false,
 }: {
   status: TaskStatus;
   label: string;
-  count: number;
+  tasks: Task[];
   collapsed?: boolean;
 }) {
   const color = STATUS_COLORS[status];
@@ -208,7 +224,7 @@ export function ColumnDragPreview({
     return (
       <div className="w-11 h-80 flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card py-2.5 shadow-2xl rotate-[2deg]">
         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-[11px] text-muted-foreground font-medium">{count}</span>
+        <span className="text-[11px] text-muted-foreground font-medium">{tasks.length}</span>
         <span className="mt-1 text-[11px] font-bold uppercase tracking-wider [writing-mode:vertical-rl]" style={{ color }}>
           {label}
         </span>
@@ -216,13 +232,19 @@ export function ColumnDragPreview({
     );
   }
   return (
-    <div className="w-[300px] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl rotate-[2deg]">
+    <div className="flex max-h-[70vh] w-[300px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl rotate-[2deg]">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
         <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color }}>{label}</span>
-        <span className="text-[11px] text-muted-foreground font-medium">{count}</span>
+        <span className="text-[11px] text-muted-foreground font-medium">{tasks.length}</span>
       </div>
-      <div className="h-40 bg-card/40" />
+      <div className="flex flex-col gap-2 overflow-hidden p-2">
+        {tasks.map((task) => (
+          <div key={task.id} className={TASK_CARD_BASE_CLASS}>
+            <TaskCardView task={task} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

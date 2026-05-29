@@ -171,7 +171,7 @@ export function DesktopKanbanBoard({
           <ColumnDragPreview
             status={activeColumnStatus}
             label={getStatusLabel(activeColumnStatus, boardSettings)}
-            count={tasksByStatus[activeColumnStatus]?.length ?? 0}
+            tasks={tasksByStatus[activeColumnStatus] ?? []}
             collapsed={boardSettings.collapsedColumns.includes(activeColumnStatus)}
           />
         ) : null}

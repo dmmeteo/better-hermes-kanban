@@ -15,64 +15,18 @@ interface TaskCardProps {
   readOnly?: boolean;
 }
 
-export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }: TaskCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: task.id,
-    data: { task },
-    disabled: isStatusReadOnly(task.status),
-  });
+// Shared visual shell so non-interactive clones (e.g. the column drag preview)
+// can render real-looking cards without calling the drag hooks.
+export const TASK_CARD_BASE_CLASS =
+  'relative flex flex-col gap-2 bg-secondary/80 text-card-foreground border border-border/80 rounded-lg p-3.5';
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  // Suppress the click that browsers may fire right after a drag ends, so a
-  // completed drag never opens the detail drawer. A plain tap (movement below
-  // the sensor's 5px threshold) never sets isDragging, so it still opens.
-  const wasDraggingRef = useRef(false);
-  useEffect(() => {
-    if (isDragging) wasDraggingRef.current = true;
-  }, [isDragging]);
-
-  const handleClick = () => {
-    if (wasDraggingRef.current) {
-      wasDraggingRef.current = false;
-      return;
-    }
-    onClick(task);
-  };
-
+/** Presentational card content (no drag hooks). The parent supplies the
+ *  relative card container (TASK_CARD_BASE_CLASS) the absolute status line needs. */
+export function TaskCardView({ task, showGrip = false }: { task: Task; showGrip?: boolean }) {
   const statusColor = STATUS_COLORS[task.status];
   const isReadOnlyStatus = isStatusReadOnly(task.status);
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...(!readOnly ? attributes : {})}
-      {...(!readOnly ? listeners : {})}
-      onClick={handleClick}
-      className={cn(
-        'relative bg-secondary/80 text-card-foreground border border-border/80 rounded-lg p-3.5',
-        readOnly ? 'cursor-pointer' : 'cursor-grab',
-        readOnly ? 'active:cursor-pointer' : 'active:cursor-grabbing active:scale-[0.98]',
-        'flex flex-col gap-2',
-        'transition-all duration-150',
-        'hover:border-muted-foreground/70 hover:-translate-y-0.5 hover:shadow-lg',
-        isDragging && 'opacity-40',
-        isOverlay && 'opacity-90 rotate-[3.5deg] scale-[1.03] shadow-2xl cursor-grabbing',
-        isReadOnlyStatus && 'running-card cursor-default',
-        'task-slide-in'
-      )}
-    >
+    <>
       {/* Status indicator line */}
       <div
         className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
@@ -109,7 +63,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
               {task.linkCount}
             </span>
           )}
-          {!isOverlay && !readOnly && (
+          {showGrip && (
             <GripVertical size={14} className="text-muted-foreground/40 cursor-grab" />
           )}
         </div>
@@ -139,6 +93,67 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
           <span className="text-[10px] text-amber-500 font-medium">{task.warningCount} warning</span>
         </div>
       )}
+    </>
+  );
+}
+
+export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }: TaskCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: task.id,
+    data: { task },
+    disabled: isStatusReadOnly(task.status),
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  // Suppress the click that browsers may fire right after a drag ends, so a
+  // completed drag never opens the detail drawer. A plain tap (movement below
+  // the sensor's 5px threshold) never sets isDragging, so it still opens.
+  const wasDraggingRef = useRef(false);
+  useEffect(() => {
+    if (isDragging) wasDraggingRef.current = true;
+  }, [isDragging]);
+
+  const handleClick = () => {
+    if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      return;
+    }
+    onClick(task);
+  };
+
+  const isReadOnlyStatus = isStatusReadOnly(task.status);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...(!readOnly ? attributes : {})}
+      {...(!readOnly ? listeners : {})}
+      onClick={handleClick}
+      className={cn(
+        TASK_CARD_BASE_CLASS,
+        readOnly ? 'cursor-pointer' : 'cursor-grab',
+        readOnly ? 'active:cursor-pointer' : 'active:cursor-grabbing active:scale-[0.98]',
+        'transition-all duration-150',
+        'hover:border-muted-foreground/70 hover:-translate-y-0.5 hover:shadow-lg',
+        isDragging && 'opacity-40',
+        isOverlay && 'opacity-90 rotate-[3.5deg] scale-[1.03] shadow-2xl cursor-grabbing',
+        isReadOnlyStatus && 'running-card cursor-default',
+        'task-slide-in'
+      )}
+    >
+      <TaskCardView task={task} showGrip={!isOverlay && !readOnly} />
     </div>
   );
 }
