@@ -684,8 +684,6 @@ function App() {
           onOpenQuickCapture={() => { setPresetStatus(undefined); setIsQuickCaptureOpen(true); }}
           onOpenSettings={() => { setIsNewBoardOpen(false); setSettingsMode('settings'); setIsSettingsOpen(true); }}
           onOpenNewBoard={() => { setIsSettingsOpen(false); setIsNewBoardOpen(true); }}
-          detailPresentation={activeDetailPresentation}
-          onDetailPresentationChange={handleDetailPresentationChange}
           isTaskPage={isTaskPage}
           isTaskSearchPage={isTaskSearchPage}
           logoHomeHref={boardPath(activeBoard.id)}
@@ -818,6 +816,8 @@ function App() {
         onBoardChange={handleBoardChange}
         onBoardsRefresh={async (preferredBoardId) => { await loadBoardData(preferredBoardId); }}
         assignees={assignees}
+        detailPresentation={detailPresentation}
+        onDetailPresentationChange={handleDetailPresentationChange}
       />
 
       <NewBoardModal

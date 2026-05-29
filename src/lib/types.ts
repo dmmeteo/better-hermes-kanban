@@ -17,6 +17,10 @@ export interface BotProfile {
   source?: 'profile' | 'assignee' | 'mock';
   taskCount?: number;
   runningCount?: number;
+  description?: string;
+  /** True when the description was machine-generated (description_auto). */
+  descriptionAuto?: boolean;
+  isDefault?: boolean;
 }
 
 export interface KanbanOrchestrationSettings {

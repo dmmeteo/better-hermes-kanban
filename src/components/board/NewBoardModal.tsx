@@ -95,7 +95,7 @@ export function NewBoardModal({ open, boards, onClose, onCreated }: NewBoardModa
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent data-testid="new-board-modal" className="max-w-md border-border bg-card p-0">
+      <DialogContent showCloseButton={false} data-testid="new-board-modal" className="max-w-md border-border bg-card p-0">
         <DialogHeader className="border-b border-border/60 px-5 py-4 text-left">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -125,6 +125,9 @@ export function NewBoardModal({ open, boards, onClose, onCreated }: NewBoardModa
               placeholder="Launch planning"
               autoFocus
             />
+            <span className="block text-[11px] text-muted-foreground">
+              Generated slug: <span className="font-mono text-foreground">{generatedSlug || '—'}</span>
+            </span>
           </label>
 
           <label className="block space-y-1.5">
@@ -137,10 +140,6 @@ export function NewBoardModal({ open, boards, onClose, onCreated }: NewBoardModa
               className="min-h-24"
             />
           </label>
-
-          <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-[11px] text-muted-foreground">
-            Generated slug: <span className="font-mono text-foreground">{generatedSlug || '—'}</span>
-          </div>
 
           {error ? (
             <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">

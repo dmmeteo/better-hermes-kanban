@@ -4,6 +4,9 @@ import type {
   NativeKanbanBoardsResponseDto,
   NativeKanbanOrchestrationResponseDto,
   NativeKanbanOrchestrationUpdateDto,
+  NativeKanbanProfileDescribeAutoBody,
+  NativeKanbanProfileDescribeBody,
+  NativeKanbanProfileDescribeResponseDto,
   NativeKanbanProfilesResponseDto,
 } from './nativeKanbanTypes';
 
@@ -64,6 +67,34 @@ export const nativeKanbanClient = {
 
   getProfiles(): Promise<NativeKanbanProfilesResponseDto | unknown[]> {
     return requestNativeKanbanJson<NativeKanbanProfilesResponseDto | unknown[]>('/profiles');
+  },
+
+  updateProfileDescription(
+    name: string,
+    body: NativeKanbanProfileDescribeBody,
+  ): Promise<NativeKanbanProfileDescribeResponseDto> {
+    return requestNativeKanbanJson<NativeKanbanProfileDescribeResponseDto>(
+      `/profiles/${encodeURIComponent(name)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+  },
+
+  autoDescribeProfile(
+    name: string,
+    body: NativeKanbanProfileDescribeAutoBody,
+  ): Promise<NativeKanbanProfileDescribeResponseDto> {
+    return requestNativeKanbanJson<NativeKanbanProfileDescribeResponseDto>(
+      `/profiles/${encodeURIComponent(name)}/describe-auto`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
   },
 
   getAssignees(boardId?: string): Promise<NativeKanbanAssigneesResponseDto | unknown[]> {

@@ -99,6 +99,26 @@ export interface NativeKanbanProfileDto {
   taskCount?: number;
   running_count?: number;
   runningCount?: number;
+  description?: string;
+  description_auto?: boolean;
+  descriptionAuto?: boolean;
+  is_default?: boolean;
+  isDefault?: boolean;
+}
+
+export interface NativeKanbanProfileDescribeBody {
+  description?: string;
+}
+
+export interface NativeKanbanProfileDescribeAutoBody {
+  overwrite?: boolean;
+}
+
+export interface NativeKanbanProfileDescribeResponseDto {
+  ok?: boolean;
+  profile?: string;
+  description?: string;
+  reason?: string;
 }
 
 export interface NativeKanbanProfilesResponseDto {

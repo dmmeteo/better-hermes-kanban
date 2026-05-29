@@ -221,6 +221,9 @@ function normalizeProfile(raw: unknown, index = 0): BotProfile {
     source: asString(item.source, 'profile') as BotProfile['source'],
     taskCount: asNullableNumber(item.task_count ?? item.taskCount) ?? undefined,
     runningCount: asNullableNumber(item.running_count ?? item.runningCount) ?? undefined,
+    description: asString(item.description, ''),
+    descriptionAuto: Boolean(item.description_auto ?? item.descriptionAuto),
+    isDefault: Boolean(item.is_default ?? item.isDefault),
   };
 }
 
@@ -670,6 +673,19 @@ export const kanbanApi = {
       console.warn(`${message}; showing offline demo profiles`);
       return [...BOT_PROFILES];
     }
+  },
+
+  async updateProfileDescription(name: string, description: string): Promise<string> {
+    const response = await nativeKanbanClient.updateProfileDescription(name, { description });
+    return asString(response.description, description);
+  },
+
+  async autoDescribeProfile(name: string, overwrite = false): Promise<{ description: string; reason: string }> {
+    const response = await nativeKanbanClient.autoDescribeProfile(name, { overwrite });
+    return {
+      description: asString(response.description, ''),
+      reason: asString(response.reason, ''),
+    };
   },
 
   async getAssignees(boardId?: string): Promise<BotProfile[]> {

@@ -1,4 +1,4 @@
-import { Plus, ChevronDown, Settings, Feather, PanelRightOpen, SquareStack, FileText } from 'lucide-react';
+import { Plus, ChevronDown, Settings, Feather } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import type { Board, BotProfile } from '@/lib/types';
@@ -8,9 +8,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -30,8 +27,6 @@ interface TopBarProps {
   onOpenQuickCapture: () => void;
   onOpenSettings: () => void;
   onOpenNewBoard: () => void;
-  detailPresentation: TaskDetailPresentation;
-  onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
   isTaskPage?: boolean;
   isTaskSearchPage?: boolean;
   logoHomeHref: string;
@@ -50,8 +45,6 @@ export function TopBar({
   onOpenQuickCapture,
   onOpenSettings,
   onOpenNewBoard,
-  detailPresentation,
-  onDetailPresentationChange,
   isTaskPage = false,
   isTaskSearchPage = false,
   logoHomeHref,
@@ -180,53 +173,6 @@ export function TopBar({
                   <Plus size={14} className="mr-2" />
                   New board
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {!isTaskPage && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 rounded-xl p-0"
-                  data-testid="task-detail-presentation-trigger"
-                  aria-label={`Task detail view: ${detailPresentation}`}
-                  title={`Task detail view: ${detailPresentation}`}
-                >
-                  {detailPresentation === 'modal' ? <SquareStack size={17} /> : detailPresentation === 'page' ? <FileText size={17} /> : <PanelRightOpen size={17} />}
-                  <span className="sr-only">Task detail view: {detailPresentation}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Task detail presentation
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup
-                  value={detailPresentation}
-                  onValueChange={(value) => onDetailPresentationChange(value as TaskDetailPresentation)}
-                >
-                  <DropdownMenuRadioItem value="drawer" className="text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span>Side drawer</span>
-                      <span className="text-[11px] text-muted-foreground">Current half-screen detail panel</span>
-                    </div>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="modal" className="text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span>Jira-style modal</span>
-                      <span className="text-[11px] text-muted-foreground">Centered overlay with keyboard close/focus trap</span>
-                    </div>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="page" className="text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span>Standalone page</span>
-                      <span className="text-[11px] text-muted-foreground">Full content canvas for comparing a task page layout</span>
-                    </div>
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
