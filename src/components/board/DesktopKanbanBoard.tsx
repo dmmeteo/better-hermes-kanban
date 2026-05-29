@@ -8,13 +8,14 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
 import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
-import { DROPPABLE_TASK_STATUSES, isStatusDropEnabled } from '@/lib/types';
+import { isStatusDropEnabled } from '@/lib/types';
 import { KanbanColumn, ColumnDragPreview } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { toast } from 'sonner';
@@ -46,6 +47,10 @@ export function DesktopKanbanBoard({
 }: DesktopKanbanBoardProps) {
   const orderedStatuses = useMemo(() => getOrderedStatuses(boardSettings), [boardSettings]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Working copy of the per-column task-id lists, live only while a task is
+  // being dragged (null otherwise → render straight from props). Seeded on
+  // drag start, cleared on drag end/cancel; the refetch reconciles afterwards.
+  const [cloneContainers, setCloneContainers] = useState<Record<string, string[]> | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -72,32 +77,103 @@ export function DesktopKanbanBoard({
     return grouped;
   }, [filteredTasks, orderedStatuses]);
 
+  // id → task lookup over the (search-filtered) set, stable across a drag.
+  const taskById = useMemo(() => {
+    const m = new Map<string, Task>();
+    filteredTasks.forEach((t) => m.set(t.id, t));
+    return m;
+  }, [filteredTasks]);
+
+  // Grouping straight from props (used when no task drag is in progress).
+  const baseContainers = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    orderedStatuses.forEach((s) => {
+      m[s] = (tasksByStatus[s] ?? []).map((t) => t.id);
+    });
+    return m;
+  }, [tasksByStatus, orderedStatuses]);
+
+  // What the columns actually render: the live working copy if dragging a task,
+  // otherwise the prop-derived grouping.
+  const renderContainers = cloneContainers ?? baseContainers;
+
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
   const activeColumnStatus =
     activeId && activeId.startsWith('column:') ? (activeId.slice('column:'.length) as TaskStatus) : null;
 
+  // The column that currently holds the dragged task → gets the drop highlight.
+  const activeDropContainer =
+    cloneContainers && activeId && !activeColumnStatus
+      ? orderedStatuses.find((s) => cloneContainers[s].includes(activeId)) ?? null
+      : null;
+
   function handleDragStart(event: DragStartEvent) {
     if (readOnly) return;
     setActiveId(event.active.id as string);
+    // Column drags don't use the task working copy.
+    if (event.active.data.current?.type === 'column') return;
+    setCloneContainers(
+      Object.fromEntries(orderedStatuses.map((s) => [s, [...(baseContainers[s] ?? [])]]))
+    );
+  }
+
+  // While dragging a task over a *different* column, move its id into that
+  // column's working list so verticalListSortingStrategy opens the gap and the
+  // dimmed in-place card becomes the drop "shadow". Same-column hover is a
+  // no-op (reorder isn't persisted), and drop-disabled columns never accept it.
+  function handleDragOver(event: DragOverEvent) {
+    if (readOnly) return;
+    const { active, over } = event;
+    if (!over) return;
+    if (active.data.current?.type === 'column') return;
+
+    const activeTaskId = active.id as string;
+    const overId = over.id as string;
+
+    setCloneContainers((prev) => {
+      if (!prev) return prev;
+      const from = orderedStatuses.find((s) => prev[s].includes(activeTaskId));
+      if (!from) return prev;
+      const to = orderedStatuses.includes(overId as TaskStatus)
+        ? (overId as TaskStatus)
+        : orderedStatuses.find((s) => prev[s].includes(overId));
+      if (!to || !isStatusDropEnabled(to) || from === to) return prev;
+
+      const fromItems = prev[from];
+      const toItems = prev[to];
+      const overIsColumn = orderedStatuses.includes(overId as TaskStatus);
+      const overIndex = overIsColumn ? -1 : toItems.indexOf(overId);
+      const newIndex = overIndex >= 0 ? overIndex : toItems.length;
+
+      return {
+        ...prev,
+        [from]: fromItems.filter((id) => id !== activeTaskId),
+        [to]: [...toItems.slice(0, newIndex), activeTaskId, ...toItems.slice(newIndex)],
+      };
+    });
+  }
+
+  function handleDragCancel() {
+    setActiveId(null);
+    setCloneContainers(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
     if (readOnly) {
       setActiveId(null);
+      setCloneContainers(null);
       return;
     }
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over) return;
 
     const activeData = active.data.current;
-    const overData = over.data.current;
-    const overId = over.id as string;
 
     // Column reordering: drag a column header onto another column. Persisted
     // per board via boardSettings.statusOrder (parent handler).
     if (activeData?.type === 'column') {
+      setActiveId(null);
+      if (!over) return;
+      const overData = over.data.current;
       const from = activeData.status as TaskStatus;
       const to =
         (overData?.type === 'column' ? (overData.status as TaskStatus) : undefined) ??
@@ -111,22 +187,16 @@ export function DesktopKanbanBoard({
       return;
     }
 
+    // Task move: the working copy already represents where the card landed.
     const activeTaskId = active.id as string;
-    const activeTaskItem = tasks.find((t) => t.id === activeTaskId);
-    if (!activeTaskItem) return;
+    const snapshot = cloneContainers;
+    setActiveId(null);
+    setCloneContainers(null);
+    if (!snapshot) return;
 
-    // Resolve the target status: a column droppable id, the column the card
-    // was dropped on, or the column of the card we dropped on.
-    const overStatus = DROPPABLE_TASK_STATUSES.find((s) => s === overId);
-    const targetStatus =
-      overStatus ??
-      (overData?.status as TaskStatus | undefined) ??
-      tasks.find((t) => t.id === overId)?.status;
-    if (!targetStatus) return;
-
-    // Dropping inside the same column is a no-op: ordering is not persisted
-    // (the backend has no position/rank field yet).
-    if (targetStatus === activeTaskItem.status) return;
+    const sourceStatus = tasks.find((t) => t.id === activeTaskId)?.status;
+    const targetStatus = orderedStatuses.find((s) => snapshot[s].includes(activeTaskId));
+    if (!sourceStatus || !targetStatus || targetStatus === sourceStatus) return;
 
     if (!isStatusDropEnabled(targetStatus)) {
       toast.error('Cannot drop into Running — status is read-only');
@@ -143,7 +213,9 @@ export function DesktopKanbanBoard({
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden custom-scrollbar px-4 pt-3 pb-4 items-stretch">
         <SortableContext items={orderedStatuses.map((s) => `column:${s}`)} strategy={horizontalListSortingStrategy}>
@@ -151,7 +223,7 @@ export function DesktopKanbanBoard({
             <KanbanColumn
               key={status}
               status={status}
-              tasks={tasksByStatus[status] || []}
+              tasks={(renderContainers[status] ?? []).map((id) => taskById.get(id)).filter(Boolean) as Task[]}
               onTaskClick={onTaskClick}
               onAddTask={onAddTask}
               readOnly={readOnly}
@@ -159,6 +231,7 @@ export function DesktopKanbanBoard({
               onRenameStatus={onRenameStatus}
               collapsed={boardSettings.collapsedColumns.includes(status)}
               onToggleCollapse={onToggleCollapse}
+              isActiveDropTarget={activeDropContainer === status}
             />
           ))}
         </SortableContext>

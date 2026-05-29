@@ -18,9 +18,11 @@ interface KanbanColumnProps {
   onRenameStatus?: (status: TaskStatus, label: string) => void;
   collapsed?: boolean;
   onToggleCollapse?: (status: TaskStatus) => void;
+  /** This column is where the currently-dragged task would drop → highlight it. */
+  isActiveDropTarget?: boolean;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus, collapsed = false, onToggleCollapse }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus, collapsed = false, onToggleCollapse, isActiveDropTarget = false }: KanbanColumnProps) {
   const isReadOnlyStatus = isStatusReadOnly(status);
   const isDropDisabled = !isStatusDropEnabled(status);
   const { setNodeRef, isOver } = useDroppable({
@@ -103,14 +105,17 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
     <div
       ref={setSortableRef}
       className={cn(
-        'flex-shrink-0 w-[300px] h-full min-h-0 flex flex-col rounded-xl border',
+        'flex-shrink-0 w-[300px] h-full min-h-0 flex flex-col rounded-xl border border-border/50',
         'bg-card/50 backdrop-blur-sm',
         'transition-colors duration-200',
-        isOver && !isDropDisabled && 'border-dashed',
-        isOver && isDropDisabled && 'border-red-500/50',
-        !isOver && 'border-border/50'
+        isOver && isDropDisabled && '!border-red-500/50'
       )}
-      style={{ ...sortableStyle, ...(isOver && !isDropDisabled ? { borderColor: `${color}60` } : {}) }}
+      style={{
+        ...sortableStyle,
+        ...(isActiveDropTarget && !isDropDisabled
+          ? { borderColor: color, boxShadow: `inset 0 0 0 2px ${color}`, backgroundColor: `${color}14` }
+          : {}),
+      }}
     >
       {/* Column Header — drag handle for reordering columns */}
       <div
