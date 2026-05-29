@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Plus, Lock, ChevronsRightLeft, ChevronsLeftRight } from 'lucide-react';
 import type { Task, TaskStatus } from '@/lib/types';
 import { STATUS_COLORS, isStatusDropEnabled, isStatusReadOnly } from '@/lib/types';
@@ -28,13 +29,36 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
     data: { status },
   });
 
+  // Column reordering — drag the column by its header. Separate id-space
+  // (`column:`) so it never collides with the body droppable (id = status).
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `column:${status}`, data: { type: 'column', status } });
+
+  const baseTransform = CSS.Transform.toString(transform);
+  const sortableStyle: CSSProperties = {
+    // While dragging, tilt the column like a task card but a touch less (card ≈ 3.5deg).
+    transform: isDragging && baseTransform ? `${baseTransform} rotate(2deg)` : baseTransform,
+    transition,
+    ...(isDragging ? { opacity: 0.5, zIndex: 50 } : {}),
+  };
+
   const color = STATUS_COLORS[status];
   const label = statusLabel || status;
 
   if (collapsed) {
     return (
       <div
-        className="flex-shrink-0 w-11 h-full min-h-0 flex flex-col items-center gap-2 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm py-2.5"
+        ref={setSortableRef}
+        style={sortableStyle}
+        {...attributes}
+        {...listeners}
+        className="flex-shrink-0 w-11 h-full min-h-0 flex flex-col items-center gap-2 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm py-2.5 cursor-grab active:cursor-grabbing"
         data-testid={`column-collapsed-${status}`}
       >
         <button
@@ -61,6 +85,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
 
   return (
     <div
+      ref={setSortableRef}
       className={cn(
         'flex-shrink-0 w-[300px] h-full min-h-0 flex flex-col rounded-xl border',
         'bg-card/50 backdrop-blur-sm',
@@ -69,10 +94,14 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         isOver && isDropDisabled && 'border-red-500/50',
         !isOver && 'border-border/50'
       )}
-      style={isOver && !isDropDisabled ? { borderColor: `${color}60` } : {}}
+      style={{ ...sortableStyle, ...(isOver && !isDropDisabled ? { borderColor: `${color}60` } : {}) }}
     >
-      {/* Column Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
+      {/* Column Header — drag handle for reordering columns */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 cursor-grab active:cursor-grabbing"
+      >
         <div className="flex items-center gap-2">
           <span
             className="w-2 h-2 rounded-full"
@@ -89,14 +118,6 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {!isReadOnlyStatus && !readOnly && (
-            <button
-              onClick={() => onAddTask?.(status)}
-              className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
-            >
-              <Plus size={14} />
-            </button>
-          )}
           {onToggleCollapse && (
             <button
               type="button"
@@ -107,6 +128,14 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
               className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
             >
               <ChevronsRightLeft size={14} />
+            </button>
+          )}
+          {!isReadOnlyStatus && !readOnly && (
+            <button
+              onClick={() => onAddTask?.(status)}
+              className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <Plus size={14} />
             </button>
           )}
         </div>
@@ -231,6 +260,7 @@ function ColumnTitle({ status, label, color, onRename }: ColumnTitleProps) {
         onChange={(e) => setDraft(e.target.value)}
         onBlur={finish}
         onKeyDown={onKeyDown}
+        onPointerDown={(e) => e.stopPropagation()}
         aria-label={`Rename ${label} column`}
         data-testid={`column-title-input-${status}`}
         className={cn(titleClass, 'w-[140px] rounded bg-background/80 px-1 py-0.5 outline-none ring-1 ring-border focus:ring-2')}
@@ -243,6 +273,7 @@ function ColumnTitle({ status, label, color, onRename }: ColumnTitleProps) {
     <button
       type="button"
       onClick={beginEdit}
+      onPointerDown={(e) => e.stopPropagation()}
       title="Rename column"
       data-testid={`column-title-${status}`}
       className={cn(titleClass, 'rounded px-1 py-0.5 -mx-1 text-left transition-colors hover:bg-accent/50 cursor-text')}

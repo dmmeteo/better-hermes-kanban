@@ -382,6 +382,10 @@ function App() {
     });
   }, [activeBoard]);
 
+  const handleReorderColumns = useCallback((order: TaskStatus[]) => {
+    setBoardSettings(saveBoardSettings(activeBoard?.id, { statusOrder: order }));
+  }, [activeBoard]);
+
   const refetchActiveBoard = useCallback(async (board: Board) => {
     const data = await kanbanApi.getBoard(board.id);
     setTasks(data.tasks);
@@ -751,6 +755,7 @@ function App() {
               boardSettings={boardSettings}
               onRenameStatus={handleRenameStatus}
               onToggleCollapse={handleToggleColumnCollapse}
+              onReorderColumns={handleReorderColumns}
             />
           )}
         </div>

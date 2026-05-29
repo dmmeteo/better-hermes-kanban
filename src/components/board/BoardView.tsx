@@ -12,6 +12,7 @@ interface BoardViewProps {
   boardSettings: BoardSettings;
   onRenameStatus?: (status: TaskStatus, label: string) => void;
   onToggleCollapse?: (status: TaskStatus) => void;
+  onReorderColumns?: (order: TaskStatus[]) => void;
 }
 
 export function BoardView({
@@ -23,6 +24,7 @@ export function BoardView({
   boardSettings,
   onRenameStatus,
   onToggleCollapse,
+  onReorderColumns,
 }: BoardViewProps) {
   return (
     <>
@@ -45,6 +47,7 @@ export function BoardView({
             boardSettings={boardSettings}
             onRenameStatus={onRenameStatus}
             onToggleCollapse={onToggleCollapse}
+            onReorderColumns={onReorderColumns}
           />
         </div>
       </div>

@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
 import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
@@ -29,6 +29,7 @@ interface DesktopKanbanBoardProps {
   boardSettings: BoardSettings;
   onRenameStatus?: (status: TaskStatus, label: string) => void;
   onToggleCollapse?: (status: TaskStatus) => void;
+  onReorderColumns?: (order: TaskStatus[]) => void;
 }
 
 export function DesktopKanbanBoard({
@@ -41,6 +42,7 @@ export function DesktopKanbanBoard({
   boardSettings,
   onRenameStatus,
   onToggleCollapse,
+  onReorderColumns,
 }: DesktopKanbanBoardProps) {
   const orderedStatuses = useMemo(() => getOrderedStatuses(boardSettings), [boardSettings]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -87,16 +89,37 @@ export function DesktopKanbanBoard({
 
     if (!over) return;
 
-    const activeTaskId = active.id as string;
+    const activeData = active.data.current;
+    const overData = over.data.current;
     const overId = over.id as string;
 
+    // Column reordering: drag a column header onto another column. Persisted
+    // per board via boardSettings.statusOrder (parent handler).
+    if (activeData?.type === 'column') {
+      const from = activeData.status as TaskStatus;
+      const to =
+        (overData?.type === 'column' ? (overData.status as TaskStatus) : undefined) ??
+        (overData?.task?.status as TaskStatus | undefined) ??
+        (overData?.status as TaskStatus | undefined);
+      if (!to || from === to) return;
+      const oldIndex = orderedStatuses.indexOf(from);
+      const newIndex = orderedStatuses.indexOf(to);
+      if (oldIndex === -1 || newIndex === -1) return;
+      onReorderColumns?.(arrayMove(orderedStatuses, oldIndex, newIndex));
+      return;
+    }
+
+    const activeTaskId = active.id as string;
     const activeTaskItem = tasks.find((t) => t.id === activeTaskId);
     if (!activeTaskItem) return;
 
-    // Resolve the target status: a column droppable id, or the column of the
-    // card we dropped on.
+    // Resolve the target status: a column droppable id, the column the card
+    // was dropped on, or the column of the card we dropped on.
     const overStatus = DROPPABLE_TASK_STATUSES.find((s) => s === overId);
-    const targetStatus = overStatus ?? tasks.find((t) => t.id === overId)?.status;
+    const targetStatus =
+      overStatus ??
+      (overData?.status as TaskStatus | undefined) ??
+      tasks.find((t) => t.id === overId)?.status;
     if (!targetStatus) return;
 
     // Dropping inside the same column is a no-op: ordering is not persisted
@@ -121,20 +144,22 @@ export function DesktopKanbanBoard({
       onDragEnd={handleDragEnd}
     >
       <div className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden custom-scrollbar px-4 pt-3 pb-4 items-stretch">
-        {orderedStatuses.map((status) => (
-          <KanbanColumn
-            key={status}
-            status={status}
-            tasks={tasksByStatus[status] || []}
-            onTaskClick={onTaskClick}
-            onAddTask={onAddTask}
-            readOnly={readOnly}
-            statusLabel={getStatusLabel(status, boardSettings)}
-            onRenameStatus={onRenameStatus}
-            collapsed={boardSettings.collapsedColumns.includes(status)}
-            onToggleCollapse={onToggleCollapse}
-          />
-        ))}
+        <SortableContext items={orderedStatuses.map((s) => `column:${s}`)} strategy={horizontalListSortingStrategy}>
+          {orderedStatuses.map((status) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              tasks={tasksByStatus[status] || []}
+              onTaskClick={onTaskClick}
+              onAddTask={onAddTask}
+              readOnly={readOnly}
+              statusLabel={getStatusLabel(status, boardSettings)}
+              onRenameStatus={onRenameStatus}
+              collapsed={boardSettings.collapsedColumns.includes(status)}
+              onToggleCollapse={onToggleCollapse}
+            />
+          ))}
+        </SortableContext>
       </div>
 
       <DragOverlay>
