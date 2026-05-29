@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MessageSquare, Link2, AlertTriangle, Lock, GripVertical } from 'lucide-react';
+import { MessageSquare, Link2, AlertTriangle, Lock } from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { STATUS_COLORS, isStatusReadOnly } from '@/lib/types';
 import { PriorityBadge } from '@/components/shared/PriorityBadge';
@@ -22,7 +22,7 @@ export const TASK_CARD_BASE_CLASS =
 
 /** Presentational card content (no drag hooks). The parent supplies the
  *  relative card container (TASK_CARD_BASE_CLASS) the absolute status line needs. */
-export function TaskCardView({ task, showGrip = false }: { task: Task; showGrip?: boolean }) {
+export function TaskCardView({ task }: { task: Task }) {
   const statusColor = STATUS_COLORS[task.status];
   const isReadOnlyStatus = isStatusReadOnly(task.status);
   return (
@@ -62,9 +62,6 @@ export function TaskCardView({ task, showGrip = false }: { task: Task; showGrip?
               <Link2 size={12} />
               {task.linkCount}
             </span>
-          )}
-          {showGrip && (
-            <GripVertical size={14} className="text-muted-foreground/40 cursor-grab" />
           )}
         </div>
       </div>
@@ -153,7 +150,7 @@ export function TaskCard({ task, onClick, isOverlay = false, readOnly = false }:
         'task-slide-in'
       )}
     >
-      <TaskCardView task={task} showGrip={!isOverlay && !readOnly} />
+      <TaskCardView task={task} />
     </div>
   );
 }
