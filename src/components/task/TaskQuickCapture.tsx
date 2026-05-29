@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import type {
   Board,
@@ -26,7 +26,7 @@ const PRIORITIES: Priority[] = ['p0', 'p1', 'p2', 'p3'];
 interface TaskQuickCaptureProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (data: CreateTaskData, boardId: string) => void | Promise<void>;
+  onCreate: (data: CreateTaskData, boardId: string, keepOpen?: boolean) => boolean | Promise<boolean>;
   boards: Board[];
   activeBoard: Board;
   /** Loaded tasks of the active board, used as parent-search candidates. */
@@ -45,7 +45,7 @@ export function TaskQuickCapture({ open, onClose, ...rest }: TaskQuickCapturePro
         data-testid="create-task-modal"
         aria-describedby={undefined}
         showCloseButton={false}
-        className="flex h-[min(86dvh,840px)] max-w-none flex-col gap-3 overflow-y-auto border-border/70 bg-background p-4 shadow-2xl sm:max-w-none md:w-[min(92vw,640px)] md:rounded-2xl md:border md:p-5 md:shadow-[0_24px_90px_rgba(0,0,0,0.55)] max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0"
+        className="flex h-[min(86dvh,840px)] max-w-none flex-col gap-3 overflow-hidden border-border/70 bg-background p-4 shadow-2xl sm:max-w-none md:w-[min(92vw,640px)] md:rounded-2xl md:border md:p-5 md:shadow-[0_24px_90px_rgba(0,0,0,0.55)] max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0"
       >
         <DialogTitle className="sr-only">Create task</DialogTitle>
         {/* Mounted only while open (Radix unmounts content on close), so the
@@ -77,6 +77,8 @@ function CreateTaskForm({
   const [workspacePath, setWorkspacePath] = useState('');
   const [skillsInput, setSkillsInput] = useState('');
   const [parent, setParent] = useState<LinkedTaskCandidate | null>(null);
+  const [createAnother, setCreateAnother] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
   // Tasks of a non-active board, lazily fetched when the board is switched
   // (the active board's tasks come in via the boardTasks prop).
   const [extraTasks, setExtraTasks] = useState<Task[] | null>(null);
@@ -166,7 +168,7 @@ function CreateTaskForm({
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
-    await onCreate(
+    const ok = await onCreate(
       {
         title: title.trim(),
         description: description.trim(),
@@ -179,13 +181,23 @@ function CreateTaskForm({
         workspacePath: workspacePath.trim() || undefined,
       },
       selectedBoardId,
+      createAnother,
     );
+    // "Create another": keep the modal open and clear the per-task fields,
+    // preserving board/status/priority/assignee/workspace for fast repeats.
+    if (ok && createAnother) {
+      setTitle('');
+      setDescription('');
+      setParent(null);
+      setSkillsInput('');
+      titleRef.current?.focus();
+    }
   };
 
   return (
     <>
-      {/* Header */}
-      <header className="flex items-center justify-between gap-3" data-testid="create-task-header">
+      {/* Header (pinned) */}
+      <header className="flex shrink-0 items-center justify-between gap-3" data-testid="create-task-header">
         <h2 className="text-sm font-semibold">Create task</h2>
         <Button
           type="button"
@@ -200,8 +212,8 @@ function CreateTaskForm({
         </Button>
       </header>
 
-      {/* Single-column body */}
-      <div className="flex flex-col gap-4">
+      {/* Single-column body (only this scrolls) */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         {/* Board */}
         <FieldRow label="Board">
           <InlineSelectField
@@ -238,6 +250,7 @@ function CreateTaskForm({
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Title</label>
           <input
+            ref={titleRef}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -255,8 +268,8 @@ function CreateTaskForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Add context or link..."
-            rows={3}
-            className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2.5 text-sm transition-all placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+            rows={6}
+            className="min-h-[140px] w-full resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-sm transition-all placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
             data-testid="create-task-description"
           />
         </div>
@@ -378,21 +391,33 @@ function CreateTaskForm({
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="mt-auto flex items-center justify-end gap-2 border-t border-border/50 pt-4">
-        <Button type="button" variant="ghost" onClick={onClose} data-testid="create-task-cancel">
-          Cancel
-        </Button>
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={!title.trim() || isSubmitting}
-          className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ backgroundColor: '#7C5CFF' }}
-          data-testid="create-task-submit"
-        >
-          {isSubmitting ? 'Creating...' : 'Create task'}
-        </button>
+      {/* Footer (pinned) */}
+      <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border/50 pt-4">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={createAnother}
+            onChange={(e) => setCreateAnother(e.target.checked)}
+            className="h-4 w-4 rounded border-border accent-[#7C5CFF]"
+            data-testid="create-task-create-another"
+          />
+          Create another
+        </label>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="ghost" onClick={onClose} data-testid="create-task-cancel">
+            Cancel
+          </Button>
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={!title.trim() || isSubmitting}
+            className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            style={{ backgroundColor: '#7C5CFF' }}
+            data-testid="create-task-submit"
+          >
+            {isSubmitting ? 'Creating...' : 'Create task'}
+          </button>
+        </div>
       </footer>
     </>
   );

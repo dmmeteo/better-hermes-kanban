@@ -513,14 +513,14 @@ function App() {
   }, [activeBoard, refetchActiveBoard, selectedTask]);
 
   const handleCreateTask = useCallback(
-    async (data: CreateTaskData, boardId: string) => {
+    async (data: CreateTaskData, boardId: string, keepOpen = false): Promise<boolean> => {
       if (!isStatusCreateSelectable(data.status)) {
         toast.error('Choose a safe starting status: triage, todo, scheduled, ready, or blocked');
-        return;
+        return false;
       }
       if (data.workspacePath && !data.workspacePath.startsWith('/')) {
         toast.error('Workspace path must be absolute');
-        return;
+        return false;
       }
       try {
         setIsCreatingTask(true);
@@ -530,7 +530,8 @@ function App() {
         if (activeBoard && boardId === activeBoard.id) {
           await refetchActiveBoard(activeBoard);
         }
-        setIsQuickCaptureOpen(false);
+        // Keep the modal open when "Create another" is on.
+        if (!keepOpen) setIsQuickCaptureOpen(false);
         toast.success(`Task ${created.id} created`, {
           duration: 30000,
           action: {
@@ -538,10 +539,11 @@ function App() {
             onClick: () => navigate(taskPath(created.id)),
           },
         });
+        return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create task';
         toast.error(message);
-        throw error;
+        return false;
       } finally {
         setIsCreatingTask(false);
       }
