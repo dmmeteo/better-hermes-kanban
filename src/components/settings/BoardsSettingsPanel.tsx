@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
-import { FileText, PanelRightOpen, SquareStack, Wand2 } from 'lucide-react';
+import { ChevronDown, FileText, PanelRightOpen, SquareStack, Wand2 } from 'lucide-react';
 import type { Board, BotProfile, KanbanOrchestrationSettings, KanbanOrchestrationUpdate } from '@/lib/types';
 import { kanbanApi } from '@/lib/kanbanApi';
 import { NativeKanbanClientError } from '@/lib/nativeKanbanClient';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { InlineEditField } from '@/components/shared/InlineEditField';
 import { InlineSelectField, type InlineSelectOption } from '@/components/shared/InlineSelectField';
@@ -34,9 +34,14 @@ const PRESENTATION_OPTIONS: {
   icon: typeof PanelRightOpen;
 }[] = [
   { value: 'drawer', label: 'Side drawer', hint: 'Half-screen detail panel', icon: PanelRightOpen },
-  { value: 'modal', label: 'Jira-style modal', hint: 'Centered overlay with focus trap', icon: SquareStack },
+  { value: 'modal', label: 'Jira-style modal', hint: 'Centered overlay', icon: SquareStack },
   { value: 'page', label: 'Standalone page', hint: 'Full content canvas', icon: FileText },
 ];
+
+// Editable board fields read as fields (not plain text): a quiet border that lifts on
+// hover in display mode, and a borderless input in edit mode so the wrapper is the frame.
+const FIELD_DISPLAY = 'rounded-lg border border-border/50 px-3 py-2 transition-colors hover:border-border hover:bg-accent/30';
+const FIELD_INPUT = 'border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0';
 
 function formatSettingValue(value: number | null) {
   return value === null || value === undefined ? 'Not configured' : String(value);
@@ -56,29 +61,16 @@ function isUnavailable(error: unknown): boolean {
   return error instanceof NativeKanbanClientError && error.status === 404;
 }
 
-// Section label — matches the Task drawer (TaskDetailBody / TaskDetailSidebar).
 function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{children}</p>
-  );
+  return <p className="text-xs font-medium text-muted-foreground">{children}</p>;
 }
 
-// Label/value row — mirrors SidebarRow in TaskDetailSidebar.tsx.
-function SettingsRow({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: ReactNode;
-  className?: string;
-}) {
+// Compact label/value row for the (collapsed) read-only runtime details.
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={cn('grid items-center gap-3', className)} data-testid={`settings-row-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-      <span className="flex items-center pt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-        {label}
-      </span>
-      <div className="min-w-0">{children}</div>
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{children}</span>
     </div>
   );
 }
@@ -95,8 +87,8 @@ export function BoardsSettingsPanel({
   const [settings, setSettings] = useState<KanbanOrchestrationSettings | null>(null);
   const [profiles, setProfiles] = useState<BotProfile[]>([]);
   const [boardAssignees, setBoardAssignees] = useState<BotProfile[]>(assignees);
-  const [settingsLoading, setSettingsLoading] = useState(false);
   const [describing, setDescribing] = useState<string | null>(null);
+  const [runtimeOpen, setRuntimeOpen] = useState(false);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
   const profileOptions = useMemo(() => mergeOptions(profiles, boardAssignees, assignees), [assignees, boardAssignees, profiles]);
@@ -112,7 +104,6 @@ export function BoardsSettingsPanel({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setSettingsLoading(true);
     Promise.all([
       kanbanApi.getOrchestration(),
       kanbanApi.getProfiles().catch(() => []),
@@ -126,9 +117,6 @@ export function BoardsSettingsPanel({
       })
       .catch((error) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : 'Failed to load settings');
-      })
-      .finally(() => {
-        if (!cancelled) setSettingsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -217,217 +205,190 @@ export function BoardsSettingsPanel({
         data-testid="settings-drawer"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="!w-screen !max-w-none gap-3 overflow-y-auto border-l border-border bg-background p-4 md:!w-[40vw] md:!min-w-[360px] md:!max-w-none md:p-5"
+        className="!w-screen !max-w-none gap-4 overflow-y-auto border-l border-border bg-background p-4 md:!w-[40vw] md:!min-w-[360px] md:!max-w-none md:p-5"
       >
-        <div className="flex flex-col gap-1 pr-8">
-          <SheetTitle className="text-base">Settings</SheetTitle>
-          <SheetDescription className="text-xs">
-            Board &amp; orchestration settings for {activeBoard.name || activeBoard.id}.
-          </SheetDescription>
-        </div>
+        <SheetTitle className="pr-8 text-base">Settings</SheetTitle>
 
-        <div className="flex flex-col gap-4">
-          {/* Active board — name & description are inline-editable */}
-          <section className="flex flex-col gap-2" data-testid="settings-active-board">
-            <SectionLabel>Active board</SectionLabel>
-            <InlineEditField
-              value={activeBoard.name || ''}
-              onSave={(next) => saveBoardField({ name: next })}
-              ariaLabel="Edit board name"
-              dataTestId="settings-board-name"
-              inputClassName="text-base font-semibold"
-              displayClassName="text-base font-semibold leading-tight break-words"
-              validate={(v) => (v.trim() ? null : 'Name is required')}
-              placeholder="Board name"
+        {/* Active board — name & description are editable fields; slug is read-only */}
+        <section className="flex flex-col gap-2" data-testid="settings-active-board">
+          <InlineEditField
+            value={activeBoard.name || ''}
+            onSave={(next) => saveBoardField({ name: next })}
+            ariaLabel="Edit board name"
+            dataTestId="settings-board-name"
+            className={FIELD_DISPLAY}
+            inputClassName={cn(FIELD_INPUT, 'text-base font-semibold')}
+            displayClassName="text-base font-semibold leading-tight break-words"
+            validate={(v) => (v.trim() ? null : 'Name is required')}
+            placeholder="Board name"
+          />
+          <div className="px-1 text-[11px] text-muted-foreground">
+            <span data-testid="settings-board-slug" className="font-mono">{activeBoard.id}</span>
+            <span> · </span>
+            <span data-testid="settings-board-task-count">{activeBoard.taskCount} tasks</span>
+          </div>
+          <InlineEditField
+            value={activeBoard.description || ''}
+            onSave={(next) => saveBoardField({ description: next })}
+            as="textarea"
+            ariaLabel="Edit board description"
+            dataTestId="settings-board-description"
+            className={cn(FIELD_DISPLAY, 'min-h-[60px]')}
+            inputClassName={cn(FIELD_INPUT, '!min-h-0 leading-relaxed')}
+            renderDisplay={(v) => <MarkdownText className="text-sm leading-relaxed" value={v} />}
+            emptyDisplay={<span className="text-sm text-muted-foreground">Add a description</span>}
+          />
+        </section>
+
+        <Separator />
+
+        {/* Task detail presentation — directly under Active board */}
+        <section className="flex flex-col gap-2" data-testid="settings-detail-presentation-section">
+          <SectionLabel>Task view</SectionLabel>
+          <div className="grid gap-2" data-testid="settings-detail-presentation">
+            {PRESENTATION_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const active = detailPresentation === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  data-testid={`settings-detail-presentation-${option.value}`}
+                  aria-pressed={active}
+                  onClick={() => onDetailPresentationChange(option.value)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                    active ? 'border-primary bg-primary/10' : 'border-border/60 bg-background/40 hover:bg-accent',
+                  )}
+                >
+                  <Icon size={16} className="shrink-0 text-muted-foreground" />
+                  <span className="space-y-0.5">
+                    <span className="block font-medium">{option.label}</span>
+                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* Orchestration — inline fields, each saves immediately */}
+        <section className="flex flex-col gap-2.5" data-testid="settings-orchestration">
+          <SectionLabel>Orchestration</SectionLabel>
+          <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
+            <span className="text-xs text-muted-foreground">Orchestrator</span>
+            <InlineSelectField
+              value={settings?.orchestratorProfile || ''}
+              options={selectOptions}
+              onChange={(next) => patchOrchestration({ orchestratorProfile: next }, 'Orchestrator profile updated')}
+              renderTrigger={(current) => <span className="text-sm">{current ? current.label : 'Use resolved default'}</span>}
+              ariaLabel="Edit orchestrator profile"
+              dataTestId="settings-orchestrator-profile"
             />
-            <div className="px-1 text-[11px] text-muted-foreground">
-              <span data-testid="settings-board-slug" className="font-mono">{activeBoard.id}</span>
-              <span> · </span>
-              <span data-testid="settings-board-task-count">{activeBoard.taskCount} tasks</span>
-            </div>
-            <div className="mt-1 flex flex-col gap-1.5">
-              <SectionLabel>Description</SectionLabel>
-              <InlineEditField
-                value={activeBoard.description || ''}
-                onSave={(next) => saveBoardField({ description: next })}
-                as="textarea"
-                ariaLabel="Edit board description"
-                dataTestId="settings-board-description"
-                inputClassName="!min-h-0 leading-relaxed"
-                renderDisplay={(v) => <MarkdownText className="text-sm leading-relaxed" value={v} />}
-                emptyDisplay={<span className="text-sm text-muted-foreground">— add a description —</span>}
-              />
-            </div>
-          </section>
+            <span className="text-xs text-muted-foreground">Assignee</span>
+            <InlineSelectField
+              value={settings?.defaultAssignee || ''}
+              options={selectOptions}
+              onChange={(next) => patchOrchestration({ defaultAssignee: next }, 'Default assignee updated')}
+              renderTrigger={(current) => <span className="text-sm">{current ? current.label : 'Use resolved default'}</span>}
+              ariaLabel="Edit default assignee"
+              dataTestId="settings-default-assignee"
+            />
+          </div>
+          <label className="flex items-center gap-2 px-1 text-sm">
+            <input
+              type="checkbox"
+              data-testid="settings-auto-decompose"
+              checked={settings?.autoDecompose ?? true}
+              onChange={(event) => patchOrchestration({ autoDecompose: event.target.checked }, 'Auto-decompose updated')}
+              className="h-4 w-4 shrink-0 accent-primary"
+            />
+            <span className="text-xs text-muted-foreground">Auto-decompose new triage tasks</span>
+          </label>
+        </section>
 
-          <Separator />
+        <Separator />
 
-          {/* Orchestration — inline fields, each saves immediately */}
-          <section className="flex flex-col gap-3" data-testid="settings-orchestration">
-            <SectionLabel>Orchestration</SectionLabel>
-            {settingsLoading ? (
-              <p className="px-1 text-xs text-muted-foreground">Loading settings…</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <SettingsRow label="Orchestrator" className="grid-cols-[110px_minmax(0,1fr)]">
-                  <InlineSelectField
-                    value={settings?.orchestratorProfile || ''}
-                    options={selectOptions}
-                    onChange={(next) => patchOrchestration({ orchestratorProfile: next }, 'Orchestrator profile updated')}
-                    renderTrigger={(current) => <span className="text-sm">{current ? current.label : 'Use resolved default'}</span>}
-                    ariaLabel="Edit orchestrator profile"
-                    dataTestId="settings-orchestrator-profile"
-                  />
-                </SettingsRow>
-                <SettingsRow label="Assignee" className="grid-cols-[110px_minmax(0,1fr)]">
-                  <InlineSelectField
-                    value={settings?.defaultAssignee || ''}
-                    options={selectOptions}
-                    onChange={(next) => patchOrchestration({ defaultAssignee: next }, 'Default assignee updated')}
-                    renderTrigger={(current) => <span className="text-sm">{current ? current.label : 'Use resolved default'}</span>}
-                    ariaLabel="Edit default assignee"
-                    dataTestId="settings-default-assignee"
-                  />
-                </SettingsRow>
-                <SettingsRow label="Auto-decompose" className="grid-cols-[110px_minmax(0,1fr)]">
-                  <label className="flex items-center gap-2 px-2 py-1 text-sm">
-                    <input
-                      type="checkbox"
-                      data-testid="settings-auto-decompose"
-                      checked={settings?.autoDecompose ?? true}
-                      onChange={(event) => patchOrchestration({ autoDecompose: event.target.checked }, 'Auto-decompose updated')}
-                      className="h-4 w-4 shrink-0 accent-primary"
-                    />
-                    <span className="text-xs text-muted-foreground">Decompose new triage tasks automatically</span>
-                  </label>
-                </SettingsRow>
-              </div>
-            )}
-          </section>
-
-          <Separator />
-
-          {/* Profile descriptions — guide the orchestrator's routing */}
-          <section className="flex flex-col gap-2" data-testid="settings-profile-descriptions-section">
-            <SectionLabel>Profile descriptions</SectionLabel>
-            <p className="px-1 text-[11px] text-muted-foreground">
-              Descriptions guide the orchestrator's routing. Edit and save, or use the wand to auto-generate.
-            </p>
-            {profiles.length === 0 ? (
-              <p className="px-1 text-xs text-muted-foreground">No profiles available.</p>
-            ) : (
-              <div className="flex flex-col gap-3" data-testid="settings-profile-descriptions">
-                {profiles.map((profile) => (
-                  <div key={profile.id} className="rounded-lg border border-border/60 bg-background/40 p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-medium">{profile.name}</span>
-                        {profile.isDefault ? (
-                          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">default</span>
-                        ) : null}
-                        {profile.descriptionAuto ? (
-                          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">auto-generated</span>
-                        ) : null}
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`Auto-generate description for ${profile.name}`}
-                        title="Auto-generate description"
-                        data-testid={`settings-profile-auto-${profile.id}`}
-                        onClick={() => autoDescribe(profile.id)}
-                        disabled={describing === profile.id}
-                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card hover:bg-accent disabled:opacity-50"
-                      >
-                        <Wand2 size={14} className={cn(describing === profile.id && 'animate-pulse')} />
-                      </button>
+        {/* Profile descriptions */}
+        <section className="flex flex-col gap-2" data-testid="settings-profile-descriptions-section">
+          <SectionLabel>Profiles</SectionLabel>
+          {profiles.length === 0 ? (
+            <p className="px-1 text-xs text-muted-foreground">No profiles available.</p>
+          ) : (
+            <div className="flex flex-col gap-2" data-testid="settings-profile-descriptions">
+              {profiles.map((profile) => (
+                <div key={profile.id} className="rounded-lg border border-border/60 bg-background/40 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium">{profile.name}</span>
+                      {profile.isDefault ? (
+                        <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">default</span>
+                      ) : null}
+                      {profile.descriptionAuto ? (
+                        <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">auto</span>
+                      ) : null}
                     </div>
-                    <InlineEditField
-                      value={profile.description || ''}
-                      onSave={(next) => saveProfileDescription(profile.id, next)}
-                      as="textarea"
-                      ariaLabel={`Edit description for ${profile.name}`}
-                      dataTestId={`settings-profile-description-${profile.id}`}
-                      inputClassName="!min-h-0 text-sm leading-relaxed"
-                      textareaRows={3}
-                      emptyDisplay={<span className="text-sm text-muted-foreground">What is this profile good at?</span>}
-                    />
+                    <button
+                      type="button"
+                      aria-label={`Auto-generate description for ${profile.name}`}
+                      title="Auto-generate description"
+                      data-testid={`settings-profile-auto-${profile.id}`}
+                      onClick={() => autoDescribe(profile.id)}
+                      disabled={describing === profile.id}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card hover:bg-accent disabled:opacity-50"
+                    >
+                      <Wand2 size={14} className={cn(describing === profile.id && 'animate-pulse')} />
+                    </button>
                   </div>
-                ))}
+                  <InlineEditField
+                    value={profile.description || ''}
+                    onSave={(next) => saveProfileDescription(profile.id, next)}
+                    as="textarea"
+                    ariaLabel={`Edit description for ${profile.name}`}
+                    dataTestId={`settings-profile-description-${profile.id}`}
+                    inputClassName="!min-h-0 text-sm leading-relaxed"
+                    textareaRows={3}
+                    emptyDisplay={<span className="text-sm text-muted-foreground">What is this profile good at?</span>}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <Separator />
+
+        {/* Runtime details — read-only, collapsed by default */}
+        <div className="rounded-2xl border border-border/60 bg-background/30" data-testid="settings-runtime-info">
+          <button
+            type="button"
+            onClick={() => setRuntimeOpen((v) => !v)}
+            aria-expanded={runtimeOpen}
+            data-testid="settings-runtime-toggle"
+            className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span>Runtime details</span>
+            <ChevronDown size={14} className={cn('transition-transform', runtimeOpen && 'rotate-180')} aria-hidden />
+          </button>
+          {runtimeOpen && (
+            <div className="flex flex-col gap-3 px-3 pb-3">
+              <div className="flex flex-col gap-1.5">
+                <InfoRow label="Resolved orchestrator"><span data-testid="settings-resolved-orchestrator-profile">{settings?.resolvedOrchestratorProfile || 'default'}</span></InfoRow>
+                <InfoRow label="Resolved assignee"><span data-testid="settings-resolved-default-assignee">{settings?.resolvedDefaultAssignee || 'default'}</span></InfoRow>
+                <InfoRow label="Active profile"><span data-testid="settings-active-profile">{settings?.activeProfile || 'default'}</span></InfoRow>
               </div>
-            )}
-          </section>
-
-          <Separator />
-
-          {/* Task detail presentation — per-board preference */}
-          <section className="flex flex-col gap-2" data-testid="settings-detail-presentation-section">
-            <SectionLabel>Task detail presentation</SectionLabel>
-            <div className="grid gap-2" data-testid="settings-detail-presentation">
-              {PRESENTATION_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const active = detailPresentation === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    data-testid={`settings-detail-presentation-${option.value}`}
-                    aria-pressed={active}
-                    onClick={() => onDetailPresentationChange(option.value)}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors',
-                      active ? 'border-primary bg-primary/10' : 'border-border/60 bg-background/40 hover:bg-accent',
-                    )}
-                  >
-                    <Icon size={16} className="shrink-0 text-muted-foreground" />
-                    <span className="space-y-0.5">
-                      <span className="block font-medium">{option.label}</span>
-                      <span className="block text-xs text-muted-foreground">{option.hint}</span>
-                    </span>
-                  </button>
-                );
-              })}
+              <Separator />
+              <div className="flex flex-col gap-1.5">
+                <InfoRow label="Max in progress"><span data-testid="settings-advanced-max-in-progress">{formatSettingValue(settings?.advanced.maxInProgress ?? null)}</span></InfoRow>
+                <InfoRow label="Max spawn"><span data-testid="settings-advanced-max-spawn">{formatSettingValue(settings?.advanced.maxSpawn ?? null)}</span></InfoRow>
+                <InfoRow label="Dispatch interval"><span data-testid="settings-advanced-dispatch-interval">{formatSettingValue(settings?.advanced.dispatchIntervalSeconds ?? null)}</span></InfoRow>
+                <InfoRow label="Failure limit"><span data-testid="settings-advanced-failure-limit">{formatSettingValue(settings?.advanced.failureLimit ?? null)}</span></InfoRow>
+                <InfoRow label="Stale timeout"><span data-testid="settings-advanced-stale-timeout">{formatSettingValue(settings?.advanced.dispatchStaleTimeoutSeconds ?? null)}</span></InfoRow>
+              </div>
             </div>
-          </section>
-
-          <Separator />
-
-          {/* Read-only runtime info — grouped like the Task drawer sidebar card */}
-          <aside className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/30 p-3" data-testid="settings-runtime-info">
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Resolved runtime helpers</SectionLabel>
-              <SettingsRow label="Orchestrator" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-resolved-orchestrator-profile" className="text-sm">{settings?.resolvedOrchestratorProfile || 'default'}</span>
-              </SettingsRow>
-              <SettingsRow label="Assignee" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-resolved-default-assignee" className="text-sm">{settings?.resolvedDefaultAssignee || 'default'}</span>
-              </SettingsRow>
-              <SettingsRow label="Active profile" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-active-profile" className="text-sm">{settings?.activeProfile || 'default'}</span>
-              </SettingsRow>
-            </div>
-
-            <Separator />
-
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Advanced dispatcher limits</SectionLabel>
-              <p className="px-1 text-[11px] text-muted-foreground">Read-only until backend save support exists.</p>
-              <SettingsRow label="Max in progress" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-advanced-max-in-progress" className="text-sm">{formatSettingValue(settings?.advanced.maxInProgress ?? null)}</span>
-              </SettingsRow>
-              <SettingsRow label="Max spawn" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-advanced-max-spawn" className="text-sm">{formatSettingValue(settings?.advanced.maxSpawn ?? null)}</span>
-              </SettingsRow>
-              <SettingsRow label="Dispatch interval" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-advanced-dispatch-interval" className="text-sm">{formatSettingValue(settings?.advanced.dispatchIntervalSeconds ?? null)}</span>
-              </SettingsRow>
-              <SettingsRow label="Failure limit" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-advanced-failure-limit" className="text-sm">{formatSettingValue(settings?.advanced.failureLimit ?? null)}</span>
-              </SettingsRow>
-              <SettingsRow label="Stale timeout" className="grid-cols-[140px_minmax(0,1fr)]">
-                <span data-testid="settings-advanced-stale-timeout" className="text-sm">{formatSettingValue(settings?.advanced.dispatchStaleTimeoutSeconds ?? null)}</span>
-              </SettingsRow>
-            </div>
-          </aside>
+          )}
         </div>
       </SheetContent>
     </Sheet>
