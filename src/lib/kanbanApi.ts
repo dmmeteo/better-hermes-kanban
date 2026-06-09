@@ -22,17 +22,18 @@ import { nativeKanbanClient } from './nativeKanbanClient';
 import { nativeBoardFromPayload, nativeBoardsFromPayload, nativeTasksFromBoardPayload, mapNativeTask } from './nativeKanbanMappers';
 
 const API_BASE = '/api/plugins/kanban';
-const NATIVE_STATUSES: TaskStatus[] = [
+// Real statuses a task may carry (mirrors backend BOARD_COLUMNS). `archived` is a
+// UI-only column, not a status, so it is intentionally excluded here.
+const ALL_STATUSES: TaskStatus[] = [
   'triage',
   'todo',
   'scheduled',
   'ready',
   'running',
   'blocked',
+  'review',
   'done',
 ];
-const UI_ONLY_STATUSES: TaskStatus[] = ['review'];
-const ALL_STATUSES: TaskStatus[] = [...NATIVE_STATUSES, ...UI_ONLY_STATUSES];
 
 type JsonObject = Record<string, unknown>;
 
@@ -371,9 +372,12 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const kanbanApi = {
-  async getBoard(boardId?: string): Promise<{ tasks: Task[]; board: Board; source: 'live' | 'fallback' }> {
+  async getBoard(
+    boardId?: string,
+    options?: { includeArchived?: boolean },
+  ): Promise<{ tasks: Task[]; board: Board; source: 'live' | 'fallback' }> {
     try {
-      const payload = await nativeKanbanClient.getBoard(boardId);
+      const payload = await nativeKanbanClient.getBoard(boardId, options);
       const board = nativeBoardFromPayload(payload, boardId);
       const tasks = nativeTasksFromBoardPayload(payload).map((task) => mapNativeTask(task, board.id));
       return { tasks, board: { ...board, taskCount: tasks.length }, source: 'live' };

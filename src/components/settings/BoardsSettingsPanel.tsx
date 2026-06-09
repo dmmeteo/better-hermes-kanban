@@ -25,6 +25,8 @@ interface BoardsSettingsPanelProps {
   assignees?: BotProfile[];
   detailPresentation: TaskDetailPresentation;
   onDetailPresentationChange: (presentation: TaskDetailPresentation) => void;
+  showArchived: boolean;
+  onToggleShowArchived: (next: boolean) => void;
 }
 
 const PRESENTATION_OPTIONS: {
@@ -83,6 +85,8 @@ export function BoardsSettingsPanel({
   assignees = [],
   detailPresentation,
   onDetailPresentationChange,
+  showArchived,
+  onToggleShowArchived,
 }: BoardsSettingsPanelProps) {
   const [settings, setSettings] = useState<KanbanOrchestrationSettings | null>(null);
   const [profiles, setProfiles] = useState<BotProfile[]>([]);
@@ -270,6 +274,23 @@ export function BoardsSettingsPanel({
               );
             })}
           </div>
+        </section>
+
+        <Separator />
+
+        {/* Board display — board-level view preferences */}
+        <section className="flex flex-col gap-2" data-testid="settings-board-display-section">
+          <SectionLabel>Board display</SectionLabel>
+          <label className="flex items-center gap-2 px-1 text-sm">
+            <input
+              type="checkbox"
+              data-testid="settings-show-archived"
+              checked={showArchived}
+              onChange={(event) => onToggleShowArchived(event.target.checked)}
+              className="h-4 w-4 shrink-0 accent-primary"
+            />
+            <span className="text-xs text-muted-foreground">Show archived tasks in a dedicated column</span>
+          </label>
         </section>
 
         <Separator />

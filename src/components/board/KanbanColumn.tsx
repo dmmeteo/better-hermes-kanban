@@ -20,11 +20,18 @@ interface KanbanColumnProps {
   onToggleCollapse?: (status: TaskStatus) => void;
   /** This column is where the currently-dragged task would drop → highlight it. */
   isActiveDropTarget?: boolean;
+  /** Whether the column header can be dragged to reorder columns. Default true. */
+  reorderable?: boolean;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus, collapsed = false, onToggleCollapse, isActiveDropTarget = false }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly = false, statusLabel, onRenameStatus, collapsed = false, onToggleCollapse, isActiveDropTarget = false, reorderable = true }: KanbanColumnProps) {
   const isReadOnlyStatus = isStatusReadOnly(status);
   const isDropDisabled = !isStatusDropEnabled(status);
+  // The dedicated archived column is read-only display; never offer the dispatcher
+  // "drop disabled" lock treatment, and keep its cards undraggable.
+  const isArchivedColumn = status === 'archived';
+  const showDropDisabledHint = isDropDisabled && !isArchivedColumn;
+  const cardsReadOnly = readOnly || isArchivedColumn;
   const { setNodeRef, isOver } = useDroppable({
     id: status,
     disabled: isDropDisabled || readOnly,
@@ -74,8 +81,8 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
       <div
         ref={setSortableRef}
         style={sortableStyle}
-        {...attributes}
-        {...listeners}
+        {...(reorderable ? attributes : {})}
+        {...(reorderable ? listeners : {})}
         className="flex-shrink-0 w-11 h-full min-h-0 flex flex-col items-center gap-2 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm py-2.5 cursor-default active:cursor-grabbing"
         data-testid={`column-collapsed-${status}`}
       >
@@ -119,9 +126,12 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
     >
       {/* Column Header — drag handle for reordering columns */}
       <div
-        {...attributes}
-        {...listeners}
-        className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 cursor-default active:cursor-grabbing"
+        {...(reorderable ? attributes : {})}
+        {...(reorderable ? listeners : {})}
+        className={cn(
+          'flex items-center justify-between px-3 py-2.5 border-b border-border/50',
+          reorderable ? 'cursor-default active:cursor-grabbing' : 'cursor-default',
+        )}
       >
         <div className="flex items-center gap-2">
           <span
@@ -167,11 +177,11 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
         ref={setNodeRef}
         className={cn(
           'flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2',
-          isDropDisabled && 'relative'
+          showDropDisabledHint && 'relative'
         )}
       >
         {/* Dispatcher-owned status overlay */}
-        {isDropDisabled && (
+        {showDropDisabledHint && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-xl bg-red-500/5 pointer-events-none">
             <Lock size={20} className="text-red-400/60 mb-1" />
             <span className="text-[11px] text-red-400/60 font-medium">Drop disabled</span>
@@ -188,7 +198,7 @@ export function KanbanColumn({ status, tasks, onTaskClick, onAddTask, readOnly =
                 key={task.id}
                 task={task}
                 onClick={onTaskClick}
-                readOnly={readOnly}
+                readOnly={cardsReadOnly}
               />
             ))}
           </div>

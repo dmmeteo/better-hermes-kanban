@@ -60,8 +60,14 @@ export const nativeKanbanClient = {
     return requestNativeKanbanJson<NativeKanbanBoardsResponseDto | unknown[]>('/boards');
   },
 
-  getBoard(boardId?: string): Promise<NativeKanbanBoardResponseDto | unknown[]> {
-    const query = boardId ? `?board=${encodeURIComponent(boardId)}` : '';
+  getBoard(
+    boardId?: string,
+    options?: { includeArchived?: boolean },
+  ): Promise<NativeKanbanBoardResponseDto | unknown[]> {
+    const params = new URLSearchParams();
+    if (boardId) params.set('board', boardId);
+    if (options?.includeArchived) params.set('include_archived', 'true');
+    const query = params.toString() ? `?${params.toString()}` : '';
     return requestNativeKanbanJson<NativeKanbanBoardResponseDto | unknown[]>(`/board${query}`);
   },
 

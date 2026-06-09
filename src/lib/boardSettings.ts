@@ -5,13 +5,15 @@ import type { TaskDetailPresentation } from '@/components/layout/TopBar';
 export type BoardStatusLabels = Partial<Record<TaskStatus, string>>;
 
 export interface BoardSettings {
-  /** Column order — only real API statuses (NATIVE_STATUS_ORDER); never the UI-only `review`. */
+  /** Column order — real API statuses only (NATIVE_STATUS_ORDER); never the UI-only `archived`. */
   statusOrder: TaskStatus[];
   /** Sparse map of user-renamed labels. Absent key = original STATUS_LABELS name. */
   statusLabels: BoardStatusLabels;
   /** Statuses whose column is collapsed on the desktop board. */
   collapsedColumns: TaskStatus[];
   detailPresentation: TaskDetailPresentation;
+  /** When true, render a dedicated read-only `Archived` column and fetch archived tasks. */
+  showArchived: boolean;
 }
 
 type StoredBoardSettings = Partial<BoardSettings>;
@@ -61,19 +63,27 @@ export const STATUS_HELPER_COPY: Record<TaskStatus, string> = {
   review: 'Waiting for human or orchestrator approval.',
   blocked: 'Paused and needs external action or unblock.',
   done: 'Complete.',
+  archived: 'Archived and hidden from the active board unless shown.',
 };
 
 function isNativeStatus(value: unknown): value is TaskStatus {
   return typeof value === 'string' && (NATIVE_STATUS_ORDER as string[]).includes(value);
 }
 
-// Columns mirror real API statuses only: base on NATIVE_STATUS_ORDER and drop any
-// stored non-native status (e.g. the UI-only `review`).
+// Columns mirror real API statuses only: keep stored native statuses, drop any
+// non-native value, and insert any missing native status at its canonical
+// NATIVE_STATUS_ORDER index (so e.g. `review` lands between `blocked` and `done`
+// for boards saved before it became a real column, rather than tacked onto the end).
 function normalizeStatusOrder(value: unknown): TaskStatus[] {
   if (!Array.isArray(value)) return [...NATIVE_STATUS_ORDER];
   const ordered = value.filter(isNativeStatus);
-  const missing = NATIVE_STATUS_ORDER.filter((status) => !ordered.includes(status));
-  return [...ordered, ...missing];
+  for (let i = 0; i < NATIVE_STATUS_ORDER.length; i++) {
+    const status = NATIVE_STATUS_ORDER[i];
+    if (!ordered.includes(status)) {
+      ordered.splice(i, 0, status);
+    }
+  }
+  return ordered;
 }
 
 // Sparse: keep only genuine renames (non-empty and different from the original name).
@@ -96,6 +106,10 @@ function normalizeCollapsed(value: unknown): TaskStatus[] {
 
 function normalizePresentation(value: unknown): TaskDetailPresentation {
   return PRESENTATIONS.includes(value as TaskDetailPresentation) ? (value as TaskDetailPresentation) : 'drawer';
+}
+
+function normalizeShowArchived(value: unknown): boolean {
+  return Boolean(value);
 }
 
 function parseMap(raw: string | null): StoredSettingsMap {
@@ -163,6 +177,7 @@ function defaultSettings(): BoardSettings {
     statusLabels: {},
     collapsedColumns: [],
     detailPresentation: 'drawer',
+    showArchived: false,
   };
 }
 
@@ -175,6 +190,7 @@ export function getBoardSettings(boardId?: string | null): BoardSettings {
     statusLabels: normalizeStatusLabels(stored.statusLabels),
     collapsedColumns: normalizeCollapsed(stored.collapsedColumns),
     detailPresentation: normalizePresentation(stored.detailPresentation),
+    showArchived: normalizeShowArchived(stored.showArchived),
   };
 }
 
@@ -187,6 +203,7 @@ export function saveBoardSettings(boardId: string | null | undefined, patch: Par
     statusLabels: patch.statusLabels ? normalizeStatusLabels(patch.statusLabels) : current.statusLabels,
     collapsedColumns: patch.collapsedColumns ? normalizeCollapsed(patch.collapsedColumns) : current.collapsedColumns,
     detailPresentation: patch.detailPresentation ? normalizePresentation(patch.detailPresentation) : current.detailPresentation,
+    showArchived: patch.showArchived !== undefined ? normalizeShowArchived(patch.showArchived) : current.showArchived,
   };
   if (boardId) {
     const settings = readSettingsMap();
@@ -209,6 +226,14 @@ export function migrateLegacyDetailPresentation(boardId?: string | null): BoardS
 
 export function getOrderedStatuses(settings?: BoardSettings): TaskStatus[] {
   return normalizeStatusOrder(settings?.statusOrder);
+}
+
+// Columns to render on the board: the native status columns plus a trailing
+// UI-only `archived` column when the board setting is enabled. Kept separate
+// from getOrderedStatuses so `archived` never leaks into status dropdowns.
+export function getBoardColumns(settings?: BoardSettings): TaskStatus[] {
+  const columns = getOrderedStatuses(settings);
+  return settings?.showArchived ? [...columns, 'archived'] : columns;
 }
 
 export function getStatusLabel(status: TaskStatus, settings?: BoardSettings): string {

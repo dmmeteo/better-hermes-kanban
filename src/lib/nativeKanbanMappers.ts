@@ -1,8 +1,9 @@
 import type { Board, LinkedTask, Priority, Task, TaskActivity, TaskRun, TaskStatus, TaskWorkerLog } from './types';
 import { NATIVE_STATUS_ORDER } from './types';
 
-const UI_ONLY_STATUSES: TaskStatus[] = ['review'];
-const ALL_STATUSES: TaskStatus[] = [...NATIVE_STATUS_ORDER, ...UI_ONLY_STATUSES];
+// Real statuses a task may carry. `archived` is a UI-only column, not a status,
+// so it is intentionally excluded here.
+const ALL_STATUSES: TaskStatus[] = [...NATIVE_STATUS_ORDER];
 
 type JsonObject = Record<string, unknown>;
 
@@ -207,6 +208,7 @@ export function mapNativeTask(raw: unknown, boardId: string): Task {
     workspacePath,
     createdBy,
     skills: skills && skills.length > 0 ? skills : null,
+    archived: Boolean(item.archived ?? item.is_archived ?? item.isArchived),
     createdAt: toIso(item.created_at ?? item.createdAt),
     updatedAt: toIso(item.updated_at ?? item.updatedAt ?? item.started_at ?? item.completed_at),
   };

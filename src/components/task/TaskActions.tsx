@@ -174,9 +174,8 @@ export function TaskActions({
           </button>
         ) : showReview ? (
           <button
-            onClick={() => toast.info('Review is a UI-only column and is not supported by the Hermes update API yet')}
-            className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-xs font-semibold opacity-60 cursor-not-allowed"
-            title="Review is UI-only; use a native Hermes status instead."
+            onClick={() => onStatusChange('review')}
+            className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-xs font-semibold transition-all active:scale-95"
             style={{
               backgroundColor: 'rgba(245, 158, 11, 0.12)',
               color: '#F59E0B',
