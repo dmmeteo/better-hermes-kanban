@@ -113,7 +113,9 @@ function App() {
         (stickyBoardId ? boardsResult.boards.find((board) => board.id === stickyBoardId) : null) ||
         boardsResult.boards.find((board) => board.isDefault) ||
         boardsResult.boards[0];
-      const boardData = await kanbanApi.getBoard(preferredBoard?.id);
+      const boardData = await kanbanApi.getBoard(preferredBoard?.id, {
+        includeArchived: getBoardSettings(preferredBoard?.id).showArchived,
+      });
       setTasks(boardData.tasks);
       setBoards(boardsResult.boards);
       setActiveBoard(boardData.board);
@@ -169,7 +171,9 @@ function App() {
         throw lastError instanceof Error ? lastError : new Error(`Task ${taskId} not found on any board`);
       }
       const taskBoardId = directTask.boardId || boardIdFromUrl;
-      const boardData = await kanbanApi.getBoard(taskBoardId);
+      const boardData = await kanbanApi.getBoard(taskBoardId, {
+        includeArchived: getBoardSettings(taskBoardId).showArchived,
+      });
       const mergedTasks = directTask
         ? boardData.tasks.some((task) => task.id === directTask.id)
           ? boardData.tasks.map((task) => (task.id === directTask.id ? mergeTaskUpdate(task, directTask) : task))
@@ -387,12 +391,19 @@ function App() {
   }, [activeBoard]);
 
   const refetchActiveBoard = useCallback(async (board: Board) => {
-    const data = await kanbanApi.getBoard(board.id);
+    const data = await kanbanApi.getBoard(board.id, {
+      includeArchived: getBoardSettings(board.id).showArchived,
+    });
     setTasks(data.tasks);
     setActiveBoard(data.board);
     setDataSource(data.source);
     setLoadError(data.source === 'fallback' ? 'Live Kanban API unavailable; showing offline demo data.' : null);
   }, []);
+
+  const handleToggleShowArchived = useCallback((next: boolean) => {
+    setBoardSettings(saveBoardSettings(activeBoard?.id, { showArchived: next }));
+    if (activeBoard) void refetchActiveBoard(activeBoard);
+  }, [activeBoard, refetchActiveBoard]);
 
   const updateSelectedTask = useCallback(
     async (patch: UpdateTaskData) => {
@@ -616,7 +627,9 @@ function App() {
     async (board: Board) => {
       try {
         setIsLoading(true);
-        const data = await kanbanApi.getBoard(board.id);
+        const data = await kanbanApi.getBoard(board.id, {
+          includeArchived: getBoardSettings(board.id).showArchived,
+        });
         setTasks(data.tasks);
         setActiveBoard(data.board);
         if (data.board?.id) setSelectedBoardSlug(data.board.id);
@@ -818,6 +831,8 @@ function App() {
         assignees={assignees}
         detailPresentation={detailPresentation}
         onDetailPresentationChange={handleDetailPresentationChange}
+        showArchived={boardSettings.showArchived}
+        onToggleShowArchived={handleToggleShowArchived}
       />
 
       <NewBoardModal

@@ -23,13 +23,17 @@ export function MobileStatusBoard({
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     tasks.forEach((t) => {
-      c[t.status] = (c[t.status] || 0) + 1;
+      const bucket = t.archived ? 'archived' : t.status;
+      c[bucket] = (c[bucket] || 0) + 1;
     });
     return c;
   }, [tasks]);
 
   const filteredTasks = useMemo(() => {
-    let result = tasks.filter((t) => t.status === activeStatus);
+    let result =
+      activeStatus === 'archived'
+        ? tasks.filter((t) => t.archived)
+        : tasks.filter((t) => !t.archived && t.status === activeStatus);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -66,7 +70,7 @@ export function MobileStatusBoard({
       {/* Task list */}
       <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-2.5">
         {filteredTasks.map((task) => (
-          <TaskCard key={task.id} task={task} onClick={onTaskClick} />
+          <TaskCard key={task.id} task={task} onClick={onTaskClick} readOnly={activeStatus === 'archived'} />
         ))}
         {filteredTasks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">

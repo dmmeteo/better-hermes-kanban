@@ -14,7 +14,7 @@ import {
 import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
-import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
+import { getBoardColumns, getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
 import { isStatusDropEnabled } from '@/lib/types';
 import { KanbanColumn, ColumnDragPreview } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
@@ -45,7 +45,11 @@ export function DesktopKanbanBoard({
   onToggleCollapse,
   onReorderColumns,
 }: DesktopKanbanBoardProps) {
+  // Reorderable native status columns (drives column drag/reorder + persistence).
   const orderedStatuses = useMemo(() => getOrderedStatuses(boardSettings), [boardSettings]);
+  // All rendered columns: native statuses + a trailing read-only `archived` column
+  // when enabled. Drives grouping/containers/rendering but NOT column reordering.
+  const columns = useMemo(() => getBoardColumns(boardSettings), [boardSettings]);
   const [activeId, setActiveId] = useState<string | null>(null);
   // Working copy of the per-column task-id lists, live only while a task is
   // being dragged (null otherwise → render straight from props). Seeded on
@@ -71,11 +75,14 @@ export function DesktopKanbanBoard({
 
   const tasksByStatus = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
-    orderedStatuses.forEach((status) => {
-      grouped[status] = filteredTasks.filter((t) => t.status === status);
+    columns.forEach((status) => {
+      grouped[status] =
+        status === 'archived'
+          ? filteredTasks.filter((t) => t.archived)
+          : filteredTasks.filter((t) => !t.archived && t.status === status);
     });
     return grouped;
-  }, [filteredTasks, orderedStatuses]);
+  }, [filteredTasks, columns]);
 
   // id → task lookup over the (search-filtered) set, stable across a drag.
   const taskById = useMemo(() => {
@@ -87,11 +94,11 @@ export function DesktopKanbanBoard({
   // Grouping straight from props (used when no task drag is in progress).
   const baseContainers = useMemo(() => {
     const m: Record<string, string[]> = {};
-    orderedStatuses.forEach((s) => {
+    columns.forEach((s) => {
       m[s] = (tasksByStatus[s] ?? []).map((t) => t.id);
     });
     return m;
-  }, [tasksByStatus, orderedStatuses]);
+  }, [tasksByStatus, columns]);
 
   // What the columns actually render: the live working copy if dragging a task,
   // otherwise the prop-derived grouping.
@@ -104,7 +111,7 @@ export function DesktopKanbanBoard({
   // The column that currently holds the dragged task → gets the drop highlight.
   const activeDropContainer =
     cloneContainers && activeId && !activeColumnStatus
-      ? orderedStatuses.find((s) => cloneContainers[s].includes(activeId)) ?? null
+      ? columns.find((s) => cloneContainers[s].includes(activeId)) ?? null
       : null;
 
   function handleDragStart(event: DragStartEvent) {
@@ -113,7 +120,7 @@ export function DesktopKanbanBoard({
     // Column drags don't use the task working copy.
     if (event.active.data.current?.type === 'column') return;
     setCloneContainers(
-      Object.fromEntries(orderedStatuses.map((s) => [s, [...(baseContainers[s] ?? [])]]))
+      Object.fromEntries(columns.map((s) => [s, [...(baseContainers[s] ?? [])]]))
     );
   }
 
@@ -132,16 +139,18 @@ export function DesktopKanbanBoard({
 
     setCloneContainers((prev) => {
       if (!prev) return prev;
-      const from = orderedStatuses.find((s) => prev[s].includes(activeTaskId));
+      const from = columns.find((s) => prev[s].includes(activeTaskId));
       if (!from) return prev;
-      const to = orderedStatuses.includes(overId as TaskStatus)
+      // Tasks in the read-only `archived` column cannot be moved (no unarchive yet).
+      if (from === 'archived') return prev;
+      const to = columns.includes(overId as TaskStatus)
         ? (overId as TaskStatus)
-        : orderedStatuses.find((s) => prev[s].includes(overId));
+        : columns.find((s) => prev[s].includes(overId));
       if (!to || !isStatusDropEnabled(to) || from === to) return prev;
 
       const fromItems = prev[from];
       const toItems = prev[to];
-      const overIsColumn = orderedStatuses.includes(overId as TaskStatus);
+      const overIsColumn = columns.includes(overId as TaskStatus);
       const overIndex = overIsColumn ? -1 : toItems.indexOf(overId);
       const newIndex = overIndex >= 0 ? overIndex : toItems.length;
 
@@ -194,12 +203,15 @@ export function DesktopKanbanBoard({
     setCloneContainers(null);
     if (!snapshot) return;
 
-    const sourceStatus = tasks.find((t) => t.id === activeTaskId)?.status;
-    const targetStatus = orderedStatuses.find((s) => snapshot[s].includes(activeTaskId));
+    const sourceTask = tasks.find((t) => t.id === activeTaskId);
+    const sourceStatus = sourceTask?.status;
+    // Archived tasks are read-only on the board (no unarchive transition yet).
+    if (sourceTask?.archived) return;
+    const targetStatus = columns.find((s) => snapshot[s].includes(activeTaskId));
     if (!sourceStatus || !targetStatus || targetStatus === sourceStatus) return;
-
-    if (!isStatusDropEnabled(targetStatus)) {
-      toast.error('Cannot drop into Running — status is read-only');
+    // `archived` is a UI-only column, never a real status target.
+    if (targetStatus === 'archived' || !isStatusDropEnabled(targetStatus)) {
+      if (targetStatus === 'running') toast.error('Cannot drop into Running — status is read-only');
       return;
     }
 
@@ -218,22 +230,26 @@ export function DesktopKanbanBoard({
       onDragCancel={handleDragCancel}
     >
       <div className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden custom-scrollbar px-4 pt-3 pb-4 items-stretch">
-        <SortableContext items={orderedStatuses.map((s) => `column:${s}`)} strategy={horizontalListSortingStrategy}>
-          {orderedStatuses.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              tasks={(renderContainers[status] ?? []).map((id) => taskById.get(id)).filter(Boolean) as Task[]}
-              onTaskClick={onTaskClick}
-              onAddTask={onAddTask}
-              readOnly={readOnly}
-              statusLabel={getStatusLabel(status, boardSettings)}
-              onRenameStatus={onRenameStatus}
-              collapsed={boardSettings.collapsedColumns.includes(status)}
-              onToggleCollapse={onToggleCollapse}
-              isActiveDropTarget={activeDropContainer === status}
-            />
-          ))}
+        <SortableContext items={columns.map((s) => `column:${s}`)} strategy={horizontalListSortingStrategy}>
+          {columns.map((status) => {
+            const isArchived = status === 'archived';
+            return (
+              <KanbanColumn
+                key={status}
+                status={status}
+                tasks={(renderContainers[status] ?? []).map((id) => taskById.get(id)).filter(Boolean) as Task[]}
+                onTaskClick={onTaskClick}
+                onAddTask={onAddTask}
+                readOnly={readOnly}
+                reorderable={!isArchived}
+                statusLabel={getStatusLabel(status, boardSettings)}
+                onRenameStatus={isArchived ? undefined : onRenameStatus}
+                collapsed={boardSettings.collapsedColumns.includes(status)}
+                onToggleCollapse={isArchived ? undefined : onToggleCollapse}
+                isActiveDropTarget={activeDropContainer === status}
+              />
+            );
+          })}
         </SortableContext>
       </div>
 

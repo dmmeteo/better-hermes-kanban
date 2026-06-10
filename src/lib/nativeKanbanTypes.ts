@@ -59,6 +59,9 @@ export interface NativeKanbanTaskDto {
   warning_count?: number;
   warningCount?: number;
   warnings?: number;
+  archived?: boolean;
+  is_archived?: boolean;
+  isArchived?: boolean;
   created_at?: string | number;
   createdAt?: string | number;
   updated_at?: string | number;

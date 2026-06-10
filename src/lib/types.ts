@@ -6,7 +6,11 @@ export type TaskStatus =
   | 'running'
   | 'blocked'
   | 'review'
-  | 'done';
+  | 'done'
+  // UI-only pseudo-status used as a dedicated column for archived tasks.
+  // No task ever carries this as its real `status`; tasks are bucketed into
+  // this column via the separate `Task.archived` flag.
+  | 'archived';
 
 export type Priority = 'p0' | 'p1' | 'p2' | 'p3';
 
@@ -130,6 +134,8 @@ export interface Task {
   workspacePath?: string | null;
   createdBy?: string | null;
   skills?: string[] | null;
+  /** True when the task has been archived; surfaced in the dedicated Archived column. */
+  archived?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -223,8 +229,8 @@ export const STATUS_ORDER: TaskStatus[] = [
   'done',
 ];
 
-// Subset of statuses the kanban API accepts in PATCH/POST payloads.
-// `review` is UI-only; the backend does not understand it.
+// Real board columns as defined by the backend (`plugin_api.py → BOARD_COLUMNS`).
+// Mirrors STATUS_ORDER exactly. The UI-only `archived` pseudo-status is NOT here.
 export const NATIVE_STATUS_ORDER: TaskStatus[] = [
   'triage',
   'todo',
@@ -232,6 +238,7 @@ export const NATIVE_STATUS_ORDER: TaskStatus[] = [
   'ready',
   'running',
   'blocked',
+  'review',
   'done',
 ];
 
@@ -244,6 +251,7 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   blocked: 'Blocked',
   review: 'Review',
   done: 'Done',
+  archived: 'Archived',
 };
 
 export const STATUS_COLORS: Record<TaskStatus, string> = {
@@ -255,6 +263,7 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   blocked: '#EF4444',
   review: '#F59E0B',
   done: '#22C55E',
+  archived: '#9CA3AF',
 };
 
 export const STATUS_DESCRIPTIONS: Record<TaskStatus, string> = {
@@ -266,6 +275,7 @@ export const STATUS_DESCRIPTIONS: Record<TaskStatus, string> = {
   blocked: 'Needs human input or an external unblock before continuing.',
   review: 'Implementation is waiting for review before it can be marked done.',
   done: 'Terminal completed work.',
+  archived: 'Archived tasks, hidden from the active board unless explicitly shown.',
 };
 
 export type StatusRule = {
@@ -284,6 +294,9 @@ export const STATUS_RULES: Record<TaskStatus, StatusRule> = {
   blocked: { selectable: true, createSelectable: true, dropEnabled: true, readOnly: false },
   review: { selectable: true, createSelectable: false, dropEnabled: true, readOnly: false },
   done: { selectable: true, createSelectable: false, dropEnabled: true, readOnly: false },
+  // Archived is a read-only display column. `dropEnabled` stays false unless the
+  // backend is confirmed to support unarchive (drag-out), see plan B5.
+  archived: { selectable: false, createSelectable: false, dropEnabled: false, readOnly: true },
 };
 
 export const SELECTABLE_TASK_STATUSES = STATUS_ORDER.filter((status) => STATUS_RULES[status].selectable);

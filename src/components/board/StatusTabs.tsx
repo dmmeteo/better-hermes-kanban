@@ -1,6 +1,6 @@
 import type { TaskStatus } from '@/lib/types';
 import type { BoardSettings } from '@/lib/boardSettings';
-import { getOrderedStatuses, getStatusLabel } from '@/lib/boardSettings';
+import { getBoardColumns, getStatusLabel } from '@/lib/boardSettings';
 import { STATUS_COLORS } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -12,10 +12,10 @@ interface StatusTabsProps {
 }
 
 export function StatusTabs({ activeStatus, onStatusChange, counts, boardSettings }: StatusTabsProps) {
-  const orderedStatuses = getOrderedStatuses(boardSettings);
+  const columns = getBoardColumns(boardSettings);
   return (
     <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2">
-      {orderedStatuses.map((status) => {
+      {columns.map((status) => {
         const count = counts[status] || 0;
         const isActive = activeStatus === status;
         const color = STATUS_COLORS[status];
